@@ -696,9 +696,7 @@ export default function ProductDetailPage({ params }: Props) {
               <TabsTrigger value="questions">
                 Questions ({questions.length})
               </TabsTrigger>
-              <TabsTrigger value="reviews">
-                Reviews ({reviewCount})
-              </TabsTrigger>
+              <TabsTrigger value="reviews">Reviews ({reviewCount})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="specification" className="pt-4">
@@ -709,7 +707,7 @@ export default function ProductDetailPage({ params }: Props) {
                       <h4 className="text-sm font-semibold text-gray-700">
                         {section.label}
                       </h4>
-                      <dl className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
+                      <dl className="mt-1 grid grid-cols-1  text-sm">
                         {section.items.map((item) => (
                           <div
                             key={item.label}

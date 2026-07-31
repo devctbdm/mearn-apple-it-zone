@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useWishlist, useCart } from '@/store';
 import { authApi, orderApi, SavedAddress } from '@/lib/api';
 
 type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -172,7 +173,15 @@ export default function AccountPage() {
   });
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [wishlist] = useState<WishItem[]>([]);
+  const { wishlist: wishItems, removeFromWishlist } = useWishlist();
+  const { addItem } = useCart();
+  const wishlist: WishItem[] = wishItems.map((w) => ({
+    id: w._id,
+    name: w.name,
+    price: w.discountPrice > 0 ? w.discountPrice : w.price,
+    image: w.image,
+    inStock: w.stock > 0,
+  }));
 
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePassOpen, setChangePassOpen] = useState(false);
@@ -235,7 +244,7 @@ export default function AccountPage() {
       addresses: addresses.length,
       totalSpent,
     };
-  }, [orders, addresses, wishlist]);
+  }, [orders, addresses, wishItems]);
 
   const setDefaultAddress = async (id: string) => {
     try {
@@ -289,6 +298,7 @@ export default function AccountPage() {
   };
 
   const removeWish = (id: string) => {
+    removeFromWishlist(id);
     toast.success('Removed from wishlist');
   };
 
@@ -510,13 +520,25 @@ export default function AccountPage() {
                             </Badge>
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            ${w.price.toLocaleString()}
+                            ৳{w.price.toLocaleString()}
                           </p>
                           <div className="mt-3 flex gap-2">
                             <Button
                               size="sm"
                               className="flex-1"
                               disabled={!w.inStock}
+                              onClick={() => {
+                                addItem({
+                                  productId: w.id,
+                                  name: w.name,
+                                  price: w.price,
+                                  promoDiscount: 0,
+                                  image: w.image,
+                                  stock: w.inStock ? 1 : 0,
+                                  quantity: 1,
+                                });
+                                toast.success('Added to cart');
+                              }}
                             >
                               Add to cart
                             </Button>

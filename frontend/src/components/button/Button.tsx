@@ -1,5 +1,6 @@
 // src/components/ui/Button/Button.tsx
 import { ReactNode, ButtonHTMLAttributes } from 'react';
+import { LoaderCircle } from 'lucide-react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
@@ -46,7 +47,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">
-          <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+          <LoaderCircle className="h-4 w-4 animate-spin" />
           Loading...
         </span>
       ) : (

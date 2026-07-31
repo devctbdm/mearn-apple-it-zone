@@ -8,8 +8,12 @@ import {
   createCompareSlice,
   CompareSlice,
 } from './slices/compare.slice';
+import {
+  createWishlistSlice,
+  WishlistSlice,
+} from './slices/wishlist.slice';
 
-export type RootStore = AuthSlice & CartSlice & UISlice & CheckoutSlice & CompareSlice;
+export type RootStore = AuthSlice & CartSlice & UISlice & CheckoutSlice & CompareSlice & WishlistSlice;
 
 // Create the root store
 export const useAppStore = create<RootStore>()(
@@ -20,6 +24,7 @@ export const useAppStore = create<RootStore>()(
       ...createUISlice(...args),
       ...createCheckoutSlice(...args),
       ...createCompareSlice(...args),
+      ...createWishlistSlice(...args),
     }),
     {
       name: 'appleitzone-storage', // localStorage key
@@ -42,6 +47,9 @@ export const useAppStore = create<RootStore>()(
         compare: {
           compareItems: state.compareItems,
         },
+        wishlist: {
+          wishlist: state.wishlist,
+        },
       }),
       merge: (persistedState: any, currentState: RootStore) => {
         return {
@@ -50,6 +58,7 @@ export const useAppStore = create<RootStore>()(
           ...(persistedState?.ui || {}),
           ...(persistedState?.checkout || {}),
           ...(persistedState?.compare || {}),
+          ...(persistedState?.wishlist || {}),
         };
       },
     }
@@ -161,5 +170,18 @@ export const useCompare = () => {
     addToCompare,
     removeFromCompare,
     clearCompare,
+  };
+};
+
+export const useWishlist = () => {
+  const wishlist = useAppStore((state) => state.wishlist);
+  const toggleWishlist = useAppStore((state) => state.toggleWishlist);
+  const removeFromWishlist = useAppStore((state) => state.removeFromWishlist);
+  const clearWishlist = useAppStore((state) => state.clearWishlist);
+  return {
+    wishlist,
+    toggleWishlist,
+    removeFromWishlist,
+    clearWishlist,
   };
 };
