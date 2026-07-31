@@ -33,6 +33,7 @@ import {
   CommandIcon,
   Apple,
   ShoppingBasket,
+  Gem,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -68,11 +69,27 @@ const data = {
       url: '/admin/customers',
       icon: <UsersIcon />,
     },
+    
     {
       title: 'Invoices',
       url: '/admin/invoice',
       icon: <FileChartColumnIcon />,
     },
+    {
+      title: 'Reviews',
+      url: '/admin/reviews',
+      icon: <FileTextIcon />,
+    },
+    {
+      title: 'Questions',
+      url: '/admin/questions',
+      icon: <CircleHelpIcon />,
+    },
+    {
+      title: 'Promo Managements',
+      url: '/admin/promo',
+      icon: <Gem />,
+    }
   ],
   navClouds: [
     {

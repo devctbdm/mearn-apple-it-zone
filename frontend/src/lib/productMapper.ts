@@ -10,11 +10,13 @@ export type RawProduct = {
   discountPrice: number;
   category: string;
   categories?: string[];
+  productCode?: string;
   images: string[];
   stock: number;
   status: string;
   featured: boolean;
   specifications: Record<string, any>;
+  content?: any[];
   ratings: any[];
   averageRating: number;
   createdAt: string;
@@ -31,9 +33,12 @@ export function toProductShape(p: RawProduct): Product {
     discountPrice: p.discountPrice || 0,
     category: p.category || '',
     path: [],
+    productCode: p.productCode || '',
     images: p.images || [],
     stock: p.stock ?? 0,
+    featured: !!p.featured,
     specifications: p.specifications || {},
+    content: p.content || [],
     averageRating: p.averageRating || 0,
     ratings: p.ratings || [],
     createdAt: p.createdAt,

@@ -333,3 +333,177 @@ export const productApi = {
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/products/${id}`),
 };
+
+export type Review = {
+  _id: string;
+  rating: number;
+  comment: string;
+  status: 'approved' | 'pending' | 'rejected';
+  featured: boolean;
+  createdAt: string;
+  user: { _id: string; name: string } | null;
+  product: { _id: string; name: string; slug: string; image: string } | null;
+};
+
+export type ReviewStats = {
+  total: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  featured: number;
+  averageRating: number;
+  distribution: { rating: number; count: number }[];
+};
+
+export type ReviewPaginatedResponse = {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  reviews: Review[];
+};
+
+export const reviewApi = {
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    rating?: string;
+    featured?: string;
+  }) => api.get<ReviewPaginatedResponse>('/reviews', { params }),
+
+  getStats: () => api.get<{ success: boolean; stats: ReviewStats }>('/reviews/stats'),
+
+  update: (id: string, data: { status?: string; featured?: boolean }) =>
+    api.patch<{ success: boolean; review: Review }>(`/reviews/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/reviews/${id}`),
+};
+
+export type Question = {
+  _id: string;
+  question: string;
+  answer: string;
+  status: 'pending' | 'answered' | 'rejected';
+  featured: boolean;
+  createdAt: string;
+  answeredAt: string | null;
+  product: { _id: string; name: string; slug: string; image: string } | null;
+  user: { _id: string; name: string } | null;
+  answeredBy: { _id: string; name: string } | null;
+};
+
+export type QuestionStats = {
+  total: number;
+  pending: number;
+  answered: number;
+  rejected: number;
+  featured: number;
+};
+
+export type QuestionPaginatedResponse = {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  questions: Question[];
+};
+
+export const questionApi = {
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    featured?: string;
+    productId?: string;
+  }) => api.get<QuestionPaginatedResponse>('/questions', { params }),
+
+  getStats: () => api.get<{ success: boolean; stats: QuestionStats }>('/questions/stats'),
+
+  update: (id: string, data: { answer?: string; status?: string; featured?: boolean }) =>
+    api.patch<{ success: boolean; question: Question }>(`/questions/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/questions/${id}`),
+};
+
+export type PromoCode = {
+  _id: string;
+  code: string;
+  description: string;
+  type: 'percentage' | 'fixed' | 'free_shipping';
+  value: number;
+  minOrder: number;
+  maxDiscount: number;
+  maxUses: number;
+  perUserLimit: number;
+  usageCount: number;
+  startDate: string | null;
+  endDate: string | null;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PromoStats = {
+  total: number;
+  active: number;
+  inactive: number;
+  totalRedemptions: number;
+  expiringSoon: number;
+};
+
+export type PromoPaginatedResponse = {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  promos: PromoCode[];
+};
+
+export type PromoFormData = {
+  code: string;
+  description: string;
+  type: 'percentage' | 'fixed' | 'free_shipping';
+  value: number;
+  minOrder: number;
+  maxDiscount: number;
+  maxUses: number;
+  perUserLimit: number;
+  startDate: string | null;
+  endDate: string | null;
+  status: 'active' | 'inactive';
+};
+
+export const promoApi = {
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    type?: string;
+  }) => api.get<PromoPaginatedResponse>('/promo', { params }),
+
+  getStats: () => api.get<{ success: boolean; stats: PromoStats }>('/promo/stats'),
+
+  create: (data: PromoFormData) =>
+    api.post<{ success: boolean; promo: PromoCode }>('/promo', data),
+
+  update: (id: string, data: Partial<PromoFormData>) =>
+    api.put<{ success: boolean; promo: PromoCode }>(`/promo/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/promo/${id}`),
+
+  validate: (code: string, subtotal: number) =>
+    api.post<{ success: boolean; promo: Partial<PromoCode>; discount: number }>('/promo/validate', {
+      code,
+      subtotal,
+    }),
+};

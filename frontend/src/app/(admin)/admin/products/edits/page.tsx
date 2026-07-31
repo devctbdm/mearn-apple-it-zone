@@ -52,8 +52,11 @@ type ContentBlock =
 type ProductFormValue = {
   name: string;
   sku: string;
+  productCode: string;
+  brand: string;
   categories: string[];
   price: number;
+  regularPrice: number;
   stock: number;
   status: Status;
   featured: boolean;
@@ -118,8 +121,11 @@ export default function EditsProductsPage() {
   const [form, setForm] = useState<ProductFormValue>({
     name: "",
     sku: "",
+    productCode: "",
+    brand: "",
     categories: [],
     price: 0,
+    regularPrice: 0,
     stock: 0,
     status: "active",
     featured: false,
@@ -153,8 +159,11 @@ export default function EditsProductsPage() {
         setForm({
           name: p.name || "",
           sku: p.sku || "",
+          productCode: p.productCode || "",
+          brand: p.specifications?.brand || p.specifications?._keySpecs?.Brand || "",
           categories: p.categories?.length ? p.categories : (p.category ? [p.category] : []),
-          price: p.price || 0,
+          price: p.discountPrice > 0 ? p.discountPrice : p.price || 0,
+          regularPrice: p.price || 0,
           stock: p.stock || 0,
           status: p.status || "active",
           featured: p.featured || false,
@@ -190,15 +199,28 @@ export default function EditsProductsPage() {
       const fd = new FormData();
       fd.append("name", form.name);
       fd.append("description", form.description);
-      fd.append("price", String(form.price));
+      const sale = Number(form.price) || 0;
+      const regular = Number(form.regularPrice) || 0;
+      if (regular > 0 && regular > sale) {
+        fd.append("price", String(regular));
+        fd.append("discountPrice", String(sale));
+      } else {
+        fd.append("price", String(sale));
+        fd.append("discountPrice", "0");
+      }
       fd.append("category", form.categories[0]);
       fd.append("categories", JSON.stringify(form.categories));
       fd.append("stock", String(form.stock));
       fd.append("status", form.status);
       fd.append("featured", String(form.featured));
       if (form.sku) fd.append("sku", form.sku);
+      if (form.productCode) fd.append("productCode", form.productCode);
 
       const specs: Record<string, any> = { _keySpecs: {}, _keyFeatures: {}, _specGroups: {} };
+      if (form.brand) {
+        specs._keySpecs.Brand = form.brand;
+        specs.brand = form.brand;
+      }
       form.keySpecs.forEach((s) => { if (s.label) specs._keySpecs[s.label] = s.value; });
       form.keyFeatures.forEach((f) => { if (f.label) specs._keyFeatures[f.label] = f.value; });
       form.specs.forEach((g) => {
@@ -289,6 +311,18 @@ function ProductForm({
           <Label>SKU</Label>
           <Input value={value.sku} onChange={(e) => onChange({ sku: e.target.value })} />
         </div>
+        <div className="space-y-1.5">
+          <Label>Product Code</Label>
+          <Input value={value.productCode} onChange={(e) => onChange({ productCode: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Brand</Label>
+          <Input
+            value={value.brand}
+            placeholder="e.g. MSI, ASUS, TP-Link"
+            onChange={(e) => onChange({ brand: e.target.value })}
+          />
+        </div>
         <div className="col-span-2 space-y-1.5">
           <Label>Categories</Label>
           <CategoryMultiSelect
@@ -309,6 +343,19 @@ function ProductForm({
             value={value.price}
             onChange={(e) => onChange({ price: Number(e.target.value) })}
           />
+          <p className="text-xs text-muted-foreground">What customers pay</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Regular Price ($)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={value.regularPrice}
+            placeholder="Higher than price to show a discount"
+            onChange={(e) => onChange({ regularPrice: Number(e.target.value) })}
+          />
+          <p className="text-xs text-muted-foreground">Original price (shown crossed out)</p>
         </div>
         <div className="space-y-1.5">
           <Label>Stock</Label>

@@ -8,10 +8,17 @@ import { categoryApi, productApi } from '@/lib/api';
 import type { Category } from '@/lib/api';
 import { toProductShape, type RawProduct } from '@/lib/productMapper';
 import type { Product } from '@/types/product';
-import { ProductGrid } from '@/components/store/product/ProductGrid';
 import { Breadcrumb } from '@/components/store/layout/Breadcrumb';
 import { AddToCartButton } from '@/components/store/cart/AddToCartButton';
-import { ChevronLeft, Star } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  ChevronLeft,
+  Minus,
+  Plus,
+  Star,
+  MessageSquare,
+  HelpCircle,
+} from 'lucide-react';
 
 interface Props {
   params: Promise<{
@@ -102,12 +109,88 @@ function renderSpecs(
   return sections;
 }
 
+// Pull short feature bullets from _keyFeatures (fall back to _keySpecs)
+function extractKeyFeatures(specs: Record<string, any>): string[] {
+  if (!specs || typeof specs !== 'object') return [];
+  const features = specs._keyFeatures;
+  if (features && typeof features === 'object') {
+    const values = Object.entries(features)
+      .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+      .map(([k, v]) => `${k}: ${v}`);
+    if (values.length > 0) return values;
+  }
+  const keySpecs = specs._keySpecs;
+  if (keySpecs && typeof keySpecs === 'object') {
+    return Object.entries(keySpecs)
+      .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+      .slice(0, 6)
+      .map(([k, v]) => `${k}: ${v}`);
+  }
+  return [];
+}
+
+// Render rich content blocks produced by the admin ContentEditor
+function renderContentBlocks(
+  blocks: any[],
+  fallbackAlt: string
+): React.ReactNode {
+  if (!Array.isArray(blocks) || blocks.length === 0) return null;
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, i) => {
+        if (!block || typeof block !== 'object') return null;
+        switch (block.type) {
+          case 'title':
+            return (
+              <h3 key={i} className="text-lg font-semibold text-gray-800">
+                {block.text}
+              </h3>
+            );
+          case 'text':
+            return (
+              <p key={i} className="text-gray-600 leading-relaxed">
+                {block.text}
+              </p>
+            );
+          case 'image':
+            return (
+              <Image
+                key={i}
+                src={block.url}
+                alt={block.alt || fallbackAlt}
+                width={800}
+                height={450}
+                className="rounded-lg w-auto h-auto"
+              />
+            );
+          case 'link':
+            return (
+              <a
+                key={i}
+                href={block.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 hover:underline inline-block"
+              >
+                {block.label}
+              </a>
+            );
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
 export default function ProductDetailPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
   const [categorySlugs, setCategorySlugs] = useState<string[]>([]);
+  const [activeImage, setActiveImage] = useState(0);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,6 +204,8 @@ export default function ProductDetailPage({ params }: Props) {
         if (prodRes.data.success) {
           const raw = prodRes.data.product as RawProduct;
           setProduct(toProductShape(raw));
+          setActiveImage(0);
+          setQuantity(1);
 
           const cats: Category[] = catRes.data.categories || [];
           const primaryName =
@@ -152,7 +237,15 @@ export default function ProductDetailPage({ params }: Props) {
     return (
       <div className="max-w-7xl m-auto px-4 py-8">
         <div className="h-6 bg-gray-200 rounded w-48 mb-6" />
-        <div className="h-96 bg-gray-100 rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          <div className="h-96 bg-gray-100 rounded-2xl animate-pulse" />
+          <div className="space-y-4">
+            <div className="h-8 bg-gray-100 rounded w-3/4 animate-pulse" />
+            <div className="h-6 bg-gray-100 rounded w-1/2 animate-pulse" />
+            <div className="h-40 bg-gray-100 rounded-2xl animate-pulse" />
+            <div className="h-32 bg-gray-100 rounded-2xl animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -185,6 +278,21 @@ export default function ProductDetailPage({ params }: Props) {
     : 'Out of Stock';
   const stockColor = inStock ? 'text-green-600' : 'text-red-600';
 
+  const brand =
+    product.specifications?.brand ||
+    product.specifications?._keySpecs?.Brand ||
+    product.specifications?._keyFeatures?.Brand ||
+    '—';
+
+  const keyFeatures = extractKeyFeatures(product.specifications || {});
+  const reviewCount = product.ratings?.length || 0;
+  const monthlyEmi = Math.round(finalPrice / 12);
+  const maxQty = inStock ? product.stock : 0;
+  const currentQty = Math.min(Math.max(quantity, 1), maxQty || 1);
+
+  const images =
+    product.images.length > 0 ? product.images : ['/placeholder-image.png'];
+
   return (
     <div className="max-w-7xl m-auto px-4 py-8">
       {/* Breadcrumb */}
@@ -200,17 +308,17 @@ export default function ProductDetailPage({ params }: Props) {
         </Link>
       </div>
 
-      {/* Product Main Section */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        {/* Left Column: Image Gallery */}
+      {/* ================= TOP SECTION ================= */}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+        {/* Left Column: Image Slider */}
         <div className="space-y-4">
           <div className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden shadow-lg">
             <Image
-              src={product.images[0] || '/placeholder-image.png'}
+              src={images[activeImage]}
               alt={product.name}
               fill
               className="object-contain"
-              sizes="(max-width: 768px) 100vw, 50vw"
+              sizes="(max-width: 1024px) 100vw, 50vw"
               priority
             />
             {hasDiscount && (
@@ -219,13 +327,18 @@ export default function ProductDetailPage({ params }: Props) {
               </span>
             )}
           </div>
-          {/* Thumbnail Strip (if more images) */}
-          {product.images.length > 1 && (
+          {images.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {product.images.map((img, idx) => (
-                <div
+              {images.map((img, idx) => (
+                <button
                   key={idx}
-                  className="relative w-20 h-20 shrink-0 bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition"
+                  type="button"
+                  onClick={() => setActiveImage(idx)}
+                  className={`relative w-20 h-20 shrink-0 bg-gray-50 rounded-lg overflow-hidden border-2 transition ${
+                    idx === activeImage
+                      ? 'border-blue-500 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
                 >
                   <Image
                     src={img}
@@ -234,7 +347,7 @@ export default function ProductDetailPage({ params }: Props) {
                     className="object-cover"
                     sizes="80px"
                   />
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -246,10 +359,8 @@ export default function ProductDetailPage({ params }: Props) {
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
               {product.name}
             </h1>
-            {product.specifications?.brand && (
-              <p className="text-sm text-gray-500 mt-1">
-                Brand: {product.specifications.brand}
-              </p>
+            {brand !== '—' && (
+              <p className="text-sm text-gray-500 mt-1">Brand: {brand}</p>
             )}
           </div>
 
@@ -278,81 +389,133 @@ export default function ProductDetailPage({ params }: Props) {
                 {product.averageRating.toFixed(1)}
               </span>
               <span className="text-sm text-gray-500">
-                ({product.ratings?.length || 0} reviews)
+                ({reviewCount} reviews)
               </span>
             </div>
           )}
 
-          {/* Price */}
-          <div className="border-b border-gray-200 pb-4">
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-extrabold text-green-700">
-                ৳{finalPrice.toLocaleString()}
-              </span>
-              {hasDiscount && (
-                <span className="text-lg text-gray-400 line-through">
-                  ৳{product.price.toLocaleString()}
+          {/* Pricing / Summary Table */}
+          <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-gray-600">Price</span>
+              <span className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold text-green-700">
+                  ৳{finalPrice.toLocaleString()}
                 </span>
-              )}
-            </div>
-            {hasDiscount && (
-              <p className="text-sm text-green-600 mt-1">
-                You save ৳{(product.price - finalPrice).toLocaleString()} (
-                {discountPercent}%)
-              </p>
-            )}
-          </div>
-
-          {/* Stock Status */}
-          <div className="flex items-center gap-2">
-            <span className={`font-medium ${stockColor}`}>{stockText}</span>
-            {inStock && product.stock < 10 && (
-              <span className="text-sm text-orange-600">
-                🔥 Only {product.stock} left!
+                {hasDiscount && (
+                  <span className="text-sm text-gray-400 line-through">
+                    ৳{product.price.toLocaleString()}
+                  </span>
+                )}
               </span>
-            )}
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-gray-600">
+                Regular Price
+              </span>
+              <span
+                className={`font-semibold ${
+                  hasDiscount ? 'text-gray-400 line-through' : 'text-gray-800'
+                }`}
+              >
+                ৳{product.price.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-gray-600">Status</span>
+              <span className={`font-semibold ${stockColor}`}>{stockText}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-gray-600">
+                Product Code
+              </span>
+              <span className="font-semibold text-gray-800">
+                {product.productCode || '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-gray-600">Brand</span>
+              <span className="font-semibold text-gray-800">{brand}</span>
+            </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <h3 className="font-semibold text-gray-800">Description</h3>
-            <p className="text-gray-600 mt-1 leading-relaxed">
-              {product.description}
-            </p>
-          </div>
-
-          {/* Specifications */}
-          {renderSpecs(product.specifications || {}).length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-800">Specifications</h3>
-              <div className="mt-2 space-y-4">
-                {renderSpecs(product.specifications || {}).map((section) => (
-                  <div key={section.label}>
-                    <h4 className="text-sm font-semibold text-gray-700">
-                      {section.label}
-                    </h4>
-                    <dl className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
-                      {section.items.map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex py-1 border-b border-gray-100"
-                        >
-                          <dt className="w-1/2 font-medium text-gray-600 capitalize">
-                            {item.label.replace(/-/g, ' ')}
-                          </dt>
-                          <dd className="w-1/2 text-gray-800">{item.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
+          {/* Key Features */}
+          {keyFeatures.length > 0 && (
+            <div className="rounded-xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-800">Key Features</h3>
+              <ul className="mt-2 space-y-1.5">
+                {keyFeatures.map((f, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2 text-sm text-gray-600"
+                  >
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                    {f}
+                  </li>
                 ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Payment Options */}
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="font-semibold text-gray-800">Payment Options</h3>
+            <div className="mt-3 space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2.5">
+                <span className="text-green-800 font-medium">
+                  ৳{finalPrice.toLocaleString()}{' '}
+                  <span className="font-normal">Cash Discount Price</span>
+                </span>
+                <span className="text-green-700">Online / Cash Payment</span>
+              </div>
+              <div className="rounded-lg border border-gray-100 px-3 py-2.5">
+                <p className="font-medium text-gray-800">
+                  ৳{monthlyEmi.toLocaleString()}
+                  <span className="text-gray-500 font-normal">/month</span>
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {hasDiscount && (
+                    <>Regular Price: ৳{product.price.toLocaleString()} · </>
+                  )}
+                  0% EMI for up to 12 Months***
+                </p>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Add to Cart */}
-          <div className="pt-4">
-            <AddToCartButton product={product} />
+          {/* Quantity + Add to Cart */}
+          <div className="flex items-center gap-4">
+            <div
+              className="flex items-center rounded-lg border border-gray-300 overflow-hidden"
+              aria-label="Quantity"
+            >
+              <button
+                type="button"
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                disabled={!inStock || quantity <= 1}
+                className="p-2.5 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Minus size={16} />
+              </button>
+              <span className="w-10 text-center font-semibold text-gray-800">
+                {currentQty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+                disabled={!inStock || quantity >= maxQty}
+                className="p-2.5 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <div className="flex-1">
+              <AddToCartButton
+                product={product}
+                quantity={currentQty}
+                disabled={!inStock}
+              />
+            </div>
           </div>
 
           {/* Extra info */}
@@ -364,15 +527,131 @@ export default function ProductDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Related Products */}
-      {related.length > 0 && (
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            You May Also Like
-          </h2>
-          <ProductGrid products={related} columns={4} />
+      {/* ================= BOTTOM SECTION ================= */}
+      <div className="mt-14 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 lg:gap-12">
+        {/* Left: Tabs */}
+        <div className="min-w-0">
+          <Tabs defaultValue="specification">
+            <TabsList variant="line">
+              <TabsTrigger value="specification">Specification</TabsTrigger>
+              <TabsTrigger value="description">Description</TabsTrigger>
+              <TabsTrigger value="questions">Questions (0)</TabsTrigger>
+              <TabsTrigger value="reviews">Reviews ({reviewCount})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="specification" className="pt-4">
+              {renderSpecs(product.specifications || {}).length > 0 ? (
+                <div className="space-y-5">
+                  {renderSpecs(product.specifications || {}).map((section) => (
+                    <div key={section.label + Math.random()}>
+                      <h4 className="text-sm font-semibold text-gray-700">
+                        {section.label}
+                      </h4>
+                      <dl className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
+                        {section.items.map((item) => (
+                          <div
+                            key={item.label}
+                            className="flex py-1.5 border-b border-gray-100"
+                          >
+                            <dt className="w-1/2 font-medium text-gray-600 capitalize">
+                              {item.label.replace(/-/g, ' ')}
+                            </dt>
+                            <dd className="w-1/2 text-gray-800">
+                              {item.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 py-4">
+                  No specifications available for this product.
+                </p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="description" className="pt-4">
+              <p className="text-gray-600 leading-relaxed">
+                {product.description || 'No description available.'}
+              </p>
+              {renderContentBlocks(product.content || [], product.name)}
+            </TabsContent>
+
+            <TabsContent value="questions" className="pt-4">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <HelpCircle size={36} className="text-gray-300" />
+                <p className="mt-3 text-gray-500">
+                  No questions yet. Be the first to ask about this product.
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reviews" className="pt-4">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <MessageSquare size={36} className="text-gray-300" />
+                {reviewCount > 0 ? (
+                  <p className="mt-3 text-gray-500">
+                    {reviewCount} review{reviewCount > 1 ? 's' : ''} for this
+                    product.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-gray-500">
+                    No reviews yet for this product.
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
-      )}
+
+        {/* Right: Similar Products */}
+        <aside className="min-w-0">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Similar Products
+          </h2>
+          {related.length > 0 ? (
+            <div className="space-y-3">
+              {related.map((p) => {
+                const pFinal = p.discountPrice > 0 ? p.discountPrice : p.price;
+                return (
+                  <Link
+                    key={p._id}
+                    href={`/product/${p.slug}`}
+                    className="flex gap-3 rounded-xl border border-gray-200 p-3 hover:border-blue-300 hover:shadow-sm transition"
+                  >
+                    <div className="relative h-16 w-16 shrink-0 bg-gray-50 rounded-lg overflow-hidden">
+                      <Image
+                        src={p.images[0] || '/placeholder-image.png'}
+                        alt={p.name}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 line-clamp-2">
+                        {p.name}
+                      </p>
+                      <p className="text-sm font-bold text-green-700 mt-1">
+                        ৳{pFinal.toLocaleString()}
+                        {p.discountPrice > 0 && p.discountPrice < p.price && (
+                          <span className="ml-1.5 text-xs text-gray-400 line-through font-normal">
+                            ৳{p.price.toLocaleString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">No similar products found.</p>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

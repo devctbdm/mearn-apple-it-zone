@@ -8,9 +8,12 @@ export interface Product {
   discountPrice: number;
   category: string; // e.g., 'desktops', 'laptops', 'components'
   path?: string[]; // e.g., ['desktops', 'gaming', 'intel']
+  productCode?: string;
   images: string[];
   stock: number;
-  specifications?: Record<string, string | number>;
+  featured: boolean;
+  specifications?: Record<string, any>;
+  content?: any[];
   averageRating: number;
   ratings: Rating[];
   createdAt: string;

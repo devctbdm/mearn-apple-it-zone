@@ -35,6 +35,10 @@ const productSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    productCode: {
+      type: String,
+      trim: true,
+    },
     category: {
       type: String,
       required: [true, 'Please provide a category'],
@@ -84,6 +88,15 @@ const productSchema = new mongoose.Schema(
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         rating: { type: Number, min: 1, max: 5 },
         comment: { type: String, trim: true },
+        status: {
+          type: String,
+          enum: ['pending', 'approved', 'rejected'],
+          default: 'approved',
+        },
+        featured: {
+          type: Boolean,
+          default: false,
+        },
         createdAt: { type: Date, default: Date.now },
       },
     ],
@@ -111,13 +124,14 @@ productSchema.pre('save', function () {
   }
 });
 
-// ---- Calculate average rating when a new rating is added ----
+// ---- Calculate average rating (rejected reviews are excluded) ----
 productSchema.methods.calculateAverageRating = function () {
-  if (this.ratings.length === 0) {
+  const approved = this.ratings.filter((r) => r.status !== 'rejected');
+  if (approved.length === 0) {
     this.averageRating = 0;
   } else {
-    const total = this.ratings.reduce((sum, r) => sum + r.rating, 0);
-    this.averageRating = (total / this.ratings.length).toFixed(1);
+    const total = approved.reduce((sum, r) => sum + r.rating, 0);
+    this.averageRating = (total / approved.length).toFixed(1);
   }
   return this.averageRating;
 };
