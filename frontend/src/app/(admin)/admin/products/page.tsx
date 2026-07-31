@@ -82,6 +82,7 @@ type BackendProduct = {
   price: number;
   discountPrice?: number;
   category: string;
+  categories?: string[];
   stock: number;
   status: Status;
   featured: boolean;
@@ -97,6 +98,7 @@ type Product = {
   _id: string;
   name: string;
   category: string;
+  categories?: string[];
   price: number;
   stock: number;
   status: Status;
@@ -153,6 +155,7 @@ export default function AdminProductsPage() {
             _id: p._id,
             name: p.name,
             category: p.category,
+            categories: p.categories || (p.category ? [p.category] : []),
             price: p.price,
             stock: p.stock,
             status: p.status,
@@ -198,14 +201,14 @@ export default function AdminProductsPage() {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
-      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (categoryFilter !== "all" && !(p.categories || [p.category]).includes(categoryFilter)) return false;
       if (featuredFilter === "featured" && !p.featured) return false;
       if (featuredFilter === "not_featured" && p.featured) return false;
       if (!q) return true;
       return (
         p._id.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        (p.categories || [p.category]).some((c) => c.toLowerCase().includes(q))
       );
     });
   }, [products, query, statusFilter, categoryFilter, featuredFilter]);
@@ -388,7 +391,7 @@ export default function AdminProductsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{p.category}</TableCell>
+                      <TableCell>{(p.categories || [p.category]).join(", ")}</TableCell>
                       <TableCell className="text-right">${p.price.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{p.stock}</TableCell>
                       <TableCell>
@@ -478,7 +481,7 @@ export default function AdminProductsPage() {
           {viewProduct && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <Info label="Category" value={viewProduct.category} />
+                <Info label="Category" value={(viewProduct.categories || [viewProduct.category]).join(", ")} />
                 <Info label="Status" value={statusLabels[viewProduct.status]} />
                 <Info label="Price" value={`$${viewProduct.price.toFixed(2)}`} />
                 <Info label="Stock" value={String(viewProduct.stock)} />

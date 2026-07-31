@@ -50,12 +50,22 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // 3. Rate limiting (prevent brute force)
+// General API limit: generous for a storefront (products, categories, cart, user, etc.)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 1000 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api', limiter);
+
+// Stricter limiter for auth endpoints (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // 50 login/register attempts per windowMs per IP
+  message: 'Too many login attempts from this IP, please try again later.',
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // 4. Logging (dev format)
 if (process.env.NODE_ENV === 'development') {

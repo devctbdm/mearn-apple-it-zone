@@ -1,6 +1,6 @@
-'use client'
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   Star,
@@ -16,25 +16,26 @@ import {
   ArrowUp,
   ArrowDown,
   X,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
-import { ImageUploader } from "@/components/admin/products/ImageUploader";
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent } from '@/components/ui/card';
+import { ImageUploader } from '@/components/admin/products/ImageUploader';
+import { CategoryMultiSelect } from '@/components/admin/products/CategoryMultiSelect';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import { categoryApi, productApi } from "@/lib/api";
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import { categoryApi, productApi } from '@/lib/api';
 
-type Status = "active" | "draft" | "out_of_stock";
+type Status = 'active' | 'draft' | 'out_of_stock';
 
 type SpecField = { id: string; label: string; value: string };
 type SpecGroup = { id: string; name: string; fields: SpecField[] };
@@ -42,15 +43,15 @@ type KeySpec = { id: string; label: string; value: string };
 type KeyFeature = { id: string; label: string; value: string };
 
 type ContentBlock =
-  | { id: string; type: "title"; text: string }
-  | { id: string; type: "text"; text: string }
-  | { id: string; type: "image"; url: string; alt: string }
-  | { id: string; type: "link"; label: string; url: string };
+  | { id: string; type: 'title'; text: string }
+  | { id: string; type: 'text'; text: string }
+  | { id: string; type: 'image'; url: string; alt: string }
+  | { id: string; type: 'link'; label: string; url: string };
 
 type ProductFormValue = {
   name: string;
   sku: string;
-  category: string;
+  categories: string[];
   price: number;
   stock: number;
   status: Status;
@@ -68,18 +69,20 @@ const uid = () => `id-${++idCounter}`;
 
 export default function NewProductPage() {
   const router = useRouter();
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<
+    { _id: string; name: string; parentId: string | null }[]
+  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [form, setForm] = useState<ProductFormValue>({
-    name: "",
-    sku: "",
-    category: "",
+    name: '',
+    sku: '',
+    categories: [],
     price: 0,
     stock: 0,
-    status: "active",
+    status: 'active',
     featured: false,
-    description: "",
+    description: '',
     images: [],
     keySpecs: [],
     keyFeatures: [],
@@ -88,57 +91,69 @@ export default function NewProductPage() {
   });
 
   useEffect(() => {
-    categoryApi.getAll().then(({ data }) => {
-      if (data.success) {
-        setCategories(data.categories);
-        if (data.categories.length > 0 && !form.category) {
-          setForm((prev) => ({ ...prev, category: data.categories[0].name }));
+    categoryApi
+      .getAll()
+      .then(({ data }) => {
+        if (data.success) {
+          setCategories(data.categories);
         }
-      }
-    }).catch(() => toast.error("Failed to load categories"));
+      })
+      .catch(() => toast.error('Failed to load categories'));
   }, []);
 
   async function handleSubmit() {
     if (!form.name.trim()) {
-      toast.error("Product name is required");
+      toast.error('Product name is required');
       return;
     }
-    if (!form.category) {
-      toast.error("Please select a category");
+    if (!form.categories.length) {
+      toast.error('Please select at least one category');
       return;
     }
 
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("description", form.description);
-      fd.append("price", String(form.price));
-      fd.append("category", form.category);
-      fd.append("stock", String(form.stock));
-      fd.append("status", form.status);
-      fd.append("featured", String(form.featured));
-      if (form.sku) fd.append("sku", form.sku);
+      fd.append('name', form.name);
+      fd.append('description', form.description);
+      fd.append('price', String(form.price));
+      fd.append('category', form.categories[0]);
+      fd.append('categories', JSON.stringify(form.categories));
+      fd.append('stock', String(form.stock));
+      fd.append('status', form.status);
+      fd.append('featured', String(form.featured));
+      if (form.sku) fd.append('sku', form.sku);
 
-      const specs: Record<string, any> = { _keySpecs: {}, _keyFeatures: {}, _specGroups: {} };
-      form.keySpecs.forEach((s) => { if (s.label) specs._keySpecs[s.label] = s.value; });
-      form.keyFeatures.forEach((f) => { if (f.label) specs._keyFeatures[f.label] = f.value; });
+      const specs: Record<string, any> = {
+        _keySpecs: {},
+        _keyFeatures: {},
+        _specGroups: {},
+      };
+      form.keySpecs.forEach((s) => {
+        if (s.label) specs._keySpecs[s.label] = s.value;
+      });
+      form.keyFeatures.forEach((f) => {
+        if (f.label) specs._keyFeatures[f.label] = f.value;
+      });
       form.specs.forEach((g) => {
         specs._specGroups[g.name] = {};
-        g.fields.forEach((f) => { if (f.label) specs._specGroups[g.name][f.label] = f.value; });
+        g.fields.forEach((f) => {
+          if (f.label) specs._specGroups[g.name][f.label] = f.value;
+        });
       });
-      fd.append("specifications", JSON.stringify(specs));
-      if (form.content.length > 0) fd.append("content", JSON.stringify(form.content));
+      fd.append('specifications', JSON.stringify(specs));
+      if (form.content.length > 0)
+        fd.append('content', JSON.stringify(form.content));
 
-      imageFiles.forEach((file) => fd.append("images", file));
+      imageFiles.forEach((file) => fd.append('images', file));
 
       const { data } = await productApi.create(fd);
       if (data.success) {
         toast.success(`Product "${form.name}" created`);
-        router.push("/admin/products");
+        router.push('/admin/products');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to create product");
+      toast.error(err?.response?.data?.message || 'Failed to create product');
     } finally {
       setSubmitting(false);
     }
@@ -151,8 +166,12 @@ export default function NewProductPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Add New Product</h1>
-          <p className="text-sm text-muted-foreground">Create a new product in your catalog.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Add New Product
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Create a new product in your catalog.
+          </p>
         </div>
       </div>
 
@@ -170,7 +189,7 @@ export default function NewProductPage() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={submitting}>
-              <Plus /> {submitting ? "Creating..." : "Create product"}
+              <Plus /> {submitting ? 'Creating...' : 'Create product'}
             </Button>
           </div>
         </CardContent>
@@ -188,7 +207,7 @@ function ProductForm({
 }: {
   value: ProductFormValue;
   onChange: (v: Partial<ProductFormValue>) => void;
-  categories: { _id: string; name: string }[];
+  categories: { _id: string; name: string; parentId: string | null }[];
   imageFiles: File[];
   onImageFilesChange: (files: File[]) => void;
 }) {
@@ -197,20 +216,29 @@ function ProductForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1.5">
           <Label>Name</Label>
-          <Input value={value.name} onChange={(e) => onChange({ name: e.target.value })} />
+          <Input
+            value={value.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>SKU</Label>
-          <Input value={value.sku} onChange={(e) => onChange({ sku: e.target.value })} />
+          <Input
+            value={value.sku}
+            onChange={(e) => onChange({ sku: e.target.value })}
+          />
         </div>
-        <div className="space-y-1.5">
-          <Label>Category</Label>
-          <Select value={value.category} onValueChange={(v) => onChange({ category: v || '' })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {categories.map((c) => <SelectItem key={c._id} value={c.name}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="col-span-2 space-y-1.5">
+          <Label>Categories</Label>
+          <CategoryMultiSelect
+            categories={categories}
+            value={value.categories}
+            onChange={(v) => onChange({ categories: v })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Select one or more categories. The first one is the primary
+            category.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label>Price ($)</Label>
@@ -233,8 +261,13 @@ function ProductForm({
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label>Status</Label>
-          <Select value={value.status} onValueChange={(v) => onChange({ status: v as Status })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={value.status}
+            onValueChange={(v) => onChange({ status: v as Status })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
@@ -247,7 +280,9 @@ function ProductForm({
             <Label className="flex items-center gap-2">
               <Star className="h-4 w-4 text-amber-500" /> Featured product
             </Label>
-            <p className="text-xs text-muted-foreground">Highlight this product on the storefront.</p>
+            <p className="text-xs text-muted-foreground">
+              Highlight this product on the storefront.
+            </p>
           </div>
           <Switch
             checked={value.featured}
@@ -305,7 +340,7 @@ function KeySpecsEditor({
   onChange: (v: KeySpec[]) => void;
 }) {
   function addSpec() {
-    onChange([...value, { id: uid(), label: "", value: "" }]);
+    onChange([...value, { id: uid(), label: '', value: '' }]);
   }
   function updateSpec(id: string, patch: Partial<KeySpec>) {
     onChange(value.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -374,7 +409,7 @@ function KeyFeaturesEditor({
   onChange: (v: KeyFeature[]) => void;
 }) {
   function addFeature() {
-    onChange([...value, { id: uid(), label: "", value: "" }]);
+    onChange([...value, { id: uid(), label: '', value: '' }]);
   }
   function updateFeature(id: string, patch: Partial<KeyFeature>) {
     onChange(value.map((f) => (f.id === id ? { ...f, ...patch } : f)));
@@ -389,7 +424,8 @@ function KeyFeaturesEditor({
         <div>
           <h3 className="font-medium">Key Features</h3>
           <p className="text-xs text-muted-foreground">
-            Highlight main product features (e.g., Model, Processor, Memory, Storage, Graphics)
+            Highlight main product features (e.g., Model, Processor, Memory,
+            Storage, Graphics)
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={addFeature}>
@@ -404,12 +440,16 @@ function KeyFeaturesEditor({
               <Input
                 placeholder="Label (e.g., Processor)"
                 value={feature.label}
-                onChange={(e) => updateFeature(feature.id, { label: e.target.value })}
+                onChange={(e) =>
+                  updateFeature(feature.id, { label: e.target.value })
+                }
               />
               <Input
                 placeholder="Value (e.g., Intel Core Ultra 9 processor 285K)"
                 value={feature.value}
-                onChange={(e) => updateFeature(feature.id, { value: e.target.value })}
+                onChange={(e) =>
+                  updateFeature(feature.id, { value: e.target.value })
+                }
               />
             </div>
             <Button
@@ -443,7 +483,14 @@ function SpecsEditor({
   onChange: (v: SpecGroup[]) => void;
 }) {
   function addGroup() {
-    onChange([...value, { id: uid(), name: "New group", fields: [{ id: uid(), label: "", value: "" }] }]);
+    onChange([
+      ...value,
+      {
+        id: uid(),
+        name: 'New group',
+        fields: [{ id: uid(), label: '', value: '' }],
+      },
+    ]);
   }
   function updateGroup(id: string, patch: Partial<SpecGroup>) {
     onChange(value.map((g) => (g.id === id ? { ...g, ...patch } : g)));
@@ -454,24 +501,33 @@ function SpecsEditor({
   function addField(gid: string) {
     onChange(
       value.map((g) =>
-        g.id === gid ? { ...g, fields: [...g.fields, { id: uid(), label: "", value: "" }] } : g,
-      ),
+        g.id === gid
+          ? { ...g, fields: [...g.fields, { id: uid(), label: '', value: '' }] }
+          : g
+      )
     );
   }
   function updateField(gid: string, fid: string, patch: Partial<SpecField>) {
     onChange(
       value.map((g) =>
         g.id === gid
-          ? { ...g, fields: g.fields.map((f) => (f.id === fid ? { ...f, ...patch } : f)) }
-          : g,
-      ),
+          ? {
+              ...g,
+              fields: g.fields.map((f) =>
+                f.id === fid ? { ...f, ...patch } : f
+              ),
+            }
+          : g
+      )
     );
   }
   function removeField(gid: string, fid: string) {
     onChange(
       value.map((g) =>
-        g.id === gid ? { ...g, fields: g.fields.filter((f) => f.id !== fid) } : g,
-      ),
+        g.id === gid
+          ? { ...g, fields: g.fields.filter((f) => f.id !== fid) }
+          : g
+      )
     );
   }
 
@@ -522,13 +578,17 @@ function SpecsEditor({
                   <Input
                     className="col-span-4 h-8"
                     value={f.label}
-                    onChange={(e) => updateField(g.id, f.id, { label: e.target.value })}
+                    onChange={(e) =>
+                      updateField(g.id, f.id, { label: e.target.value })
+                    }
                     placeholder="Label (e.g. Size)"
                   />
                   <Input
                     className="col-span-7 h-8"
                     value={f.value}
-                    onChange={(e) => updateField(g.id, f.id, { value: e.target.value })}
+                    onChange={(e) =>
+                      updateField(g.id, f.id, { value: e.target.value })
+                    }
                     placeholder="Value (e.g. 6.7 inch)"
                   />
                   <Button
@@ -569,20 +629,22 @@ function ContentEditor({
   value: ContentBlock[];
   onChange: (v: ContentBlock[]) => void;
 }) {
-  function add(type: ContentBlock["type"]) {
+  function add(type: ContentBlock['type']) {
     const base = { id: uid() };
     const block: ContentBlock =
-      type === "title"
-        ? { ...base, type: "title", text: "" }
-        : type === "text"
-          ? { ...base, type: "text", text: "" }
-          : type === "image"
-            ? { ...base, type: "image", url: "", alt: "" }
-            : { ...base, type: "link", label: "", url: "" };
+      type === 'title'
+        ? { ...base, type: 'title', text: '' }
+        : type === 'text'
+          ? { ...base, type: 'text', text: '' }
+          : type === 'image'
+            ? { ...base, type: 'image', url: '', alt: '' }
+            : { ...base, type: 'link', label: '', url: '' };
     onChange([...value, block]);
   }
   function update(id: string, patch: Partial<ContentBlock>) {
-    onChange(value.map((b) => (b.id === id ? ({ ...b, ...patch } as ContentBlock) : b)));
+    onChange(
+      value.map((b) => (b.id === id ? ({ ...b, ...patch } as ContentBlock) : b))
+    );
   }
   function remove(id: string) {
     onChange(value.filter((b) => b.id !== id));
@@ -595,11 +657,11 @@ function ContentEditor({
     [next[idx], next[j]] = [next[j], next[idx]];
     onChange(next);
   }
-  function applyInlineFormat(id: string, wrap: "**" | "*" | "- ") {
+  function applyInlineFormat(id: string, wrap: '**' | '*' | '- ') {
     const b = value.find((x) => x.id === id);
-    if (!b || (b.type !== "text" && b.type !== "title")) return;
-    if (wrap === "- ") {
-      update(id, { text: (b.text ? b.text + "\n" : "") + "- " });
+    if (!b || (b.type !== 'text' && b.type !== 'title')) return;
+    if (wrap === '- ') {
+      update(id, { text: (b.text ? b.text + '\n' : '') + '- ' });
     } else {
       update(id, { text: `${b.text}${wrap}text${wrap}` });
     }
@@ -609,22 +671,45 @@ function ContentEditor({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Label className="text-sm font-semibold">Description (rich content)</Label>
+          <Label className="text-sm font-semibold">
+            Description (rich content)
+          </Label>
           <p className="text-xs text-muted-foreground">
-            Compose the product page with blocks: title, description, image, and link.
+            Compose the product page with blocks: title, description, image, and
+            link.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Button type="button" variant="outline" size="sm" onClick={() => add("title")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => add('title')}
+          >
             <TypeIcon /> Title
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => add("text")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => add('text')}
+          >
             <AlignLeft /> Text
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => add("image")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => add('image')}
+          >
             <ImageIcon /> Image
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => add("link")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => add('link')}
+          >
             <LinkIcon /> Link
           </Button>
         </div>
@@ -641,41 +726,85 @@ function ContentEditor({
           <div key={b.id} className="rounded-md border">
             <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-2 py-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium capitalize text-muted-foreground">
-                {b.type === "title" && <TypeIcon className="h-3.5 w-3.5" />}
-                {b.type === "text" && <AlignLeft className="h-3.5 w-3.5" />}
-                {b.type === "image" && <ImageIcon className="h-3.5 w-3.5" />}
-                {b.type === "link" && <LinkIcon className="h-3.5 w-3.5" />}
+                {b.type === 'title' && <TypeIcon className="h-3.5 w-3.5" />}
+                {b.type === 'text' && <AlignLeft className="h-3.5 w-3.5" />}
+                {b.type === 'image' && <ImageIcon className="h-3.5 w-3.5" />}
+                {b.type === 'link' && <LinkIcon className="h-3.5 w-3.5" />}
                 {b.type}
               </div>
               <div className="flex items-center gap-0.5">
-                {(b.type === "text" || b.type === "title") && (
+                {(b.type === 'text' || b.type === 'title') && (
                   <>
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => applyInlineFormat(b.id, "**")} aria-label="Bold">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => applyInlineFormat(b.id, '**')}
+                      aria-label="Bold"
+                    >
                       <Bold className="h-3.5 w-3.5" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => applyInlineFormat(b.id, "*")} aria-label="Italic">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => applyInlineFormat(b.id, '*')}
+                      aria-label="Italic"
+                    >
                       <Italic className="h-3.5 w-3.5" />
                     </Button>
-                    {b.type === "text" && (
-                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => applyInlineFormat(b.id, "- ")} aria-label="List">
+                    {b.type === 'text' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => applyInlineFormat(b.id, '- ')}
+                        aria-label="List"
+                      >
                         <List className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </>
                 )}
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => move(b.id, -1)} disabled={i === 0} aria-label="Move up">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => move(b.id, -1)}
+                  disabled={i === 0}
+                  aria-label="Move up"
+                >
                   <ArrowUp className="h-3.5 w-3.5" />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => move(b.id, 1)} disabled={i === value.length - 1} aria-label="Move down">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => move(b.id, 1)}
+                  disabled={i === value.length - 1}
+                  aria-label="Move down"
+                >
                   <ArrowDown className="h-3.5 w-3.5" />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => remove(b.id)} aria-label="Delete block">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive"
+                  onClick={() => remove(b.id)}
+                  aria-label="Delete block"
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
             <div className="p-3">
-              {b.type === "title" && (
+              {b.type === 'title' && (
                 <Input
                   value={b.text}
                   onChange={(e) => update(b.id, { text: e.target.value })}
@@ -683,7 +812,7 @@ function ContentEditor({
                   className="text-base font-semibold"
                 />
               )}
-              {b.type === "text" && (
+              {b.type === 'text' && (
                 <Textarea
                   rows={3}
                   value={b.text}
@@ -691,7 +820,7 @@ function ContentEditor({
                   placeholder="Write a paragraph. Use **bold**, *italic*, or - list items."
                 />
               )}
-              {b.type === "image" && (
+              {b.type === 'image' && (
                 <div className="space-y-2">
                   <Input
                     value={b.url}
@@ -712,7 +841,7 @@ function ContentEditor({
                   )}
                 </div>
               )}
-              {b.type === "link" && (
+              {b.type === 'link' && (
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     value={b.label}

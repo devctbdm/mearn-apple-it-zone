@@ -6,6 +6,7 @@ import { NavDocuments } from '@/components/nav-documents';
 import { NavMain } from '@/components/nav-main';
 import { SuperAdminNav } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Sidebar,
   SidebarContent,
@@ -36,11 +37,6 @@ import {
 import Link from 'next/link';
 
 const data = {
-  user: {
-    name: 'shadcn',
-    email: 'm@example.com',
-    avatar: '/avatars/shadcn.jpg',
-  },
   navMain: [
     {
       title: 'Dashboard',
@@ -126,23 +122,7 @@ const data = {
       ],
     },
   ],
-  navSecondary: [
-    {
-      title: 'Settings',
-      url: '#',
-      icon: <Settings2Icon />,
-    },
-    {
-      title: 'Get Help',
-      url: '#',
-      icon: <CircleHelpIcon />,
-    },
-    {
-      title: 'Search',
-      url: '#',
-      icon: <SearchIcon />,
-    },
-  ],
+
   documents: [
     {
       name: 'Data Library',
@@ -175,6 +155,12 @@ const data = {
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth();
+  const sidebarUser = {
+    name: user?.name || 'Guest',
+    email: user?.email || 'Not signed in',
+    avatar: '',
+  };
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -196,7 +182,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SuperAdminNav items={data.navSuperadmin} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
   );

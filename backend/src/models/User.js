@@ -37,6 +37,20 @@ const userSchema = new mongoose.Schema(
       postcode: { type: String, default: '1000' },
       country: { type: String, default: 'Bangladesh' },
     },
+    addresses: [
+      {
+        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+        label: { type: String, default: 'Home' },
+        fullName: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        street: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        postcode: { type: String, default: '' },
+        country: { type: String, default: 'Bangladesh' },
+        isDefault: { type: Boolean, default: false },
+      },
+    ],
     role: {
       type: String,
       enum: ['super_admin', 'admin', 'manager', 'customer'],

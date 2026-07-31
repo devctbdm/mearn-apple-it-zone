@@ -1,24 +1,32 @@
 'use client';
 import { FeaturedProductsGrid } from './FeaturedProductsCard';
 import { useState, useEffect } from 'react';
-
-import { dummyProducts } from '@/data/dummy/products';
-// Dummy product data (replace with your actual data fetching)
+import { productApi } from '@/lib/api';
+import type { RawProduct } from '@/lib/productMapper';
 
 const FeaturedProducts = () => {
-  const featuredProducts = dummyProducts.filter(
-    (product) => product.isFeatured
-  );
   const [isLoading, setIsLoading] = useState(true);
-  const [products, setProducts] = useState(featuredProducts);
+  const [products, setProducts] = useState<RawProduct[]>([]);
 
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    let mounted = true;
+    productApi
+      .getAll({ limit: 12 })
+      .then(({ data }) => {
+        if (!mounted) return;
+        const all = data.products || [];
+        const featured = all.filter(
+          (p) => p.featured && p.status !== 'draft'
+        );
+        setProducts(featured.length > 0 ? featured : all);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -31,12 +39,33 @@ const FeaturedProducts = () => {
           </p>
         </div>
         <FeaturedProductsGrid
-          products={products}
+          products={products.map((p) => ({
+            id: p._id,
+            name: p.name,
+            slug: p.slug,
+            price: p.price,
+            comparePrice: p.discountPrice > 0 ? p.discountPrice : null,
+            images: p.images || [],
+            isFeatured: p.featured,
+            category: {
+              name:
+                p.categories && p.categories.length > 0
+                  ? p.categories[0]
+                  : p.category,
+              slug:
+                (p.categories && p.categories.length > 0
+                  ? p.categories[0]
+                  : p.category
+                )
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-'),
+            },
+          }))}
           columns={4}
           imageHeight={220}
           showCategory={true}
           isLoading={isLoading}
-          skeletonCount={products.length}
+          skeletonCount={8}
         />
       </div>
     </>

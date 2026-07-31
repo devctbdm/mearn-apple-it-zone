@@ -12,7 +12,7 @@ export const getAllProducts = async (req, res) => {
     const query = {};
 
     if (category) {
-      query.category = category;
+      query.$or = [{ categories: category }, { category }];
     }
     if (minPrice || maxPrice) {
       query.price = {};
@@ -78,12 +78,29 @@ export const getProductById = async (req, res) => {
   }
 };
 
+// @desc    Get single product by slug
+// @route   GET /api/products/slug/:slug
+// @access  Public
+export const getProductBySlug = async (req, res) => {
+  try {
+    const product = await Product.findOne({ slug: req.params.slug }).populate('ratings.user', 'name');
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+    res.json({ success: true, product });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get products by category
 // @route   GET /api/products/category/:category
 // @access  Public
 export const getProductsByCategory = async (req, res) => {
   try {
-    const products = await Product.find({ category: req.params.category });
+    const products = await Product.find({
+      $or: [{ categories: req.params.category }, { category: req.params.category }],
+    });
     res.json({ success: true, products });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -95,10 +112,27 @@ export const getProductsByCategory = async (req, res) => {
 // @access  Private/Admin
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, content } = req.body;
+    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, content, categories } = req.body;
 
     // Handle uploaded images
     const imageUrls = req.files ? req.files.map((file) => file.path) : [];
+
+    const parseArray = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.filter((v) => typeof v === 'string' && v.trim());
+      if (typeof val === 'string') {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' && v.trim()) : [];
+        } catch {
+          return [val];
+        }
+      }
+      return [];
+    };
+
+    const parsedCategories = parseArray(categories);
+    const primaryCategory = parsedCategories.length > 0 ? parsedCategories[0] : category;
 
     const product = new Product({
       name,
@@ -106,7 +140,8 @@ export const createProduct = async (req, res) => {
       description,
       price,
       discountPrice: discountPrice || 0,
-      category,
+      category: primaryCategory || category,
+      categories: parsedCategories,
       stock,
       sku: sku || undefined,
       status: status || 'active',
@@ -140,7 +175,7 @@ export const updateProduct = async (req, res) => {
     }
 
     // Update fields
-    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, content } = req.body;
+    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, content, categories } = req.body;
     if (name) {
       product.name = name;
       product.slug = name.toLowerCase().replace(/\s+/g, '-');
@@ -156,6 +191,25 @@ export const updateProduct = async (req, res) => {
     }
     if (category) {
       product.category = category;
+    }
+    if (categories !== undefined) {
+      const parseArray = (val) => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val.filter((v) => typeof v === 'string' && v.trim());
+        if (typeof val === 'string') {
+          try {
+            const parsed = JSON.parse(val);
+            return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' && v.trim()) : [];
+          } catch {
+            return [val];
+          }
+        }
+        return [];
+      };
+      product.categories = parseArray(categories);
+      if (product.categories.length > 0 && !category) {
+        product.category = product.categories[0];
+      }
     }
     if (stock !== undefined) {
       product.stock = stock;

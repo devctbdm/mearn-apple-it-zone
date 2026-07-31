@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
@@ -55,8 +55,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { authApi, orderApi, SavedAddress } from '@/lib/api';
 
-type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
+type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
 type Order = {
   id: string;
   date: string;
@@ -88,107 +90,31 @@ type WishItem = {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-const initialOrders: Order[] = [
-  {
-    id: 'ORD-1042',
-    date: '2026-07-20',
-    items: 2,
-    total: 1899,
-    status: 'delivered',
-  },
-  {
-    id: 'ORD-1039',
-    date: '2026-07-15',
-    items: 1,
-    total: 1299,
-    status: 'processing',
-  },
-  {
-    id: 'ORD-1033',
-    date: '2026-07-08',
-    items: 3,
-    total: 349,
-    status: 'pending',
-  },
-  {
-    id: 'ORD-1021',
-    date: '2026-06-28',
-    items: 1,
-    total: 599,
-    status: 'cancelled',
-  },
-  {
-    id: 'ORD-1017',
-    date: '2026-06-19',
-    items: 2,
-    total: 249,
-    status: 'delivered',
-  },
-];
-
-const initialAddresses: Address[] = [
-  {
-    id: uid(),
-    label: 'Home',
-    fullName: 'John Appleseed',
-    phone: '+1 555 123 4567',
-    line1: '1 Infinite Loop',
-    city: 'Cupertino',
-    region: 'CA',
-    postal: '95014',
-    country: 'USA',
-    isDefault: true,
-  },
-  {
-    id: uid(),
-    label: 'Office',
-    fullName: 'John Appleseed',
-    phone: '+1 555 987 6543',
-    line1: 'One Apple Park Way',
-    city: 'Cupertino',
-    region: 'CA',
-    postal: '95014',
-    country: 'USA',
-    isDefault: false,
-  },
-];
-
-const initialWishlist: WishItem[] = [
-  {
-    id: uid(),
-    name: 'iPhone 17 Pro',
-    price: 1199,
-    image: 'https://images.unsplash.com/photo-1592286927505-1def25115558?w=400',
-    inStock: true,
-  },
-  {
-    id: uid(),
-    name: 'AirPods Pro 3',
-    price: 249,
-    image: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=400',
-    inStock: true,
-  },
-  {
-    id: uid(),
-    name: 'Apple Watch Ultra 3',
-    price: 799,
-    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=400',
-    inStock: false,
-  },
-];
+const mapBackendAddress = (a: SavedAddress): Address => ({
+  id: a._id,
+  label: a.label,
+  fullName: a.fullName,
+  phone: a.phone,
+  line1: a.street,
+  city: a.city,
+  region: a.state,
+  postal: a.postcode,
+  country: a.country,
+  isDefault: a.isDefault,
+});
 
 const statusMeta: Record<
   OrderStatus,
   { label: string; className: string; Icon: typeof Clock }
 > = {
-  pending: {
-    label: 'Pending',
-    className: 'bg-amber-100 text-amber-800',
-    Icon: Clock,
-  },
   processing: {
     label: 'Processing',
     className: 'bg-blue-100 text-blue-800',
+    Icon: Truck,
+  },
+  shipped: {
+    label: 'Shipped',
+    className: 'bg-indigo-100 text-indigo-800',
     Icon: Truck,
   },
   delivered: {
@@ -204,9 +130,7 @@ const statusMeta: Record<
 };
 
 const profileSchema = z.object({
-  firstName: z.string().trim().min(1, 'First name required').max(60),
-  lastName: z.string().trim().min(1, 'Last name required').max(60),
-  email: z.string().trim().email('Invalid email').max(255),
+  name: z.string().trim().min(1, 'Name required').max(60),
   phone: z.string().trim().min(6, 'Phone required').max(30),
 });
 
@@ -233,15 +157,15 @@ const addressSchema = z.object({
 });
 
 export default function AccountPage() {
+  const { user } = useAuth();
   const [profile, setProfile] = useState({
-    firstName: 'John',
-    lastName: 'Appleseed',
-    email: 'john@appleitzone.com',
-    phone: '+1 555 123 4567',
+    name: user?.name || 'Guest',
+    email: user?.email || '',
+    phone: user?.phone || '',
   });
-  const [orders] = useState<Order[]>(initialOrders);
-  const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
-  const [wishlist, setWishlist] = useState<WishItem[]>(initialWishlist);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [wishlist] = useState<WishItem[]>([]);
 
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePassOpen, setChangePassOpen] = useState(false);
@@ -251,6 +175,40 @@ export default function AccountPage() {
   }>({ open: false });
   const [deleteAddress, setDeleteAddress] = useState<Address | null>(null);
 
+  useEffect(() => {
+    if (user) {
+      setProfile({ name: user.name, email: user.email, phone: user.phone });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    authApi
+      .getAddresses()
+      .then(({ data }) => {
+        if (data.success) setAddresses(data.addresses.map(mapBackendAddress));
+      })
+      .catch(() => toast.error('Failed to load addresses'));
+  }, []);
+
+  useEffect(() => {
+    orderApi
+      .getMyOrders()
+      .then(({ data }) => {
+        if (data.success) {
+          setOrders(
+            data.orders.map((o) => ({
+              id: o._id,
+              date: o.createdAt,
+              items: o.items.reduce((a, i) => a + i.quantity, 0),
+              total: o.totalAmount,
+              status: o.orderStatus,
+            }))
+          );
+        }
+      })
+      .catch(() => toast.error('Failed to load orders'));
+  }, []);
+
   const stats = useMemo(() => {
     const totalSpent = orders
       .filter((o) => o.status !== 'cancelled')
@@ -258,7 +216,7 @@ export default function AccountPage() {
     return {
       orders: orders.length,
       pending: orders.filter(
-        (o) => o.status === 'pending' || o.status === 'processing'
+        (o) => o.status === 'processing' || o.status === 'shipped'
       ).length,
       wishlist: wishlist.length,
       addresses: addresses.length,
@@ -266,39 +224,69 @@ export default function AccountPage() {
     };
   }, [orders, addresses, wishlist]);
 
-  const setDefaultAddress = (id: string) => {
-    setAddresses((prev) => prev.map((a) => ({ ...a, isDefault: a.id === id })));
-    toast.success('Default address updated');
-  };
-
-  const saveAddress = (values: z.infer<typeof addressSchema>, id?: string) => {
-    if (id) {
-      setAddresses((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, ...values } : a))
-      );
-      toast.success('Address updated');
-    } else {
-      setAddresses((prev) => [
-        ...prev,
-        { id: uid(), ...values, isDefault: prev.length === 0 },
-      ]);
-      toast.success('Address added');
+  const setDefaultAddress = async (id: string) => {
+    try {
+      const { data } = await authApi.setDefaultAddress(id);
+      if (data.success) {
+        setAddresses(data.addresses.map(mapBackendAddress));
+        toast.success('Default address updated');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update address');
     }
   };
 
-  const removeAddress = (id: string) => {
-    setAddresses((prev) => {
-      const filtered = prev.filter((a) => a.id !== id);
-      if (filtered.length && !filtered.some((a) => a.isDefault))
-        filtered[0].isDefault = true;
-      return filtered;
-    });
-    toast.success('Address removed');
+  const saveAddress = async (
+    values: z.infer<typeof addressSchema>,
+    id?: string
+  ) => {
+    const payload = {
+      label: values.label,
+      fullName: values.fullName,
+      phone: values.phone,
+      street: values.line1,
+      city: values.city,
+      state: values.region,
+      postcode: values.postal,
+      country: values.country,
+    };
+    try {
+      const { data } = id
+        ? await authApi.updateAddress(id, payload)
+        : await authApi.addAddress(payload);
+      if (data.success) {
+        setAddresses(data.addresses.map(mapBackendAddress));
+        toast.success(id ? 'Address updated' : 'Address added');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save address');
+    }
+  };
+
+  const removeAddress = async (id: string) => {
+    try {
+      const { data } = await authApi.deleteAddress(id);
+      if (data.success) {
+        setAddresses(data.addresses.map(mapBackendAddress));
+        toast.success('Address removed');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to remove address');
+    }
   };
 
   const removeWish = (id: string) => {
-    setWishlist((prev) => prev.filter((w) => w.id !== id));
     toast.success('Removed from wishlist');
+  };
+
+  const saveProfile = async (v: z.infer<typeof profileSchema>) => {
+    try {
+      await authApi.updateProfile({ name: v.name, phone: v.phone });
+      setProfile({ ...profile, name: v.name, phone: v.phone });
+      toast.success('Profile updated');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update profile');
+    }
   };
 
   return (
@@ -309,13 +297,10 @@ export default function AccountPage() {
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-semibold text-primary-foreground">
-                {profile.firstName[0]}
-                {profile.lastName[0]}
+                {profile.name.trim().charAt(0).toUpperCase() || 'U'}
               </div>
               <div>
-                <h1 className="text-xl font-semibold">
-                  {profile.firstName} {profile.lastName}
-                </h1>
+                <h1 className="text-xl font-semibold">{profile.name}</h1>
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
                 <p className="text-sm text-muted-foreground">{profile.phone}</p>
               </div>
@@ -600,8 +585,7 @@ export default function AccountPage() {
                   <CardDescription>Your account details.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                  <Row label="First name" value={profile.firstName} />
-                  <Row label="Last name" value={profile.lastName} />
+                  <Row label="Name" value={profile.name} />
                   <Row label="Email" value={profile.email} />
                   <Row label="Phone" value={profile.phone} />
                   <Button
@@ -638,11 +622,8 @@ export default function AccountPage() {
       <EditProfileDialog
         open={editProfileOpen}
         onOpenChange={setEditProfileOpen}
-        initial={profile}
-        onSave={(v) => {
-          setProfile(v);
-          toast.success('Profile updated');
-        }}
+        initial={{ name: profile.name, phone: profile.phone }}
+        onSave={saveProfile}
       />
 
       {/* Change password dialog */}
@@ -758,12 +739,13 @@ function EditProfileDialog({
   initial: z.infer<typeof profileSchema>;
   onSave: (v: z.infer<typeof profileSchema>) => void;
 }) {
+  const { user } = useAuth();
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<
     Partial<Record<keyof typeof initial, string>>
   >({});
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = profileSchema.safeParse(values);
     if (!parsed.success) {
@@ -775,7 +757,7 @@ function EditProfileDialog({
       setErrors(fe);
       return;
     }
-    onSave(parsed.data);
+    await onSave(parsed.data);
     onOpenChange(false);
   };
 
@@ -798,42 +780,19 @@ function EditProfileDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>First name</Label>
-              <Input
-                value={values.firstName}
-                onChange={(e) =>
-                  setValues({ ...values, firstName: e.target.value })
-                }
-              />
-              {errors.firstName && (
-                <p className="text-xs text-destructive">{errors.firstName}</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Last name</Label>
-              <Input
-                value={values.lastName}
-                onChange={(e) =>
-                  setValues({ ...values, lastName: e.target.value })
-                }
-              />
-              {errors.lastName && (
-                <p className="text-xs text-destructive">{errors.lastName}</p>
-              )}
-            </div>
+          <div className="space-y-1">
+            <Label>Name</Label>
+            <Input
+              value={values.name}
+              onChange={(e) => setValues({ ...values, name: e.target.value })}
+            />
+            {errors.name && (
+              <p className="text-xs text-destructive">{errors.name}</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Email</Label>
-            <Input
-              type="email"
-              value={values.email}
-              onChange={(e) => setValues({ ...values, email: e.target.value })}
-            />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email}</p>
-            )}
+            <Input value={user?.email || ''} disabled />
           </div>
           <div className="space-y-1">
             <Label>Phone</Label>
@@ -874,7 +833,7 @@ function ChangePasswordDialog({
   >({});
   const [show, setShow] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = passwordSchema.safeParse(values);
     if (!parsed.success) {
@@ -886,10 +845,18 @@ function ChangePasswordDialog({
       setErrors(fe);
       return;
     }
-    toast.success('Password changed');
-    onOpenChange(false);
-    setValues({ current: '', next: '', confirm: '' });
-    setErrors({});
+    try {
+      await authApi.changePassword({
+        currentPassword: values.current,
+        newPassword: values.next,
+      });
+      toast.success('Password changed');
+      onOpenChange(false);
+      setValues({ current: '', next: '', confirm: '' });
+      setErrors({});
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to change password');
+    }
   };
 
   return (

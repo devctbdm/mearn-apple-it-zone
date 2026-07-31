@@ -1,12 +1,17 @@
 // src/app/(store)/product/[slug]/page.tsx
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getProductBySlug, getRelatedProducts } from '@/data/products.dummy';
+import { categoryApi, productApi } from '@/lib/api';
+import type { Category } from '@/lib/api';
+import { toProductShape, type RawProduct } from '@/lib/productMapper';
+import type { Product } from '@/types/product';
 import { ProductGrid } from '@/components/store/product/ProductGrid';
 import { Breadcrumb } from '@/components/store/layout/Breadcrumb';
 import { AddToCartButton } from '@/components/store/cart/AddToCartButton';
-import { ChevronLeft, Star, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, Star } from 'lucide-react';
 
 interface Props {
   params: Promise<{
@@ -14,13 +19,156 @@ interface Props {
   }>;
 }
 
-export default async function ProductDetailPage({ params }: Props) {
-  const { slug } = await params;
-  const product = getProductBySlug(slug);
+// Walk up the parentId chain to build the root -> leaf category list
+function categoryChain(categories: Category[], name: string): Category[] {
+  const cat = categories.find((c) => c.name === name);
+  if (!cat) return [];
+  const chain: Category[] = [];
+  let current: Category | undefined = cat;
+  while (current) {
+    chain.unshift(current);
+    current = categories.find((c) => c._id === current!.parentId);
+  }
+  return chain;
+}
 
-  // If product not found, show 404
+// Flatten specifications (structured or legacy flat format) into displayable sections
+function renderSpecs(
+  specs: Record<string, any>
+): { label: string; items: { label: string; value: string }[] }[] {
+  if (!specs || typeof specs !== 'object') return [];
+
+  // new structured format
+  if (specs._keySpecs || specs._keyFeatures || specs._specGroups) {
+    const sections: {
+      label: string;
+      items: { label: string; value: string }[];
+    }[] = [];
+    if (specs._keySpecs && Object.keys(specs._keySpecs).length > 0) {
+      sections.push({
+        label: 'Key Specifications',
+        items: Object.entries(specs._keySpecs).map(([k, v]) => ({
+          label: k,
+          value: String(v),
+        })),
+      });
+    }
+    if (specs._keyFeatures && Object.keys(specs._keyFeatures).length > 0) {
+      sections.push({
+        label: 'Key Features',
+        items: Object.entries(specs._keyFeatures).map(([k, v]) => ({
+          label: k,
+          value: String(v),
+        })),
+      });
+    }
+    if (specs._specGroups && Object.keys(specs._specGroups).length > 0) {
+      for (const [groupName, fields] of Object.entries(specs._specGroups)) {
+        if (typeof fields === 'object' && fields !== null) {
+          sections.push({
+            label: groupName,
+            items: Object.entries(fields).map(([k, v]) => ({
+              label: k,
+              value: String(v),
+            })),
+          });
+        }
+      }
+    }
+    return sections;
+  }
+
+  // legacy flat format
+  const flatItems: { label: string; value: string }[] = [];
+  const sections: {
+    label: string;
+    items: { label: string; value: string }[];
+  }[] = [];
+  for (const [key, val] of Object.entries(specs)) {
+    if (typeof val === 'object' && val !== null) {
+      sections.push({
+        label: key,
+        items: Object.entries(val).map(([k, v]) => ({
+          label: k,
+          value: String(v),
+        })),
+      });
+    } else {
+      flatItems.push({ label: key, value: String(val) });
+    }
+  }
+  if (flatItems.length > 0)
+    sections.unshift({ label: 'Specifications', items: flatItems });
+  return sections;
+}
+
+export default function ProductDetailPage({ params }: Props) {
+  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
+  const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [categorySlugs, setCategorySlugs] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { slug } = await params;
+      try {
+        const [prodRes, catRes, allRes] = await Promise.all([
+          productApi.getBySlug(slug),
+          categoryApi.getAll(),
+          productApi.getAll({ limit: 1000 }),
+        ]);
+        if (prodRes.data.success) {
+          const raw = prodRes.data.product as RawProduct;
+          setProduct(toProductShape(raw));
+
+          const cats: Category[] = catRes.data.categories || [];
+          const primaryName =
+            raw.categories && raw.categories.length > 0
+              ? raw.categories[0]
+              : raw.category;
+          const chain = categoryChain(cats, primaryName);
+          setCategorySlugs(chain.map((c) => c.slug));
+          setCategoryPath(chain.map((c) => c.name));
+
+          const relatedRaw = (allRes.data.products || []).filter(
+            (p: RawProduct) =>
+              p._id !== raw._id &&
+              p.status !== 'draft' &&
+              (p.categories || [p.category]).includes(primaryName)
+          );
+          setRelated(relatedRaw.slice(0, 4).map(toProductShape));
+        }
+      } catch {
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [params]);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl m-auto px-4 py-8">
+        <div className="h-6 bg-gray-200 rounded w-48 mb-6" />
+        <div className="h-96 bg-gray-100 rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
   if (!product) {
-    notFound();
+    return (
+      <div className="px-4 py-16 text-center">
+        <p className="text-2xl text-gray-500">Product not found</p>
+        <Link
+          href="/"
+          className="text-blue-600 hover:underline mt-4 inline-block"
+        >
+          ← Back to Home
+        </Link>
+      </div>
+    );
   }
 
   const finalPrice =
@@ -31,14 +179,6 @@ export default async function ProductDetailPage({ params }: Props) {
     ? Math.round((1 - product.discountPrice / product.price) * 100)
     : 0;
 
-  // Related products (same category)
-  const relatedProducts = getRelatedProducts(product, 4);
-
-  // Build category path for breadcrumb from product.path
-  // Remove the last segment (which is the product-specific segment like 'core-i9')
-  const categorySlug = product.path.slice(0, -1);
-
-  // Determine stock status
   const inStock = product.stock > 0;
   const stockText = inStock
     ? `In Stock (${product.stock} available)`
@@ -46,17 +186,17 @@ export default async function ProductDetailPage({ params }: Props) {
   const stockColor = inStock ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="max-w-7xl m-auto px-4 py-8">
       {/* Breadcrumb */}
-      <Breadcrumb slug={categorySlug} />
+      <Breadcrumb slug={categorySlugs} />
 
       <div className="mt-4">
         <Link
-          href={`/${categorySlug.join('/')}`}
+          href={`/products/${categorySlugs.join('/')}`}
           className="inline-flex items-center text-sm text-blue-600 hover:underline"
         >
           <ChevronLeft size={16} />
-          Back to Category
+          Back to {categoryPath[categoryPath.length - 1] || 'Category'}
         </Link>
       </div>
 
@@ -182,27 +322,33 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
 
           {/* Specifications */}
-          {product.specifications &&
-            Object.keys(product.specifications).length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-800">Specifications</h3>
-                <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
-                  {Object.entries(product.specifications).map(
-                    ([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex py-1 border-b border-gray-100"
-                      >
-                        <dt className="w-1/2 font-medium text-gray-600 capitalize">
-                          {key.replace(/-/g, ' ')}
-                        </dt>
-                        <dd className="w-1/2 text-gray-800">{value}</dd>
-                      </div>
-                    )
-                  )}
-                </dl>
+          {renderSpecs(product.specifications || {}).length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-800">Specifications</h3>
+              <div className="mt-2 space-y-4">
+                {renderSpecs(product.specifications || {}).map((section) => (
+                  <div key={section.label}>
+                    <h4 className="text-sm font-semibold text-gray-700">
+                      {section.label}
+                    </h4>
+                    <dl className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
+                      {section.items.map((item) => (
+                        <div
+                          key={item.label}
+                          className="flex py-1 border-b border-gray-100"
+                        >
+                          <dt className="w-1/2 font-medium text-gray-600 capitalize">
+                            {item.label.replace(/-/g, ' ')}
+                          </dt>
+                          <dd className="w-1/2 text-gray-800">{item.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
           {/* Add to Cart */}
           <div className="pt-4">
@@ -219,22 +365,14 @@ export default async function ProductDetailPage({ params }: Props) {
       </div>
 
       {/* Related Products */}
-      {relatedProducts.length > 0 && (
+      {related.length > 0 && (
         <div className="mt-16">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             You May Also Like
           </h2>
-          <ProductGrid products={relatedProducts} columns={4} />
+          <ProductGrid products={related} columns={4} />
         </div>
       )}
     </div>
   );
-}
-
-// Optional: Generate static paths for all products (for ISR / SSG)
-export async function generateStaticParams() {
-  const { dummyProducts } = await import('@/data/products.dummy');
-  return dummyProducts.map((product) => ({
-    slug: product.slug,
-  }));
 }

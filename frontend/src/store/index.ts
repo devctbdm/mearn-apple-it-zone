@@ -48,55 +48,96 @@ export const useAppStore = create<RootStore>()(
 );
 
 // 🔥 Export individual hooks for better performance (selectors)
-export const useAuth = () =>
-  useAppStore((state) => ({
-    user: state.user,
-    isLoading: state.isLoading,
-    isAuthenticated: state.isAuthenticated,
-    login: state.login,
-    register: state.register,
-    logout: state.logout,
-    fetchUser: state.fetchUser,
-  }));
+export const useAuth = () => {
+  const user = useAppStore((state) => state.user);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const login = useAppStore((state) => state.login);
+  const register = useAppStore((state) => state.register);
+  const logout = useAppStore((state) => state.logout);
+  const fetchUser = useAppStore((state) => state.fetchUser);
+  return {
+    user,
+    isLoading,
+    isAuthenticated,
+    login,
+    register,
+    logout,
+    fetchUser,
+  };
+};
 
-export const useCart = () =>
-  useAppStore((state) => ({
-    items: state.items,
-    totalItems: state.totalItems,
-    totalPrice: state.totalPrice,
-    isLoading: state.isLoading,
-    addItem: state.addItem,
-    removeItem: state.removeItem,
-    updateQuantity: state.updateQuantity,
-    clearCart: state.clearCart,
-    fetchCart: state.fetchCart,
-    syncCartWithBackend: state.syncCartWithBackend,
-  }));
+export const useCart = () => {
+  const items = useAppStore((state) => state.items);
+  const totalItems = useAppStore((state) => state.totalItems);
+  const totalPrice = useAppStore((state) => state.totalPrice);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const addItem = useAppStore((state) => state.addItem);
+  const removeItem = useAppStore((state) => state.removeItem);
+  const updateQuantity = useAppStore((state) => state.updateQuantity);
+  const clearCart = useAppStore((state) => state.clearCart);
+  const fetchCart = useAppStore((state) => state.fetchCart);
+  const syncCartWithBackend = useAppStore((state) => state.syncCartWithBackend);
+  return {
+    items,
+    totalItems,
+    totalPrice,
+    isLoading,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    fetchCart,
+    syncCartWithBackend,
+  };
+};
 
-export const useUI = () =>
-  useAppStore((state) => ({
-    isAdminSidebarOpen: state.isAdminSidebarOpen,
-    isCartDrawerOpen: state.isCartDrawerOpen,
-    isCheckoutLoading: state.isCheckoutLoading,
-    globalLoading: state.globalLoading,
-    toast: state.toast,
-    toggleAdminSidebar: state.toggleAdminSidebar,
-    toggleCartDrawer: state.toggleCartDrawer,
-    setCheckoutLoading: state.setCheckoutLoading,
-    setGlobalLoading: state.setGlobalLoading,
-    showToast: state.showToast,
-    hideToast: state.hideToast,
-  }));
+export const useUI = () => {
+  const isAdminSidebarOpen = useAppStore((state) => state.isAdminSidebarOpen);
+  const isCartDrawerOpen = useAppStore((state) => state.isCartDrawerOpen);
+  const isCheckoutLoading = useAppStore((state) => state.isCheckoutLoading);
+  const globalLoading = useAppStore((state) => state.globalLoading);
+  const toast = useAppStore((state) => state.toast);
+  const toggleAdminSidebar = useAppStore((state) => state.toggleAdminSidebar);
+  const toggleCartDrawer = useAppStore((state) => state.toggleCartDrawer);
+  const setCheckoutLoading = useAppStore((state) => state.setCheckoutLoading);
+  const setGlobalLoading = useAppStore((state) => state.setGlobalLoading);
+  const showToast = useAppStore((state) => state.showToast);
+  const hideToast = useAppStore((state) => state.hideToast);
+  return {
+    isAdminSidebarOpen,
+    isCartDrawerOpen,
+    isCheckoutLoading,
+    globalLoading,
+    toast,
+    toggleAdminSidebar,
+    toggleCartDrawer,
+    setCheckoutLoading,
+    setGlobalLoading,
+    showToast,
+    hideToast,
+  };
+};
 
-export const useCheckout = () =>
-  useAppStore((state) => ({
-    shippingAddress: state.shippingAddress,
-    paymentMethod: state.paymentMethod,
-    notes: state.notes,
-    step: state.step,
-    setShippingAddress: state.setShippingAddress,
-    setPaymentMethod: state.setPaymentMethod,
-    setNotes: state.setNotes,
-    goToStep: state.goToStep,
-    resetCheckout: state.resetCheckout,
-  }));
+export const useCheckout = () => {
+  const shippingAddress = useAppStore((state) => state.shippingAddress);
+  const paymentMethod = useAppStore((state) => state.paymentMethod);
+  const notes = useAppStore((state) => state.notes);
+  const step = useAppStore((state) => state.step);
+  const setShippingAddress = useAppStore((state) => state.setShippingAddress);
+  const setPaymentMethod = useAppStore((state) => state.setPaymentMethod);
+  const setNotes = useAppStore((state) => state.setNotes);
+  const goToStep = useAppStore((state) => state.goToStep);
+  const resetCheckout = useAppStore((state) => state.resetCheckout);
+  return {
+    shippingAddress,
+    paymentMethod,
+    notes,
+    step,
+    setShippingAddress,
+    setPaymentMethod,
+    setNotes,
+    goToStep,
+    resetCheckout,
+  };
+};

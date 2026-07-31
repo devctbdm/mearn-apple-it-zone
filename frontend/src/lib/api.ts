@@ -204,7 +204,43 @@ export const paymentSettingsApi = {
     api.put<{ success: boolean; gateway: PaymentGateway }>(`/payment-settings/${id}`, data),
 };
 
+export type AuthMe = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+  };
+};
+
+export type SavedAddress = {
+  _id: string;
+  label: string;
+  fullName: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+  isDefault: boolean;
+};
+
 export const authApi = {
+  getMe: () => api.get<{ success: boolean; user: AuthMe }>('/auth/me'),
+
+  updateProfile: (data: {
+    name?: string;
+    phone?: string;
+    address?: Partial<AuthMe['address']>;
+  }) => api.put<{ success: boolean; user: AuthMe }>('/auth/me', data),
+
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     api.put<{ success: boolean; message: string }>('/auth/me/password', data),
 
@@ -213,6 +249,56 @@ export const authApi = {
 
   revokeSession: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/auth/me/sessions/${id}`),
+
+  getAddresses: () =>
+    api.get<{ success: boolean; addresses: SavedAddress[] }>('/auth/me/addresses'),
+
+  addAddress: (data: Partial<SavedAddress>) =>
+    api.post<{ success: boolean; addresses: SavedAddress[] }>('/auth/me/addresses', data),
+
+  updateAddress: (id: string, data: Partial<SavedAddress>) =>
+    api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}`, data),
+
+  deleteAddress: (id: string) =>
+    api.delete<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}`),
+
+  setDefaultAddress: (id: string) =>
+    api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}/default`),
+};
+
+export type OrderItem = {
+  product: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+};
+
+export type Order = {
+  _id: string;
+  user: string;
+  items: OrderItem[];
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+  };
+  totalAmount: number;
+  payment: {
+    method: string;
+    status: string;
+    paidAt?: string;
+  };
+  orderStatus: 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const orderApi = {
+  getMyOrders: () =>
+    api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
 };
 
 export type ProductFormData = {
@@ -237,6 +323,9 @@ export const productApi = {
 
   getById: (id: string) =>
     api.get<{ success: boolean; product: any }>(`/products/${id}`),
+
+  getBySlug: (slug: string) =>
+    api.get<{ success: boolean; product: any }>(`/products/slug/${slug}`),
 
   update: (id: string, data: FormData) =>
     api.put<{ success: boolean; product: any }>(`/products/${id}`, data),

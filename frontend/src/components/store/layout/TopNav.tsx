@@ -9,13 +9,10 @@ import { useCart } from '@/store';
 import { useState, useEffect } from 'react';
 import Logo from '@/components/store/logo/Logo';
 
-interface TopNavProps {
-  cartItemCount?: number;
-}
-
-const TopNav = ({ cartItemCount = 3 }: TopNavProps) => {
+const TopNav = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { totalItems } = useCart();
 
   useEffect(() => {
     setIsLoggedIn(!!localStorage.getItem('mobile_token'));
@@ -61,7 +58,7 @@ const TopNav = ({ cartItemCount = 3 }: TopNavProps) => {
               variant="secondary"
               className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 px-0 text-xs text-white dark:bg-red-600"
             >
-              {3}
+              {totalItems}
             </Badge>
           </Button>
         </div>

@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageUploader } from "@/components/admin/products/ImageUploader";
+import { CategoryMultiSelect } from "@/components/admin/products/CategoryMultiSelect";
 import {
   Select,
   SelectContent,
@@ -51,7 +52,7 @@ type ContentBlock =
 type ProductFormValue = {
   name: string;
   sku: string;
-  category: string;
+  categories: string[];
   price: number;
   stock: number;
   status: Status;
@@ -110,14 +111,14 @@ export default function EditsProductsPage() {
   const searchParams = useSearchParams();
   const productId = searchParams.get("id");
 
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ _id: string; name: string; parentId: string | null }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [form, setForm] = useState<ProductFormValue>({
     name: "",
     sku: "",
-    category: "",
+    categories: [],
     price: 0,
     stock: 0,
     status: "active",
@@ -152,7 +153,7 @@ export default function EditsProductsPage() {
         setForm({
           name: p.name || "",
           sku: p.sku || "",
-          category: p.category || "",
+          categories: p.categories?.length ? p.categories : (p.category ? [p.category] : []),
           price: p.price || 0,
           stock: p.stock || 0,
           status: p.status || "active",
@@ -179,8 +180,8 @@ export default function EditsProductsPage() {
       toast.error("Product name is required");
       return;
     }
-    if (!form.category) {
-      toast.error("Please select a category");
+    if (!form.categories.length) {
+      toast.error("Please select at least one category");
       return;
     }
 
@@ -190,7 +191,8 @@ export default function EditsProductsPage() {
       fd.append("name", form.name);
       fd.append("description", form.description);
       fd.append("price", String(form.price));
-      fd.append("category", form.category);
+      fd.append("category", form.categories[0]);
+      fd.append("categories", JSON.stringify(form.categories));
       fd.append("stock", String(form.stock));
       fd.append("status", form.status);
       fd.append("featured", String(form.featured));
@@ -272,7 +274,7 @@ function ProductForm({
 }: {
   value: ProductFormValue;
   onChange: (v: Partial<ProductFormValue>) => void;
-  categories: { _id: string; name: string }[];
+  categories: { _id: string; name: string; parentId: string | null }[];
   imageFiles: File[];
   onImageFilesChange: (files: File[]) => void;
 }) {
@@ -287,14 +289,16 @@ function ProductForm({
           <Label>SKU</Label>
           <Input value={value.sku} onChange={(e) => onChange({ sku: e.target.value })} />
         </div>
-        <div className="space-y-1.5">
-          <Label>Category</Label>
-          <Select value={value.category} onValueChange={(v) => onChange({ category: v || '' })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {categories.map((c) => <SelectItem key={c._id} value={c.name}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="col-span-2 space-y-1.5">
+          <Label>Categories</Label>
+          <CategoryMultiSelect
+            categories={categories}
+            value={value.categories}
+            onChange={(v) => onChange({ categories: v })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Select one or more categories. The first one is the primary category.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label>Price ($)</Label>

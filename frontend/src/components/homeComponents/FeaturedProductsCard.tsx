@@ -126,7 +126,7 @@ export function FeaturedProductsCard({
           IMAGE CONTAINER
           ------------------------------------------------------------ */}
       <Link
-        href={`/products/${product.slug}`}
+        href={`/product/${product.slug}`}
         className="block overflow-hidden"
       >
         <div
@@ -179,7 +179,7 @@ export function FeaturedProductsCard({
           ------------------------------------------------------------ */}
       <div className="p-4">
         {/* Title */}
-        <Link href={`/products/${product.slug}`} className="block">
+        <Link href={`/product/${product.slug}`} className="block">
           <h3 className="line-clamp-2 text-sm font-medium text-gray-800 transition-colors hover:text-blue-600">
             {product.name}
           </h3>

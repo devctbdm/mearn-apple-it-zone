@@ -7,7 +7,7 @@ export interface Product {
   price: number;
   discountPrice: number;
   category: string; // e.g., 'desktops', 'laptops', 'components'
-  path: string[]; // ⭐ NEW: e.g., ['desktops', 'gaming', 'intel']
+  path?: string[]; // e.g., ['desktops', 'gaming', 'intel']
   images: string[];
   stock: number;
   specifications?: Record<string, string | number>;

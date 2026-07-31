@@ -40,6 +40,14 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Please provide a category'],
       trim: true,
     },
+    categories: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (v) => !v || v.length === 0 || v.every((c) => typeof c === 'string' && c.trim().length > 0),
+        message: 'Categories must be a non-empty string array',
+      },
+    },
     images: {
       type: [String],
       required: [true, 'Please provide at least one image'],

@@ -3,6 +3,7 @@ import {
   createProduct,
   getAllProducts,
   getProductById,
+  getProductBySlug,
   updateProduct,
   deleteProduct,
   getProductsByCategory,
@@ -16,6 +17,7 @@ const router = express.Router();
 // ---- Public routes ----
 router.get('/', getAllProducts);
 router.get('/category/:category', getProductsByCategory);
+router.get('/slug/:slug', getProductBySlug);
 router.get('/:id', getProductById);
 
 // ---- Authenticated user routes ----
