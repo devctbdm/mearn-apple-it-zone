@@ -47,6 +47,10 @@ const orderSchema = new mongoose.Schema(
       required: true,
       min: [0, 'Total amount cannot be negative'],
     },
+    coupon: {
+      code: { type: String, default: '' },
+      discount: { type: Number, default: 0, min: [0, 'Discount cannot be negative'] },
+    },
     payment: {
       method: {
         type: String,

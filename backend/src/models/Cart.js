@@ -16,6 +16,10 @@ const cartItemSchema = new mongoose.Schema({
     type: Number,
     required: true, // Snapshot price at the time of adding to cart
   },
+  promoDiscount: {
+    type: Number,
+    default: 0, // Per-unit discount from the product's sale price
+  },
   quantity: {
     type: Number,
     required: true,
@@ -62,7 +66,7 @@ cartSchema.pre('save', function () {
 
 // ---- Static method to add or update item ----
 cartSchema.statics.addItem = async function (userId, productData) {
-  const { productId, name, price, quantity, image } = productData;
+  const { productId, name, price, quantity, image, promoDiscount } = productData;
 
   let cart = await this.findOne({ user: userId });
 
@@ -70,7 +74,7 @@ cartSchema.statics.addItem = async function (userId, productData) {
     // Create new cart if doesn't exist
     cart = new this({
       user: userId,
-      items: [{ product: productId, name, price, quantity, image }],
+      items: [{ product: productId, name, price, quantity, image, promoDiscount }],
     });
   } else {
     // Check if product already exists in cart
@@ -79,9 +83,10 @@ cartSchema.statics.addItem = async function (userId, productData) {
     if (existingItemIndex > -1) {
       // Update quantity if already exists
       cart.items[existingItemIndex].quantity += quantity;
+      cart.items[existingItemIndex].promoDiscount = promoDiscount || 0;
     } else {
       // Add new item
-      cart.items.push({ product: productId, name, price, quantity, image });
+      cart.items.push({ product: productId, name, price, quantity, image, promoDiscount });
     }
   }
 

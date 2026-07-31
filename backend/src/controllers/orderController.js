@@ -2,13 +2,14 @@
 
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import PromoCode from '../models/PromoCode.js';
 
 // @desc    Create a new order
 // @route   POST /api/orders
 // @access  Private
 export const createOrder = async (req, res) => {
   try {
-    const { items, shippingAddress, paymentMethod } = req.body;
+    const { items, shippingAddress, paymentMethod, note, couponCode } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'No items in order' });
@@ -50,20 +51,44 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Re-validate coupon server-side and apply discount
+    let couponDiscount = 0;
+    let appliedPromo = null;
+    if (couponCode) {
+      const promo = await PromoCode.findOne({ code: couponCode.toUpperCase() });
+      if (promo) {
+        const result = promo.computeDiscount(totalAmount);
+        if (result.valid) {
+          couponDiscount = result.discount;
+          appliedPromo = promo;
+        }
+      }
+    }
+    totalAmount = Math.max(0, totalAmount - couponDiscount);
+
     // Create order
     const order = new Order({
       user: req.user._id,
       items: orderItems,
       shippingAddress,
       totalAmount,
+      coupon: appliedPromo
+        ? { code: appliedPromo.code, discount: couponDiscount }
+        : undefined,
       payment: {
         method: paymentMethod || 'sslcommerz',
         status: 'pending',
       },
       orderStatus: 'processing',
+      note: note || '',
     });
 
     await order.save();
+
+    if (appliedPromo) {
+      appliedPromo.usageCount += 1;
+      await appliedPromo.save();
+    }
 
     res.status(201).json({
       success: true,
@@ -140,6 +165,32 @@ export const getAllOrders = async (req, res) => {
       pages: Math.ceil(total / limit),
       orders,
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get order statistics (Admin only)
+// @route   GET /api/orders/stats
+// @access  Private/Admin
+export const getOrderStats = async (req, res) => {
+  try {
+    const grouped = await Order.aggregate([
+      { $group: { _id: '$orderStatus', count: { $sum: 1 } } },
+    ]);
+    const stats = {
+      total: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+    grouped.forEach((g) => {
+      if (stats[g._id] !== undefined) stats[g._id] = g.count;
+    });
+    stats.total =
+      stats.processing + stats.shipped + stats.delivered + stats.cancelled;
+    res.json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

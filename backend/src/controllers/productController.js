@@ -290,6 +290,9 @@ export const addRating = async (req, res) => {
         product.ratings[existingIndex].comment = comment;
       }
       product.ratings[existingIndex].createdAt = Date.now();
+      // Re-submission requires admin approval again
+      product.ratings[existingIndex].status = 'pending';
+      product.ratings[existingIndex].featured = false;
     } else {
       product.ratings.push({
         user: req.user._id,

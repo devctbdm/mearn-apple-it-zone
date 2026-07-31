@@ -91,7 +91,7 @@ const productSchema = new mongoose.Schema(
         status: {
           type: String,
           enum: ['pending', 'approved', 'rejected'],
-          default: 'approved',
+          default: 'pending',
         },
         featured: {
           type: Boolean,
@@ -124,9 +124,9 @@ productSchema.pre('save', function () {
   }
 });
 
-// ---- Calculate average rating (rejected reviews are excluded) ----
+// ---- Calculate average rating (only approved reviews are included) ----
 productSchema.methods.calculateAverageRating = function () {
-  const approved = this.ratings.filter((r) => r.status !== 'rejected');
+  const approved = this.ratings.filter((r) => r.status === 'approved');
   if (approved.length === 0) {
     this.averageRating = 0;
   } else {

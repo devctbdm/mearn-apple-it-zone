@@ -17,7 +17,7 @@ export const getCart = async (req, res) => {
 
 export const addToCart = async (req, res) => {
   try {
-    const { productId, name, price, quantity, image } = req.body;
+    const { productId, name, price, quantity, image, promoDiscount } = req.body;
 
     if (!productId || !quantity) {
       return res
@@ -25,7 +25,7 @@ export const addToCart = async (req, res) => {
         .json({ success: false, message: 'Product ID and quantity are required' });
     }
 
-    const cart = await Cart.addItem(req.user._id, { productId, name, price, quantity, image });
+    const cart = await Cart.addItem(req.user._id, { productId, name, price, quantity, image, promoDiscount });
     await cart.populate('items.product', 'name price images stock');
 
     res.json({ success: true, cart });
