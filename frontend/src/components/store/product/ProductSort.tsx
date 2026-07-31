@@ -1,4 +1,3 @@
-// src/components/store/product/ProductSort.tsx
 'use client';
 
 import {
@@ -25,7 +24,10 @@ const OPTIONS: { value: SortOption; label: string }[] = [
 
 export function ProductSort({ value, onChange }: ProductSortProps) {
   return (
-    <Select value={value} onValueChange={(v) => onChange((v || 'featured') as SortOption)}>
+    <Select
+      value={value}
+      onValueChange={(v) => onChange((v || 'featured') as SortOption)}
+    >
       <SelectTrigger className="w-fit">
         <SelectValue placeholder="Sort by" />
       </SelectTrigger>

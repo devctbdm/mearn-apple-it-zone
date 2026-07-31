@@ -106,10 +106,9 @@ const CartPage = () => {
                 </div>
               </dl>
 
-              <Link href="/checkout" className="mt-5 block">
-                <Button fullWidth size="lg">
+              <Link href="/checkout" className="mt-5">
+                <Button variant="outline" className="w-full">
                   Proceed to Checkout
-                  <ArrowRight className="ml-2" size={18} />
                 </Button>
               </Link>
 

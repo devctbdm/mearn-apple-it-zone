@@ -39,6 +39,19 @@ const categoryStorage = new CloudinaryStorage({
   },
 });
 
+const sliderStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'apple-it-zone/sliders',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    transformation: [{ width: 1600, height: 600, crop: 'limit' }],
+    public_id: (_req, _file) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      return `slider-${uniqueSuffix}`;
+    },
+  },
+});
+
 // ---- Multer instances with file filter ----
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -62,6 +75,12 @@ const categoryUpload = multer({
   fileFilter,
 });
 
+const sliderUpload = multer({
+  storage: sliderStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter,
+});
+
 // ---- Middleware exports ----
 export const uploadSingle = productUpload.single('image');
 export const uploadMultiple = productUpload.array('images', 10);
@@ -69,4 +88,5 @@ export const uploadCategoryFields = categoryUpload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'banner', maxCount: 1 },
 ]);
+export const uploadSliderImage = sliderUpload.single('image');
 export { cloudinary };

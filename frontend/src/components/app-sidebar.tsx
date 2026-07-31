@@ -34,6 +34,7 @@ import {
   Apple,
   ShoppingBasket,
   Gem,
+  Images,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -89,6 +90,11 @@ const data = {
       title: 'Promo Managements',
       url: '/admin/promo',
       icon: <Gem />,
+    },
+    {
+      title: 'Sliders',
+      url: '/admin/slider',
+      icon: <Images />,
     }
   ],
   navClouds: [

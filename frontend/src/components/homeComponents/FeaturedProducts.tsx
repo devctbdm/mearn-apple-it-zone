@@ -43,8 +43,8 @@ const FeaturedProducts = () => {
             id: p._id,
             name: p.name,
             slug: p.slug,
-            price: p.price,
-            comparePrice: p.discountPrice > 0 ? p.discountPrice : null,
+            price: p.discountPrice > 0 ? p.discountPrice : p.price,
+            comparePrice: p.discountPrice > 0 ? p.price : null,
             images: p.images || [],
             isFeatured: p.featured,
             category: {

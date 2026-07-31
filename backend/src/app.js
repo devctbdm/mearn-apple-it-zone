@@ -21,6 +21,7 @@ import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import promoRoutes from './routes/promoRoutes.js';
+import sliderRoutes from './routes/sliderRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -99,6 +100,7 @@ app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/promo', promoRoutes);
+app.use('/api/sliders', sliderRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

@@ -159,7 +159,7 @@ export default function CategoryPage({ params }: Props) {
           </aside>
 
           <div className="flex-1 min-w-0">
-            <div className="mb-4 flex items-center justify-end">
+            <div className="mb-4 flex items-center justify-end border p-2 rounded-lg">
               <ProductSort value={sort} onChange={setSort} />
             </div>
             {filteredProducts.length > 0 ? (

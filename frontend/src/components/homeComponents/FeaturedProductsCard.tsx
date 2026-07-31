@@ -127,10 +127,10 @@ export function FeaturedProductsCard({
           ------------------------------------------------------------ */}
       <Link
         href={`/product/${product.slug}`}
-        className="block overflow-hidden"
+        className="flex justify-center items-center overflow-hidden"
       >
         <div
-          className="relative w-full overflow-hidden bg-gray-100"
+          className="relative h-48 w-48 overflow-hidden bg-gray-100"
           style={{ height: imageHeight }}
         >
           <Image

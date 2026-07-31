@@ -67,6 +67,56 @@ export const categoryApi = {
     api.put<{ success: boolean; message: string }>('/categories/reorder', { orders }),
 };
 
+export type SliderType = 'hero' | 'ad_top' | 'ad_bottom';
+
+export type Slider = {
+  _id: string;
+  title: string;
+  description: string;
+  image: string;
+  link: string;
+  type: SliderType;
+  active: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SliderForm = {
+  title: string;
+  description: string;
+  image: string;
+  link: string;
+  type: SliderType;
+  active: boolean;
+  sortOrder: number;
+};
+
+export const sliderApi = {
+  getAll: (params?: { active?: boolean }) =>
+    api.get<{ success: boolean; sliders: Slider[] }>('/sliders', {
+      params: params ? { active: params.active ? 'true' : undefined } : undefined,
+    }),
+
+  create: (data: SliderForm, image?: File | null) =>
+    api.post<{ success: boolean; slider: Slider }>(
+      '/sliders',
+      toFormData(data as any, { image }),
+    ),
+
+  update: (id: string, data: Partial<SliderForm>, image?: File | null) =>
+    api.put<{ success: boolean; slider: Slider }>(
+      `/sliders/${id}`,
+      toFormData(data as any, { image }),
+    ),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/sliders/${id}`),
+
+  reorder: (orders: { id: string; sortOrder: number }[]) =>
+    api.put<{ success: boolean; message: string }>('/sliders/reorder', { orders }),
+};
+
 export type AdminUser = {
   _id: string;
   name: string;
