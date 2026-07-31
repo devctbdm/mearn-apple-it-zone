@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Eye,
   Pencil,
@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   Search,
   ShoppingBag,
-  Clock,
   Loader2,
   CheckCircle2,
   Download,
@@ -68,104 +67,11 @@ import {
 } from '@/components/ui/pagination';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
+import { orderApi, type Order, type OrderStatus } from '@/lib/api';
 
-type OrderStatus =
-  'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 type StatusFilter = OrderStatus | 'all';
 
-interface OrderItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
-interface Order {
-  id: string;
-  customer: string;
-  email: string;
-  date: string;
-  total: number;
-  status: OrderStatus;
-  items: OrderItem[];
-  shippingAddress: string;
-  paymentMethod: string;
-}
-
-const products = [
-  { name: 'Wireless Headphones', price: 99.99 },
-  { name: 'USB-C Cable', price: 12.5 },
-  { name: 'Bluetooth Speaker', price: 89.5 },
-  { name: 'Smart Watch', price: 249.0 },
-  { name: 'Phone Case', price: 15.0 },
-  { name: 'Mechanical Keyboard', price: 149.99 },
-  { name: 'Gaming Mouse', price: 59.0 },
-  { name: 'Laptop Stand', price: 39.0 },
-  { name: 'Webcam HD', price: 79.0 },
-  { name: 'Desk Lamp', price: 45.0 },
-];
-const names = [
-  'Alice Johnson',
-  'Bob Smith',
-  'Carol Davis',
-  'David Lee',
-  'Eva Martinez',
-  'Frank Wilson',
-  'Grace Kim',
-  'Henry Brown',
-  'Ivy Chen',
-  'Jack Taylor',
-  'Kate Miller',
-  'Liam Garcia',
-  'Mia Anderson',
-  'Noah Thomas',
-  'Olivia White',
-  'Peter Hall',
-  'Quinn Adams',
-  'Rachel Green',
-  'Sam Clarke',
-  'Tina Lopez',
-  'Uma Patel',
-  'Victor Ross',
-  'Wendy Cole',
-  'Xander Reed',
-  'Yara Fox',
-];
-const statuses: OrderStatus[] = [
-  'pending',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-];
-
-const generateOrders = (): Order[] =>
-  Array.from({ length: 25 }, (_, i) => {
-    const itemCount = (i % 3) + 1;
-    const items: OrderItem[] = Array.from({ length: itemCount }, (_, j) => {
-      const p = products[(i + j) % products.length];
-      return { name: p.name, qty: (j % 2) + 1, price: p.price };
-    });
-    const total = items.reduce((s, it) => s + it.price * it.qty, 0);
-    const day = ((i * 3) % 28) + 1;
-    return {
-      id: `ORD-${1024 + i}`,
-      customer: names[i % names.length],
-      email:
-        names[i % names.length].toLowerCase().replace(' ', '.') +
-        '@example.com',
-      date: `2026-06-${String(day).padStart(2, '0')}`,
-      total: Number(total.toFixed(2)),
-      status: statuses[i % statuses.length],
-      items,
-      shippingAddress: `${100 + i} Main St, City ${i + 1}`,
-      paymentMethod: i % 2 === 0 ? 'Visa •••• 4242' : 'Mastercard •••• 8888',
-    };
-  });
-
-const initialOrders: Order[] = generateOrders();
-
 const statusVariant: Record<OrderStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
   shipped: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
   delivered: 'bg-green-100 text-green-800 hover:bg-green-100',
@@ -174,66 +80,143 @@ const statusVariant: Record<OrderStatus, string> = {
 
 const PAGE_SIZE = 8;
 
+const shortId = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+
+const formatAmount = (n: number) => `৳${n.toLocaleString()}`;
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+const getCustomer = (o: Order) => (typeof o.user === 'object' ? o.user : null);
+
+const formatAddress = (a: Order['shippingAddress']) =>
+  [a.street, a.city, a.state, a.postcode, a.country].filter(Boolean).join(', ');
+
+const paymentLabel = (method: string) => {
+  switch (method) {
+    case 'cod':
+      return 'Cash on Delivery';
+    case 'bkash':
+      return 'bKash';
+    case 'nagad':
+      return 'Nagad';
+    case 'sslcommerz':
+      return 'SSLCommerz';
+    default:
+      return method;
+  }
+};
+
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<{
+    total: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+  } | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
-  const [editStatus, setEditStatus] = useState<OrderStatus>('pending');
+  const [editStatus, setEditStatus] = useState<OrderStatus>('processing');
   const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
 
-  const stats = useMemo(
-    () => ({
-      total: orders.length,
-      pending: orders.filter((o) => o.status === 'pending').length,
-      processing: orders.filter((o) => o.status === 'processing').length,
-      delivered: orders.filter((o) => o.status === 'delivered').length,
-    }),
-    [orders]
-  );
+  const fetchOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await orderApi.getAllOrders({
+        page,
+        limit: PAGE_SIZE,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      });
+      if (data.success) {
+        setOrders(data.orders);
+        setTotal(data.total);
+        setTotalPages(data.pages);
+      }
+    } catch {
+      toast.error('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, statusFilter]);
 
-  const filtered = useMemo(
-    () =>
-      orders.filter((o) => {
-        const matchesQ =
-          o.id.toLowerCase().includes(query.toLowerCase()) ||
-          o.customer.toLowerCase().includes(query.toLowerCase()) ||
-          o.email.toLowerCase().includes(query.toLowerCase());
-        const matchesS = statusFilter === 'all' || o.status === statusFilter;
-        return matchesQ && matchesS;
-      }),
-    [orders, query, statusFilter]
-  );
+  const fetchStats = useCallback(async () => {
+    try {
+      const { data } = await orderApi.getStats();
+      if (data.success) setStats(data.stats);
+    } catch {
+      // stats are best-effort
+    }
+  }, []);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter((o) => {
+      const cust = getCustomer(o);
+      const haystack = [
+        o._id,
+        cust?.name || '',
+        cust?.email || '',
+        o.shippingAddress.city,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [orders, query]);
+
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
 
-  const handleSaveStatus = () => {
+  const handleSaveStatus = async () => {
     if (!editOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === editOrder.id ? { ...o, status: editStatus } : o
-      )
-    );
-    toast.success(`Order ${editOrder.id} status updated to ${editStatus}`);
-    setEditOrder(null);
+    try {
+      await orderApi.updateStatus(editOrder._id, editStatus);
+      toast.success(
+        `Order ${shortId(editOrder._id)} status updated to ${editStatus}`
+      );
+      setEditOrder(null);
+      fetchOrders();
+      fetchStats();
+    } catch {
+      toast.error('Failed to update order status');
+    }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!cancelOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === cancelOrder.id ? { ...o, status: 'cancelled' } : o
-      )
-    );
-    toast.success(`Order ${cancelOrder.id} cancelled`);
-    setCancelOrder(null);
+    try {
+      await orderApi.updateStatus(cancelOrder._id, 'cancelled');
+      toast.success(`Order ${shortId(cancelOrder._id)} cancelled`);
+      setCancelOrder(null);
+      fetchOrders();
+      fetchStats();
+    } catch {
+      toast.error('Failed to cancel order');
+    }
   };
 
   const handleExportCSV = () => {
@@ -249,23 +232,26 @@ export default function OrdersPage() {
       'Items',
     ];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const rows = filtered.map((o) =>
-      [
-        o.id,
-        o.customer,
-        o.email,
-        o.date,
-        o.total.toFixed(2),
-        o.status,
-        o.paymentMethod,
-        o.shippingAddress,
+    const rows = filtered.map((o) => {
+      const cust = getCustomer(o);
+      return [
+        shortId(o._id),
+        cust?.name || '',
+        cust?.email || '',
+        formatDate(o.createdAt),
+        o.totalAmount,
+        o.orderStatus,
+        paymentLabel(o.payment.method),
+        formatAddress(o.shippingAddress),
         o.items
-          .map((it) => `${it.qty}x ${it.name} @$${it.price.toFixed(2)}`)
+          .map(
+            (it) => `${it.quantity}x ${it.name} @৳${it.price.toLocaleString()}`
+          )
           .join('; '),
       ]
         .map((v) => escape(String(v)))
-        .join(',')
-    );
+        .join(',');
+    });
     const csv = [headers.map(escape).join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -285,14 +271,21 @@ export default function OrdersPage() {
       toast.error('Please allow popups to print invoices.');
       return;
     }
+    const cust = getCustomer(order);
+    const itemsSubtotal = order.items.reduce(
+      (s, it) => s + it.price * it.quantity,
+      0
+    );
     const itemsRows = order.items
       .map(
         (it) => `
           <tr>
             <td style="padding:8px;border-bottom:1px solid #eee;">${it.name}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.qty}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">$${it.price.toFixed(2)}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">$${(it.price * it.qty).toFixed(2)}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.quantity}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">৳${it.price.toLocaleString()}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">৳${(
+              it.price * it.quantity
+            ).toLocaleString()}</td>
           </tr>`
       )
       .join('');
@@ -301,7 +294,7 @@ export default function OrdersPage() {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Invoice ${order.id}</title>
+          <title>Invoice ${shortId(order._id)}</title>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; color: #111; padding: 32px; }
             h1 { margin: 0 0 4px; font-size: 24px; }
@@ -316,19 +309,19 @@ export default function OrdersPage() {
         </head>
         <body>
           <h1>Invoice</h1>
-          <div class="muted">Order ${order.id} · ${order.date}</div>
+          <div class="muted">Order ${shortId(order._id)} · ${formatDate(order.createdAt)}</div>
           <div class="row">
             <div class="box">
               <div class="muted">Billed to</div>
-              <div><strong>${order.customer}</strong></div>
-              <div>${order.email}</div>
-              <div>${order.shippingAddress}</div>
+              <div><strong>${cust?.name || ''}</strong></div>
+              <div>${cust?.email || ''}</div>
+              <div>${formatAddress(order.shippingAddress)}</div>
             </div>
             <div class="box" style="text-align:right;">
               <div class="muted">Payment</div>
-              <div>${order.paymentMethod}</div>
+              <div>${paymentLabel(order.payment.method)}</div>
               <div class="muted" style="margin-top:8px;">Status</div>
-              <div style="text-transform:capitalize;">${order.status}</div>
+              <div style="text-transform:capitalize;">${order.orderStatus}</div>
             </div>
           </div>
           <table>
@@ -342,7 +335,15 @@ export default function OrdersPage() {
             </thead>
             <tbody>${itemsRows}</tbody>
           </table>
-          <div class="total">Total: $${order.total.toFixed(2)}</div>
+          <div style="text-align:right; margin-top:16px;">
+            <div class="muted">Subtotal: ৳${itemsSubtotal.toLocaleString()}</div>
+            ${
+              order.coupon && order.coupon.discount > 0
+                ? `<div class="muted">Coupon (${order.coupon.code}): -৳${order.coupon.discount.toLocaleString()}</div>`
+                : ''
+            }
+            <div class="total" style="margin-top:4px;">Total: ৳${order.totalAmount.toLocaleString()}</div>
+          </div>
           <div class="footer">Thank you for your order.</div>
           <script>window.onload = () => { window.print(); };</script>
         </body>
@@ -354,27 +355,27 @@ export default function OrdersPage() {
   const statCards = [
     {
       label: 'Total Orders',
-      value: stats.total,
+      value: stats?.total ?? total,
       icon: ShoppingBag,
       color: 'text-foreground',
     },
     {
-      label: 'Pending',
-      value: stats.pending,
-      icon: Clock,
-      color: 'text-yellow-600',
-    },
-    {
       label: 'Processing',
-      value: stats.processing,
+      value: stats?.processing ?? 0,
       icon: Loader2,
       color: 'text-blue-600',
     },
     {
       label: 'Delivered',
-      value: stats.delivered,
+      value: stats?.delivered ?? 0,
       icon: CheckCircle2,
       color: 'text-green-600',
+    },
+    {
+      label: 'Cancelled',
+      value: stats?.cancelled ?? 0,
+      icon: XCircle,
+      color: 'text-red-600',
     },
   ];
 
@@ -426,7 +427,6 @@ export default function OrdersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
@@ -455,7 +455,16 @@ export default function OrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paged.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : paged.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -465,65 +474,72 @@ export default function OrdersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paged.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{order.customer}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {order.email}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>${order.total.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={statusVariant[order.status]}
-                        variant="secondary"
-                      >
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <div className="flex items-center gap-2">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open actions</span>
-                          </div>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setViewOrder(order)}>
-                            <Eye className="mr-2 h-4 w-4" /> View details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditOrder(order);
-                              setEditStatus(order.status);
-                            }}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" /> Edit status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handlePrintInvoice(order)}
-                          >
-                            <Printer className="mr-2 h-4 w-4" /> Print invoice
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            disabled={order.status === 'cancelled'}
-                            onClick={() => setCancelOrder(order)}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" /> Cancel order
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                paged.map((order) => {
+                  const cust = getCustomer(order);
+                  return (
+                    <TableRow key={order._id}>
+                      <TableCell className="font-medium">
+                        {shortId(order._id)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{cust?.name || '—'}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {cust?.email || ''}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                      <TableCell>{formatAmount(order.totalAmount)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={statusVariant[order.orderStatus]}
+                          variant="secondary"
+                        >
+                          {order.orderStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <div className="flex items-center gap-2">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open actions</span>
+                            </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setViewOrder(order)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" /> View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditOrder(order);
+                                setEditStatus(order.orderStatus);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Edit status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePrintInvoice(order)}
+                            >
+                              <Printer className="mr-2 h-4 w-4" /> Print invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              disabled={order.orderStatus === 'cancelled'}
+                              onClick={() => setCancelOrder(order)}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" /> Cancel order
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -595,49 +611,58 @@ export default function OrdersPage() {
         </div>
 
         {/* View details dialog */}
-        <Dialog
-          open={!!viewOrder}
-          onOpenChange={(o) => !o && setViewOrder(null)}
-        >
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Order {viewOrder?.id}</DialogTitle>
-              <DialogDescription>Placed on {viewOrder?.date}</DialogDescription>
-            </DialogHeader>
-            {viewOrder && (
+        {viewOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-150 rounded-lg bg-white p-6 shadow-lg">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">
+                  Order {shortId(viewOrder._id)}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Placed on {formatDate(viewOrder.createdAt)}
+                </p>
+              </div>
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="font-medium">Customer</div>
                     <div className="text-muted-foreground">
-                      {viewOrder.customer}
+                      {getCustomer(viewOrder)?.name || '—'}
                     </div>
                     <div className="text-muted-foreground">
-                      {viewOrder.email}
+                      {getCustomer(viewOrder)?.email || ''}
                     </div>
                   </div>
                   <div>
                     <div className="font-medium">Status</div>
                     <Badge
-                      className={statusVariant[viewOrder.status]}
+                      className={statusVariant[viewOrder.orderStatus]}
                       variant="secondary"
                     >
-                      {viewOrder.status}
+                      {viewOrder.orderStatus}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <div className="font-medium">Shipping Address</div>
                   <div className="text-muted-foreground">
-                    {viewOrder.shippingAddress}
+                    {formatAddress(viewOrder.shippingAddress)}
                   </div>
                 </div>
                 <div>
                   <div className="font-medium">Payment</div>
                   <div className="text-muted-foreground">
-                    {viewOrder.paymentMethod}
+                    {paymentLabel(viewOrder.payment.method)}
                   </div>
                 </div>
+                {viewOrder.note ? (
+                  <div>
+                    <div className="font-medium">Note</div>
+                    <div className="text-muted-foreground">
+                      {viewOrder.note}
+                    </div>
+                  </div>
+                ) : null}
                 <div>
                   <div className="mb-2 font-medium">Items</div>
                   <div className="rounded-md border">
@@ -654,34 +679,59 @@ export default function OrdersPage() {
                           <TableRow key={idx}>
                             <TableCell>{it.name}</TableCell>
                             <TableCell className="text-center">
-                              {it.qty}
+                              {it.quantity}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${(it.price * it.qty).toFixed(2)}
+                              {formatAmount(it.price * it.quantity)}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                  <div className="mt-3 flex justify-end font-semibold">
-                    Total: ${viewOrder.total.toFixed(2)}
+                  <div className="mt-3 space-y-1">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>
+                        Subtotal ({viewOrder.items.length}{' '}
+                        item{viewOrder.items.length === 1 ? '' : 's'})
+                      </span>
+                      <span>
+                        {formatAmount(
+                          viewOrder.items.reduce(
+                            (sum, it) => sum + it.price * it.quantity,
+                            0
+                          )
+                        )}
+                      </span>
+                    </div>
+                    {viewOrder.coupon && viewOrder.coupon.discount > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          Coupon ({viewOrder.coupon.code})
+                        </span>
+                        <span className="font-medium text-green-600">
+                          -{formatAmount(viewOrder.coupon.discount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t border-gray-200 pt-1 font-semibold">
+                      <span>Total</span>
+                      <span>{formatAmount(viewOrder.totalAmount)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
-            {viewOrder && (
-              <DialogFooter>
+              <div className="mt-6 flex justify-start gap-2">
                 <Button variant="outline" onClick={() => setViewOrder(null)}>
                   Close
                 </Button>
                 <Button onClick={() => handlePrintInvoice(viewOrder)}>
                   <Printer className="mr-2 h-4 w-4" /> Print invoice
                 </Button>
-              </DialogFooter>
-            )}
-          </DialogContent>
-        </Dialog>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Edit status dialog */}
         <Dialog
@@ -692,7 +742,7 @@ export default function OrdersPage() {
             <DialogHeader>
               <DialogTitle>Edit Order Status</DialogTitle>
               <DialogDescription>
-                Update status for {editOrder?.id}
+                Update status for {editOrder ? shortId(editOrder._id) : ''}
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
@@ -704,7 +754,6 @@ export default function OrdersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
                   <SelectItem value="shipped">Shipped</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
@@ -730,8 +779,8 @@ export default function OrdersPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
               <AlertDialogDescription>
-                Order {cancelOrder?.id} will be marked as cancelled. This action
-                cannot be undone.
+                Order {cancelOrder ? shortId(cancelOrder._id) : ''} will be
+                marked as cancelled. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

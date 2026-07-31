@@ -4,8 +4,12 @@ import { createAuthSlice, AuthSlice } from './slices/auth.slice';
 import { createCartSlice, CartSlice } from './slices/cart.slice';
 import { createUISlice, UISlice } from './slices/ui.slice';
 import { createCheckoutSlice, CheckoutSlice } from './slices/checkout.slice';
+import {
+  createCompareSlice,
+  CompareSlice,
+} from './slices/compare.slice';
 
-export type RootStore = AuthSlice & CartSlice & UISlice & CheckoutSlice;
+export type RootStore = AuthSlice & CartSlice & UISlice & CheckoutSlice & CompareSlice;
 
 // Create the root store
 export const useAppStore = create<RootStore>()(
@@ -15,6 +19,7 @@ export const useAppStore = create<RootStore>()(
       ...createCartSlice(...args),
       ...createUISlice(...args),
       ...createCheckoutSlice(...args),
+      ...createCompareSlice(...args),
     }),
     {
       name: 'appleitzone-storage', // localStorage key
@@ -34,6 +39,9 @@ export const useAppStore = create<RootStore>()(
           paymentMethod: state.paymentMethod,
           step: state.step,
         },
+        compare: {
+          compareItems: state.compareItems,
+        },
       }),
       merge: (persistedState: any, currentState: RootStore) => {
         return {
@@ -41,6 +49,7 @@ export const useAppStore = create<RootStore>()(
           ...(persistedState?.cart || {}),
           ...(persistedState?.ui || {}),
           ...(persistedState?.checkout || {}),
+          ...(persistedState?.compare || {}),
         };
       },
     }
@@ -139,5 +148,18 @@ export const useCheckout = () => {
     setNotes,
     goToStep,
     resetCheckout,
+  };
+};
+
+export const useCompare = () => {
+  const compareItems = useAppStore((state) => state.compareItems);
+  const addToCompare = useAppStore((state) => state.addToCompare);
+  const removeFromCompare = useAppStore((state) => state.removeFromCompare);
+  const clearCompare = useAppStore((state) => state.clearCompare);
+  return {
+    compareItems,
+    addToCompare,
+    removeFromCompare,
+    clearCompare,
   };
 };

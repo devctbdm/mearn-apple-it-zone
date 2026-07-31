@@ -3,6 +3,24 @@ import { StateCreator } from 'zustand';
 import { CartItem } from '../types';
 import api from '@/lib/axios';
 
+const isBrowser = () => typeof window !== 'undefined';
+
+// Matches the axios interceptor: a stored token = logged-in (server will accept the request)
+const isAuthed = () =>
+  isBrowser() && !!localStorage.getItem('mobile_token');
+
+// Map backend cart items -> local CartItem shape
+const mapServerItems = (items: any[]): CartItem[] =>
+  (items || []).map((i: any) => ({
+    productId: i.product?._id ?? i.product,
+    name: i.name,
+    price: i.price,
+    promoDiscount: i.promoDiscount || 0,
+    quantity: i.quantity,
+    image: i.image,
+    stock: i.product?.stock ?? i.stock ?? 0,
+  }));
+
 export interface CartSlice {
   items: CartItem[];
   totalItems: number;
@@ -45,11 +63,14 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
   },
 
   fetchCart: async () => {
+    if (!isAuthed()) return;
     set({ isLoading: true, error: null });
     try {
       const response = await api.get('/cart');
       if (response.data.success) {
-        const items: CartItem[] = response.data.items || [];
+        const items = mapServerItems(
+          response.data.cart?.items ?? response.data.items ?? []
+        );
         const { totalItems, totalPrice } = get().recalculateTotals(items);
         set({ items, totalItems, totalPrice, isLoading: false });
       }
@@ -84,14 +105,45 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
     const { totalItems, totalPrice } = get().recalculateTotals(newItems);
     set({ items: newItems, totalItems, totalPrice });
 
-    // 🚀 Sync with backend if user is logged in
-    // We'll let the persistence middleware handle local storage for guests
+    // Guests stay local (persisted in localStorage). Logged-in users persist to the server.
+    if (!isAuthed()) return;
+
+    try {
+      const response = await api.post('/cart', {
+        productId: product.productId,
+        name: product.name,
+        price: product.price,
+        promoDiscount: product.promoDiscount || 0,
+        quantity: product.quantity || 1,
+        image: product.image || '',
+      });
+      if (response.data.success && response.data.cart) {
+        const serverItems = mapServerItems(response.data.cart.items);
+        const totals = get().recalculateTotals(serverItems);
+        set({ items: serverItems, ...totals });
+      }
+    } catch (error) {
+      console.error('Failed to sync cart to server:', error);
+    }
   },
 
   removeItem: async (productId: string) => {
     const newItems = get().items.filter((item) => item.productId !== productId);
     const { totalItems, totalPrice } = get().recalculateTotals(newItems);
     set({ items: newItems, totalItems, totalPrice });
+
+    if (!isAuthed()) return;
+
+    try {
+      const response = await api.delete(`/cart/${productId}`);
+      if (response.data.success && response.data.cart) {
+        const serverItems = mapServerItems(response.data.cart.items);
+        const totals = get().recalculateTotals(serverItems);
+        set({ items: serverItems, ...totals });
+      }
+    } catch (error) {
+      console.error('Failed to sync cart to server:', error);
+    }
   },
 
   updateQuantity: async (productId: string, quantity: number) => {
@@ -104,20 +156,54 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
     );
     const { totalItems, totalPrice } = get().recalculateTotals(newItems);
     set({ items: newItems, totalItems, totalPrice });
+
+    if (!isAuthed()) return;
+
+    try {
+      const response = await api.put('/cart', { productId, quantity });
+      if (response.data.success && response.data.cart) {
+        const serverItems = mapServerItems(response.data.cart.items);
+        const totals = get().recalculateTotals(serverItems);
+        set({ items: serverItems, ...totals });
+      }
+    } catch (error) {
+      console.error('Failed to sync cart to server:', error);
+    }
   },
 
   clearCart: async () => {
     set({ items: [], totalItems: 0, totalPrice: 0 });
+
+    if (!isAuthed()) return;
+
+    try {
+      await api.delete('/cart/clear');
+    } catch (error) {
+      console.error('Failed to clear cart on server:', error);
+    }
   },
 
   syncCartWithBackend: async () => {
-    // If user just logged in, send local cart items to backend
+    // Merge the guest (local) cart into the server cart after login
+    if (!isAuthed()) return;
+
     const { items } = get();
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      await get().fetchCart();
+      return;
+    }
 
     try {
-      await api.post('/cart/sync', { items });
-      // Optionally refetch from backend to ensure consistency
+      for (const item of items) {
+        await api.post('/cart', {
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          promoDiscount: item.promoDiscount || 0,
+          quantity: item.quantity,
+          image: item.image || '',
+        });
+      }
       await get().fetchCart();
     } catch (error) {
       console.error('Failed to sync cart:', error);

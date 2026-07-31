@@ -39,13 +39,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {/* Image Section */}
       <Link
         href={`/product/${product.slug}`}
-        className="block relative overflow-hidden"
+        className="relative overflow-hidden flex items-center justify-center"
       >
         <motion.div
           variants={imageZoom}
           initial="initial"
           whileHover="hover"
-          className="relative h-48 md:h-56 w-full bg-gray-100"
+          className="relative h-48 md:h-56 w-48 bg-gray-100"
         >
           <Image
             src={imageUrl}
@@ -108,7 +108,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               {product.averageRating.toFixed(1)}
             </span>
             <span className="text-xs text-gray-400">
-              ({product.ratings?.length || 0})
+              (
+              {product.ratings?.filter((r) => r.status === 'approved').length ||
+                0}
+              )
             </span>
           </div>
         )}

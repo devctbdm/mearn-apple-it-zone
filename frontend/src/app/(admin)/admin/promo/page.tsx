@@ -247,8 +247,12 @@ export default function PromoPage() {
       toast.error("Promo code is required");
       return;
     }
-    if (payload.type === "percentage" && (payload.value < 0 || payload.value > 100)) {
-      toast.error("Percentage value must be between 0 and 100");
+    if (payload.type === "percentage" && (payload.value <= 0 || payload.value > 100)) {
+      toast.error("Percentage value must be greater than 0 and at most 100");
+      return;
+    }
+    if (payload.type === "fixed" && payload.value <= 0) {
+      toast.error("Discount amount must be greater than 0");
       return;
     }
 

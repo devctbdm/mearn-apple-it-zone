@@ -266,8 +266,14 @@ export const authApi = {
     api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}/default`),
 };
 
+export type OrderStatus =
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
 export type OrderItem = {
-  product: string;
+  product: string | { _id: string; name: string };
   name: string;
   price: number;
   quantity: number;
@@ -276,7 +282,9 @@ export type OrderItem = {
 
 export type Order = {
   _id: string;
-  user: string;
+  user:
+    | string
+    | { _id: string; name: string; email: string; phone?: string };
   items: OrderItem[];
   shippingAddress: {
     street: string;
@@ -286,19 +294,57 @@ export type Order = {
     country: string;
   };
   totalAmount: number;
+  coupon?: {
+    code: string;
+    discount: number;
+  };
   payment: {
     method: string;
     status: string;
     paidAt?: string;
   };
-  orderStatus: 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  orderStatus: OrderStatus;
+  note?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type OrderStats = {
+  total: number;
+  processing: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
 };
 
 export const orderApi = {
   getMyOrders: () =>
     api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
+
+  getAllOrders: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get<{
+      success: boolean;
+      total: number;
+      page: number;
+      pages: number;
+      orders: Order[];
+    }>('/orders', { params }),
+
+  getStats: () =>
+    api.get<{ success: boolean; stats: OrderStats }>('/orders/stats'),
+
+  updateStatus: (id: string, status: OrderStatus) =>
+    api.put<{ success: boolean; order: Order }>(`/orders/${id}/status`, {
+      status,
+    }),
+
+  create: (data: {
+    items: { product: string; quantity: number }[];
+    shippingAddress: Order['shippingAddress'];
+    paymentMethod: string;
+    note?: string;
+    couponCode?: string;
+  }) => api.post<{ success: boolean; order: Order }>('/orders', data),
 };
 
 export type ProductFormData = {
@@ -326,6 +372,9 @@ export const productApi = {
 
   getBySlug: (slug: string) =>
     api.get<{ success: boolean; product: any }>(`/products/slug/${slug}`),
+
+  addRating: (id: string, data: { rating: number; comment?: string }) =>
+    api.post<{ success: boolean; product: any }>(`/products/${id}/ratings`, data),
 
   update: (id: string, data: FormData) =>
     api.put<{ success: boolean; product: any }>(`/products/${id}`, data),
@@ -424,6 +473,17 @@ export const questionApi = {
   }) => api.get<QuestionPaginatedResponse>('/questions', { params }),
 
   getStats: () => api.get<{ success: boolean; stats: QuestionStats }>('/questions/stats'),
+
+  getByProduct: (productId: string) =>
+    api.get<{ success: boolean; count: number; questions: Question[] }>(
+      `/questions/product/${productId}`
+    ),
+
+  ask: (productId: string, question: string) =>
+    api.post<{ success: boolean; question: Question }>('/questions', {
+      productId,
+      question,
+    }),
 
   update: (id: string, data: { answer?: string; status?: string; featured?: boolean }) =>
     api.patch<{ success: boolean; question: Question }>(`/questions/${id}`, data),

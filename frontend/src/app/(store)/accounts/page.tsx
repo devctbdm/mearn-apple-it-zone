@@ -59,12 +59,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { authApi, orderApi, SavedAddress } from '@/lib/api';
 
 type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
+type OrderItem = {
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+};
 type Order = {
   id: string;
   date: string;
-  items: number;
   total: number;
   status: OrderStatus;
+  items: OrderItem[];
+  coupon?: { code: string; discount: number };
 };
 
 type Address = {
@@ -199,9 +206,15 @@ export default function AccountPage() {
             data.orders.map((o) => ({
               id: o._id,
               date: o.createdAt,
-              items: o.items.reduce((a, i) => a + i.quantity, 0),
               total: o.totalAmount,
               status: o.orderStatus,
+              coupon: o.coupon,
+              items: o.items.map((i) => ({
+                name: i.name,
+                price: i.price,
+                quantity: i.quantity,
+                image: i.image,
+              })),
             }))
           );
         }
@@ -387,40 +400,70 @@ export default function AccountPage() {
                   return (
                     <div
                       key={o.id}
-                      className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="rounded-lg border bg-card p-4"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                          <Package className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{o.id}</p>
-                            <Badge
-                              variant="secondary"
-                              className={meta.className}
-                            >
-                              <Icon className="mr-1 h-3 w-3" />
-                              {meta.label}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(o.date).toLocaleDateString()} · {o.items}{' '}
-                            item{o.items > 1 ? 's' : ''}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">
+                            Order {o.id.slice(-6).toUpperCase()}
                           </p>
+                          <Badge
+                            variant="secondary"
+                            className={meta.className}
+                          >
+                            <Icon className="mr-1 h-3 w-3" />
+                            {meta.label}
+                          </Badge>
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 sm:justify-end">
                         <p className="font-semibold">
-                          ${o.total.toLocaleString()}
+                          ৳{o.total.toLocaleString()}
                         </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toast.message(`Viewing ${o.id}`)}
-                        >
-                          View
-                        </Button>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(o.date).toLocaleDateString()} · {o.items.length}{' '}
+                        item{o.items.length > 1 ? 's' : ''}
+                      </p>
+                      {o.coupon && o.coupon.discount > 0 && (
+                        <div className="mt-1 flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            Coupon ({o.coupon.code})
+                          </span>
+                          <span className="font-medium text-green-600">
+                            -৳{o.coupon.discount.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      <div className="mt-3 space-y-2">
+                        {o.items.map((it, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-3 rounded-md border p-2"
+                          >
+                            {it.image ? (
+                              <img
+                                src={it.image}
+                                alt={it.name}
+                                className="h-14 w-14 shrink-0 rounded-md border object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                {it.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {it.quantity} × ৳{it.price.toLocaleString()}
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium">
+                              ৳
+                              {(it.price * it.quantity).toLocaleString()}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );

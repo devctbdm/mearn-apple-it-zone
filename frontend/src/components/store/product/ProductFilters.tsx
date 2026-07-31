@@ -61,7 +61,7 @@ function FacetSection({
                 onCheckedChange={() => onToggle(option.value)}
                 className="shrink-0"
               />
-              <span className="flex-1 break-words text-gray-700 group-hover:text-gray-900">
+              <span className="flex-1 wrap-break-word text-gray-700 group-hover:text-gray-900">
                 {option.value}
               </span>
               <span className="text-xs text-gray-400">({option.count})</span>

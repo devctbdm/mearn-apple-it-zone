@@ -18,10 +18,13 @@ export const AddToCartButton: React.FC<Props> = ({
   const { addItem, isLoading } = useCart();
 
   const handleAdd = async () => {
+    const hasPromo =
+      product.discountPrice > 0 && product.discountPrice < product.price;
     await addItem({
       productId: product._id,
       name: product.name,
-      price: product.discountPrice > 0 ? product.discountPrice : product.price,
+      price: hasPromo ? product.discountPrice : product.price,
+      promoDiscount: hasPromo ? product.price - product.discountPrice : 0,
       image: product.images[0],
       stock: product.stock,
       quantity,
@@ -33,7 +36,7 @@ export const AddToCartButton: React.FC<Props> = ({
       onClick={handleAdd}
       loading={isLoading}
       fullWidth
-      size="lg"
+      size="sm"
       disabled={disabled}
     >
       Add to Cart

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth, useCart } from "@/store";
 import Link from "next/link";
 
 const registerSchema = z
@@ -56,6 +57,8 @@ const initialValues: FormValues = {
 
 function RegisterPage() {
   const router = useRouter();
+  const { fetchUser } = useAuth();
+  const { syncCartWithBackend } = useCart();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -101,6 +104,9 @@ function RegisterPage() {
         localStorage.setItem("mobile_token", data.token);
         document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       }
+
+      await fetchUser().catch(() => {});
+      await syncCartWithBackend().catch(() => {});
 
       toast.success("Account created! Welcome to Apple IT Zone.");
       router.push("/");

@@ -1,16 +1,20 @@
 // src/app/(store)/product/[slug]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { categoryApi, productApi } from '@/lib/api';
+import { categoryApi, productApi, questionApi } from '@/lib/api';
 import type { Category } from '@/lib/api';
 import { toProductShape, type RawProduct } from '@/lib/productMapper';
 import type { Product } from '@/types/product';
+import { useAuth } from '@/hooks/useAuth';
 import { Breadcrumb } from '@/components/store/layout/Breadcrumb';
 import { AddToCartButton } from '@/components/store/cart/AddToCartButton';
+import { Button } from '@/components/button/Button';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import {
   ChevronLeft,
   Minus,
@@ -18,6 +22,8 @@ import {
   Star,
   MessageSquare,
   HelpCircle,
+  Lock,
+  Send,
 } from 'lucide-react';
 
 interface Props {
@@ -183,6 +189,67 @@ function renderContentBlocks(
   );
 }
 
+// Read-only star display
+function Stars({ value, size = 16 }: { value: number; size?: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          size={size}
+          fill={i <= value ? 'currentColor' : 'none'}
+          className={i <= value ? 'text-yellow-400' : 'text-gray-300'}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Interactive star picker for the review form
+function StarPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button
+          key={i}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(i)}
+          className="p-0.5 transition disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label={`${i} star${i > 1 ? 's' : ''}`}
+        >
+          <Star
+            size={24}
+            fill={i <= value ? 'currentColor' : 'none'}
+            className={
+              i <= value
+                ? 'text-yellow-400'
+                : 'text-gray-300 hover:text-yellow-300'
+            }
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export default function ProductDetailPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
@@ -191,6 +258,17 @@ export default function ProductDetailPage({ params }: Props) {
   const [categorySlugs, setCategorySlugs] = useState<string[]>([]);
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const { user } = useAuth();
+
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [questionText, setQuestionText] = useState('');
+  const [questionError, setQuestionError] = useState('');
+  const [asking, setAsking] = useState(false);
+
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -232,6 +310,84 @@ export default function ProductDetailPage({ params }: Props) {
     };
     fetchData();
   }, [params]);
+
+  const loadQuestions = useCallback(async (productId: string) => {
+    try {
+      const { data } = await questionApi.getByProduct(productId);
+      setQuestions(data.questions || []);
+    } catch {
+      setQuestions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (product?._id) {
+      loadQuestions(product._id);
+    }
+  }, [product?._id, loadQuestions]);
+
+  const handleAsk = async () => {
+    if (!product) return;
+    if (!user) {
+      setQuestionError('Please login to ask a question.');
+      return;
+    }
+    if (!questionText.trim()) {
+      setQuestionError('Please write your question first.');
+      return;
+    }
+    try {
+      setAsking(true);
+      setQuestionError('');
+      const { data } = await questionApi.ask(product._id, questionText.trim());
+      if (data.success) {
+        setQuestionText('');
+        toast.success('Your question has been submitted for review.');
+        loadQuestions(product._id);
+      }
+    } catch (e: any) {
+      setQuestionError(
+        e?.response?.data?.message || 'Failed to submit your question.'
+      );
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!product) return;
+    if (!user) {
+      setReviewError('Please login to write a review.');
+      return;
+    }
+    if (rating < 1) {
+      setReviewError('Please select a star rating.');
+      return;
+    }
+    try {
+      setSubmittingReview(true);
+      setReviewError('');
+      await productApi.addRating(product._id, {
+        rating,
+        comment: comment.trim() || undefined,
+      });
+      const res = await productApi.getBySlug(product.slug);
+      if (res.data.success) {
+        setProduct(toProductShape(res.data.product));
+      }
+      setRating(0);
+      setComment('');
+      toast.success(
+        'Thanks! Your review has been submitted and is awaiting admin approval.'
+      );
+    } catch (e: any) {
+      setReviewError(
+        e?.response?.data?.message || 'Failed to submit your review.'
+      );
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -285,7 +441,9 @@ export default function ProductDetailPage({ params }: Props) {
     '—';
 
   const keyFeatures = extractKeyFeatures(product.specifications || {});
-  const reviewCount = product.ratings?.length || 0;
+  const reviewCount = (product.ratings || []).filter(
+    (r) => r.status === 'approved'
+  ).length;
   const monthlyEmi = Math.round(finalPrice / 12);
   const maxQty = inStock ? product.stock : 0;
   const currentQty = Math.min(Math.max(quantity, 1), maxQty || 1);
@@ -535,8 +693,12 @@ export default function ProductDetailPage({ params }: Props) {
             <TabsList variant="line">
               <TabsTrigger value="specification">Specification</TabsTrigger>
               <TabsTrigger value="description">Description</TabsTrigger>
-              <TabsTrigger value="questions">Questions (0)</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews ({reviewCount})</TabsTrigger>
+              <TabsTrigger value="questions">
+                Questions ({questions.length})
+              </TabsTrigger>
+              <TabsTrigger value="reviews">
+                Reviews ({reviewCount})
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="specification" className="pt-4">
@@ -580,26 +742,205 @@ export default function ProductDetailPage({ params }: Props) {
             </TabsContent>
 
             <TabsContent value="questions" className="pt-4">
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <HelpCircle size={36} className="text-gray-300" />
-                <p className="mt-3 text-gray-500">
-                  No questions yet. Be the first to ask about this product.
-                </p>
+              {/* Existing Q&A */}
+              {questions.length > 0 ? (
+                <div className="space-y-4">
+                  {questions.map((q) => (
+                    <div
+                      key={q._id}
+                      className="rounded-xl border border-gray-200 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {q.question}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {q.user?.name || 'Customer'} ·{' '}
+                            {formatDate(q.createdAt)}
+                          </p>
+                        </div>
+                        {q.featured && (
+                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                      {q.answer ? (
+                        <div className="mt-3 rounded-lg bg-green-50 p-3">
+                          <p className="text-sm leading-relaxed text-green-900">
+                            {q.answer}
+                          </p>
+                          <p className="mt-1 text-xs text-green-700">
+                            Answered by {q.answeredBy?.name || 'Seller'}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs text-gray-400">
+                          Awaiting an answer...
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <HelpCircle size={36} className="text-gray-300" />
+                  <p className="mt-3 text-gray-500">
+                    No questions yet. Be the first to ask about this product.
+                  </p>
+                </div>
+              )}
+
+              {/* Ask form / login gate */}
+              <div className="mt-6 rounded-xl border border-gray-200 p-4">
+                {user ? (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-800">
+                      Ask a Question
+                    </h4>
+                    <Textarea
+                      value={questionText}
+                      onChange={(e) => {
+                        setQuestionText(e.target.value);
+                        setQuestionError('');
+                      }}
+                      placeholder="Write your question about this product..."
+                      rows={3}
+                      className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {questionError && (
+                      <p className="text-sm text-red-600">{questionError}</p>
+                    )}
+                    <Button
+                      onClick={handleAsk}
+                      loading={asking}
+                      disabled={asking}
+                    >
+                      <Send size={16} className="mr-2" /> Submit Question
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center py-4 text-center">
+                    <Lock size={28} className="text-gray-400" />
+                    <p className="mt-2 font-medium text-gray-700">
+                      Login to ask a question
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      You need an account to ask questions about this product.
+                    </p>
+                    <div className="mt-4 flex gap-3">
+                      <Link href="/login">
+                        <Button>Login</Button>
+                      </Link>
+                      <Link href="/register">
+                        <Button variant="outline">Create account</Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
             </TabsContent>
 
             <TabsContent value="reviews" className="pt-4">
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <MessageSquare size={36} className="text-gray-300" />
-                {reviewCount > 0 ? (
+              {/* Existing reviews */}
+              {(product.ratings || []).filter((r) => r.status === 'approved')
+                .length > 0 ? (
+                <div className="space-y-4">
+                  {(product.ratings || [])
+                    .filter((r) => r.status === 'approved')
+                    .map((r) => (
+                      <div
+                        key={r._id || Math.random()}
+                        className="rounded-xl border border-gray-200 p-4"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                              {(r.user?.name || 'C').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">
+                                {r.user?.name || 'Customer'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatDate(r.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <Stars value={r.rating} />
+                        </div>
+                        {r.comment && (
+                          <p className="mt-3 text-sm leading-relaxed text-gray-600">
+                            {r.comment}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <MessageSquare size={36} className="text-gray-300" />
                   <p className="mt-3 text-gray-500">
-                    {reviewCount} review{reviewCount > 1 ? 's' : ''} for this
-                    product.
+                    No reviews yet for this product. Be the first to review it!
                   </p>
+                </div>
+              )}
+
+              {/* Review form / login gate */}
+              <div className="mt-6 rounded-xl border border-gray-200 p-4">
+                {user ? (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-800">
+                      Write a Review
+                    </h4>
+                    <div className="flex items-center gap-3">
+                      <StarPicker value={rating} onChange={setRating} />
+                      <span className="text-sm text-gray-500">
+                        {rating > 0
+                          ? `${rating} star${rating > 1 ? 's' : ''}`
+                          : 'Select a rating'}
+                      </span>
+                    </div>
+                    <Textarea
+                      value={comment}
+                      onChange={(e) => {
+                        setComment(e.target.value);
+                        setReviewError('');
+                      }}
+                      placeholder="Share your experience with this product..."
+                      rows={3}
+                      className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {reviewError && (
+                      <p className="text-sm text-red-600">{reviewError}</p>
+                    )}
+                    <Button
+                      onClick={handleSubmitReview}
+                      loading={submittingReview}
+                      disabled={submittingReview}
+                    >
+                      Submit Review
+                    </Button>
+                  </div>
                 ) : (
-                  <p className="mt-3 text-gray-500">
-                    No reviews yet for this product.
-                  </p>
+                  <div className="flex flex-col items-center py-4 text-center">
+                    <Lock size={28} className="text-gray-400" />
+                    <p className="mt-2 font-medium text-gray-700">
+                      Login to write a review
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      You need an account to review this product.
+                    </p>
+                    <div className="mt-4 flex gap-3">
+                      <Link href="/login">
+                        <Button>Login</Button>
+                      </Link>
+                      <Link href="/register">
+                        <Button variant="outline">Create account</Button>
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
             </TabsContent>

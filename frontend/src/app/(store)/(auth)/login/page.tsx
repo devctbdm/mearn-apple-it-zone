@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth, useCart } from '@/store';
 import Link from 'next/link';
 
 const loginSchema = z.object({
@@ -38,6 +39,8 @@ const initialValues: FormValues = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { fetchUser } = useAuth();
+  const { syncCartWithBackend } = useCart();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormValues, string>>
@@ -81,6 +84,9 @@ export default function LoginPage() {
         localStorage.setItem('mobile_token', data.token);
         document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       }
+
+      await fetchUser().catch(() => {});
+      await syncCartWithBackend().catch(() => {});
 
       toast.success(`Welcome back, ${data.user?.name || 'User'}!`);
       router.push('/');
