@@ -1,0 +1,53 @@
+// src/data/dummy/orders.ts
+export const dummyOrders = [
+  {
+    id: 'ord_001',
+    orderNumber: 'AB-2026-001',
+    customerName: 'Md. Ariful Islam',
+    customerEmail: 'ariful@email.com',
+    customerPhone: '01712345678',
+    total: 25400,
+    subtotal: 24000,
+    tax: 800,
+    shippingCost: 600,
+    status: 'DELIVERED',
+    paymentMethod: 'bKash',
+    shippingAddress: {
+      street: '123, Mirpur Road',
+      city: 'Dhaka',
+      state: 'Dhaka',
+      zip: '1216',
+      country: 'Bangladesh',
+    },
+    items: [
+      { name: 'Gaming PC - Star Xtreme', sku: 'GP-001', price: 85000, quantity: 1 },
+      { name: 'Wireless Mouse', sku: 'MS-012', price: 1200, quantity: 2 },
+    ],
+    createdAt: '2026-07-01T10:30:00',
+    updatedAt: '2026-07-02T15:20:00',
+  },
+  {
+    id: 'ord_002',
+    orderNumber: 'AB-2026-002',
+    customerName: 'Shakila Akhter',
+    customerEmail: 'shakila@email.com',
+    customerPhone: '01898765432',
+    total: 12500,
+    subtotal: 12000,
+    tax: 300,
+    shippingCost: 200,
+    status: 'PROCESSING',
+    paymentMethod: 'Nagad',
+    shippingAddress: {
+      street: '45, Banani',
+      city: 'Dhaka',
+      state: 'Dhaka',
+      zip: '1213',
+      country: 'Bangladesh',
+    },
+    items: [{ name: '27" 4K Monitor', sku: 'MN-012', price: 32000, quantity: 1 }],
+    createdAt: '2026-07-01T14:15:00',
+    updatedAt: '2026-07-01T16:00:00',
+  },
+  // ... more orders
+]

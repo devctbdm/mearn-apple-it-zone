@@ -1,0 +1,94 @@
+// backend/src/models/Order.js
+
+import mongoose from 'mongoose';
+
+const orderItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true, // Snapshot of product name
+  },
+  price: {
+    type: Number,
+    required: true, // Snapshot of price (final paid price)
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: [1, 'Quantity must be at least 1'],
+  },
+  image: {
+    type: String,
+    required: true, // Snapshot of product image
+  },
+});
+
+const orderSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    items: [orderItemSchema],
+    shippingAddress: {
+      street: { type: String, required: true },
+      city: { type: String, required: true },
+      state: { type: String, required: true },
+      postcode: { type: String, required: true },
+      country: { type: String, default: 'Bangladesh' },
+    },
+    totalAmount: {
+      type: Number,
+      required: true,
+      min: [0, 'Total amount cannot be negative'],
+    },
+    payment: {
+      method: {
+        type: String,
+        enum: ['sslcommerz', 'cod', 'bkash', 'nagad'],
+        default: 'sslcommerz',
+      },
+      tran_id: { type: String, unique: true, sparse: true }, // SSLCommerz transaction ID
+      val_id: { type: String }, // SSLCommerz validation ID
+      sessionKey: { type: String }, // SSLCommerz session key
+      status: {
+        type: String,
+        enum: ['pending', 'paid', 'failed', 'cancelled'],
+        default: 'pending',
+      },
+      amount: { type: Number }, // Amount paid (for verification)
+      card_type: { type: String }, // Card / Mobile banking type
+      paidAt: { type: Date },
+    },
+    orderStatus: {
+      type: String,
+      enum: ['processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'processing',
+    },
+    note: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Note cannot exceed 500 characters'],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// ---- Indexes for faster queries ----
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ orderStatus: 1 });
+
+// ---- Static method to find by transaction ID ----
+orderSchema.statics.findByTranId = function (tran_id) {
+  return this.findOne({ 'payment.tran_id': tran_id });
+};
+
+const Order = mongoose.model('Order', orderSchema);
+export default Order;
