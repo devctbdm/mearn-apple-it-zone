@@ -405,6 +405,88 @@ export const orderApi = {
   }) => api.post<{ success: boolean; order: Order }>('/orders', data),
 };
 
+export type InvoiceStatus = 'paid' | 'pending' | 'overdue' | 'cancelled';
+
+export type InvoiceItem = {
+  _id: string;
+  product: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  warranty: string;
+  serialNumbers: string[];
+};
+
+export type Invoice = {
+  _id: string;
+  order: string;
+  invoiceNumber: string;
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
+  issueDate: string;
+  dueDate: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  discount: number;
+  deliveryCharge: number;
+  extraCharge: number;
+  netPayable: number;
+  status: InvoiceStatus;
+  note: string;
+  salesPerson: string;
+  preparedBy?: { _id: string; name: string } | string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InvoiceStats = {
+  totalOutstanding: number;
+  totalPaid: number;
+  totalOverdue: number;
+  cancelledCount: number;
+};
+
+export const invoiceApi = {
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) =>
+    api.get<{
+      success: boolean;
+      total: number;
+      page: number;
+      pages: number;
+      invoices: Invoice[];
+    }>('/invoices', { params }),
+
+  getStats: () =>
+    api.get<{ success: boolean; stats: InvoiceStats }>('/invoices/stats'),
+
+  get: (id: string) =>
+    api.get<{ success: boolean; invoice: Invoice }>(`/invoices/${id}`),
+
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put<{ success: boolean; invoice: Invoice }>(`/invoices/${id}`, data),
+
+  remove: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/invoices/${id}`),
+
+  generateFromOrder: (orderId: string) =>
+    api.post<{ success: boolean; invoice: Invoice }>(
+      `/invoices/order/${orderId}`
+    ),
+
+  syncFromOrders: () =>
+    api.post<{ success: boolean; created: number }>('/invoices/sync'),
+};
+
 export type DashboardStats = {
   revenue: number;
   orders: number;

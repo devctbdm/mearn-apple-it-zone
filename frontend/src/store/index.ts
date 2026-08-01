@@ -89,7 +89,7 @@ export const useCart = () => {
   const items = useAppStore((state) => state.items);
   const totalItems = useAppStore((state) => state.totalItems);
   const totalPrice = useAppStore((state) => state.totalPrice);
-  const isLoading = useAppStore((state) => state.isLoading);
+  const cartLoading = useAppStore((state) => state.cartLoading);
   const addItem = useAppStore((state) => state.addItem);
   const removeItem = useAppStore((state) => state.removeItem);
   const updateQuantity = useAppStore((state) => state.updateQuantity);
@@ -100,7 +100,7 @@ export const useCart = () => {
     items,
     totalItems,
     totalPrice,
-    isLoading,
+    isLoading: cartLoading,
     addItem,
     removeItem,
     updateQuantity,

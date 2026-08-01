@@ -2,6 +2,7 @@
 'use client'; // Using client for loading states
 
 import { useEffect, useMemo, useState } from 'react';
+import { notFound } from 'next/navigation';
 import { categoryApi, productApi } from '@/lib/api';
 import type { Category } from '@/lib/api';
 import { toProductShape, type RawProduct } from '@/lib/productMapper';
@@ -80,13 +81,19 @@ export default function CategoryPage({ params }: Props) {
 
   // Resolve each slug segment to a category; the last resolved one defines the scope
   let scopeId: string | null = null;
+  let matchedCount = 0;
   const titleSegments: string[] = [];
   for (const segment of path) {
     const cat = categories.find((c) => c.slug === segment.toLowerCase());
     if (!cat) break;
     scopeId = cat._id;
     titleSegments.push(cat.name);
+    matchedCount += 1;
   }
+
+  // A path is valid only when every segment resolves to a known category
+  // (or it is the plain "All Products" page, i.e. empty path).
+  const isValidPath = path.length === 0 || matchedCount === path.length;
 
   const scopeNames = useMemo(
     () =>
@@ -113,6 +120,19 @@ export default function CategoryPage({ params }: Props) {
     [scopedProducts, filters, sort]
   );
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl m-auto px-4 py-8">
+        <div className="h-6 bg-gray-200 rounded w-64 mb-4" />
+        <ProductGridSkeleton count={8} />
+      </div>
+    );
+  }
+
+  if (!isValidPath) {
+    notFound();
+  }
+
   const pageTitle =
     titleSegments.length > 0
       ? titleSegments.join(' > ')
@@ -123,15 +143,6 @@ export default function CategoryPage({ params }: Props) {
               (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
             )
             .join(' > ');
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl m-auto px-4 py-8">
-        <div className="h-6 bg-gray-200 rounded w-64 mb-4" />
-        <ProductGridSkeleton count={8} />
-      </div>
-    );
-  }
 
   return (
     <PageTransition>

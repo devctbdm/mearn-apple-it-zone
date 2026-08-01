@@ -1,6 +1,13 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import html2pdf from 'html2pdf.js';
 import {
   Card,
@@ -13,6 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import {
   Table,
@@ -38,6 +47,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -64,112 +81,36 @@ import {
   Printer,
   Trash2,
   ArrowUpDown,
-  Calendar,
   DollarSign,
   Clock,
   FileSpreadsheet,
   Eye,
+  Pencil,
+  RefreshCw,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
-import { orderApi, type Order } from '@/lib/api';
+import {
+  invoiceApi,
+  type Invoice,
+  type InvoiceItem,
+  type InvoiceStatus,
+  type InvoiceStats,
+} from '@/lib/api';
 
-// --- Types ---
-type InvoiceStatus = 'paid' | 'pending' | 'overdue' | 'cancelled';
-
-interface InvoiceItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  customer: string;
-  email: string;
-  avatar: string;
-  amount: number;
-  discount: number;
-  tax: number;
-  total: number;
-  status: InvoiceStatus;
-  date: string;
-  dueDate: string;
-  items: InvoiceItem[];
-  notes?: string;
-}
-
-interface InvoiceStats {
-  totalOutstanding: number;
-  totalPaid: number;
-  totalOverdue: number;
-  cancelledCount: number;
-}
-
-// --- Mappers ---
-const shortId = (id: string) => `#${id.slice(-8).toUpperCase()}`;
-
-const getCustomer = (o: Order) => (typeof o.user === 'object' ? o.user : null);
-
-const initials = (name: string) =>
-  name
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'NA';
-
-const addDays = (date: string, days: number) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d.toISOString();
+// --- Company constants (print header) ---
+const COMPANY = {
+  name: 'Apple-IT-Zone',
+  tagline: 'IT Product Seller Company',
+  address: 'Dhaka, Bangladesh',
+  mobile: '01911059059 - 01721909064',
+  service: '01788420417',
+  email: 'appleitzonebd@gmail.com',
+  web: 'appleitzone.com',
 };
 
-const orderToInvoice = (o: Order): Invoice => {
-  const customer = getCustomer(o);
-  const name = customer?.name || 'Customer';
-  const amount = o.items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const dueDate = addDays(o.createdAt, 30);
-
-  let status: InvoiceStatus = 'pending';
-  const payStatus = o.payment?.status;
-  if (payStatus === 'paid') {
-    status = 'paid';
-  } else if (
-    payStatus === 'failed' ||
-    payStatus === 'cancelled' ||
-    o.orderStatus === 'cancelled'
-  ) {
-    status = 'cancelled';
-  } else if (new Date() > new Date(dueDate)) {
-    status = 'overdue';
-  }
-
-  return {
-    id: o._id,
-    invoiceNumber: `INV-${o._id.slice(-8).toUpperCase()}`,
-    customer: name,
-    email: customer?.email || '',
-    avatar: initials(name),
-    amount,
-    discount: o.coupon?.discount || 0,
-    tax: 0,
-    total: o.totalAmount,
-    status,
-    date: o.createdAt,
-    dueDate,
-    items: o.items.map((i) => ({
-      description: i.name,
-      quantity: i.quantity,
-      unitPrice: i.price,
-      total: i.price * i.quantity,
-    })),
-    notes: o.note || undefined,
-  };
-};
+const logoUrl = () =>
+  typeof window !== 'undefined' ? `${window.location.origin}/Logo.svg` : '';
 
 // --- Utilities ---
 const formatCurrency = (amount: number) =>
@@ -177,8 +118,28 @@ const formatCurrency = (amount: number) =>
     maximumFractionDigits: 2,
   })}`;
 
-const formatDate = (value: string, opts?: Intl.DateTimeFormatOptions) =>
-  new Date(value).toLocaleDateString('en-US', opts);
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+const formatDateTime = (value: Date) =>
+  value.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+const shortOrder = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+
+const preparedName = (inv: Invoice) =>
+  typeof inv.preparedBy === 'object' && inv.preparedBy
+    ? inv.preparedBy.name
+    : 'Admin';
 
 // --- Components ---
 
@@ -209,9 +170,7 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
       icon: <XCircle className="h-3 w-3 mr-1" />,
     },
   };
-
   const c = config[status];
-
   return (
     <Badge
       variant="outline"
@@ -272,13 +231,358 @@ function TableRowSkeleton() {
   );
 }
 
+// --- Printable invoice layout ---
+function InvoicePrint({ invoice }: { invoice: Invoice }) {
+  const th: CSSProperties = {
+    border: '1px solid #94a3b8',
+    padding: '8px',
+    background: '#e2e8f0',
+    textAlign: 'center',
+    fontWeight: 700,
+    fontSize: '13px',
+  };
+  const td: CSSProperties = {
+    border: '1px solid #cbd5e1',
+    padding: '8px',
+    verticalAlign: 'top',
+    fontSize: '13px',
+  };
+
+  return (
+    <div
+      style={{
+        fontFamily: 'Arial, sans-serif',
+        color: '#111',
+        fontSize: '13px',
+        width: '100%',
+        background: '#fff',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          border: '2px solid #1e3a8a',
+          borderRadius: '8px',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '14px 18px',
+            background: '#f8fafc',
+            borderBottom: '2px solid #1e3a8a',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img
+              src={logoUrl()}
+              alt="logo"
+              style={{ height: '54px', width: '54px', objectFit: 'contain' }}
+            />
+            <div>
+              <div
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  color: '#1e3a8a',
+                  lineHeight: 1.1,
+                }}
+              >
+                {COMPANY.name}
+              </div>
+              <div style={{ fontSize: '12px', color: '#475569' }}>
+                {COMPANY.tagline}
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              textAlign: 'right',
+              fontSize: '12px',
+              lineHeight: 1.7,
+              color: '#334155',
+            }}
+          >
+            <div>
+              <b>Address:</b> {COMPANY.address}
+            </div>
+            <div>
+              <b>Mobile:</b> {COMPANY.mobile}
+            </div>
+            <div>
+              <b>Service:</b> {COMPANY.service}
+            </div>
+            <div>
+              <b>Email:</b> {COMPANY.email}
+            </div>
+            <div>
+              <b>Web:</b> {COMPANY.web}
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '8px',
+            background: '#1e3a8a',
+            color: '#fff',
+            fontSize: '18px',
+            fontWeight: 700,
+            letterSpacing: '2px',
+          }}
+        >
+          SALES INVOICE
+        </div>
+      </div>
+
+      {/* Section 2: Customer + Invoice info */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '24px',
+          padding: '14px 4px',
+          borderBottom: '1px solid #cbd5e1',
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              marginBottom: '6px',
+              borderBottom: '1px solid #cbd5e1',
+              paddingBottom: '4px',
+              color: '#1e3a8a',
+            }}
+          >
+            Customer
+          </div>
+          <div style={{ lineHeight: 1.8 }}>
+            <div>
+              <b>Customer Name:</b> {invoice.customer.name || '-'}
+            </div>
+            <div>
+              <b>Customer Address:</b> {invoice.customer.address || '-'}
+            </div>
+            <div>
+              <b>Customer Mobile:</b> {invoice.customer.phone || '-'}
+            </div>
+            <div>
+              <b>Attention:</b> {invoice.customer.email || '-'}
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              marginBottom: '6px',
+              borderBottom: '1px solid #cbd5e1',
+              paddingBottom: '4px',
+              color: '#1e3a8a',
+            }}
+          >
+            Invoice Info
+          </div>
+          <div style={{ lineHeight: 1.8 }}>
+            <div>
+              <b>Invoice No:</b> {invoice.invoiceNumber}
+            </div>
+            <div>
+              <b>Date:</b> {formatDate(invoice.issueDate)}
+            </div>
+            <div>
+              <b>Order Number:</b> {shortOrder(invoice.order)}
+            </div>
+            <div>
+              <b>Prepared By:</b> {preparedName(invoice)}
+            </div>
+            <div>
+              <b>Bill Type:</b> {invoice.status.toUpperCase()}
+            </div>
+            <div>
+              <b>Sales Person:</b> {invoice.salesPerson}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3: Items table */}
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          marginTop: '12px',
+        }}
+      >
+        <thead>
+          <tr>
+            <th style={th}>SL</th>
+            <th style={th}>Product Title</th>
+            <th style={th}>S/N</th>
+            <th style={th}>Warranty</th>
+            <th style={th}>QTY</th>
+            <th style={th}>Unit Price</th>
+            <th style={th}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.items.length === 0 && (
+            <tr>
+              <td style={td} colSpan={7} align="center">
+                No items
+              </td>
+            </tr>
+          )}
+          {invoice.items.map((item, idx) => (
+            <tr key={idx}>
+              <td style={td} align="center">
+                {idx + 1}
+              </td>
+              <td style={td}>{item.name}</td>
+              <td style={td}>
+                {item.serialNumbers.length > 0 ? (
+                  item.serialNumbers.map((sn, i) => (
+                    <span key={i}>
+                      {sn}
+                      {i < item.serialNumbers.length - 1 && <br />}
+                    </span>
+                  ))
+                ) : (
+                  '-'
+                )}
+              </td>
+              <td style={td}>{item.warranty || '-'}</td>
+              <td style={td} align="center">
+                {item.quantity}
+              </td>
+              <td style={td} align="right">
+                {formatCurrency(item.unitPrice)}
+              </td>
+              <td style={td} align="right">
+                {formatCurrency(item.amount)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Section 4: Totals */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '24px',
+          marginTop: '12px',
+        }}
+      >
+        <div style={{ flex: 1, fontSize: '13px', lineHeight: 1.8 }}>
+          <div>
+            <b>Total:</b> {invoice.items.length} item(s)
+          </div>
+          <div>
+            <b>Delivery:</b> {formatCurrency(invoice.deliveryCharge)}
+          </div>
+        </div>
+        <div style={{ flex: 1, textAlign: 'right', fontSize: '13px', lineHeight: 1.8 }}>
+          <div>Subtotal: {formatCurrency(invoice.subtotal)}</div>
+          <div>Less Discount: {formatCurrency(invoice.discount)}</div>
+          <div>Extra Charge: {formatCurrency(invoice.extraCharge)}</div>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#1e3a8a',
+          color: '#fff',
+          padding: '10px 16px',
+          borderRadius: '6px',
+          marginTop: '10px',
+          fontSize: '16px',
+          fontWeight: 700,
+        }}
+      >
+        <span>Net Payable Amount</span>
+        <span>{formatCurrency(invoice.netPayable)}</span>
+      </div>
+
+      {/* Note */}
+      <div
+        style={{
+          marginTop: '12px',
+          padding: '10px 12px',
+          border: '1px solid #cbd5e1',
+          borderRadius: '6px',
+          fontSize: '12px',
+          background: '#fff7ed',
+          lineHeight: 1.6,
+        }}
+      >
+        <b>Note:</b>{' '}
+        {invoice.note ||
+          'Warranty will be void if any sticker removed, physically damage, water damage and burn case. No warranty for any kind of adapter.'}
+      </div>
+
+      {/* Signatures */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: '48px',
+          fontSize: '13px',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              borderTop: '1px solid #111',
+              paddingTop: '6px',
+              width: '220px',
+            }}
+          >
+            Customer Signature
+          </div>
+          <div style={{ marginTop: '22px', color: '#475569' }}>
+            Print Date: {formatDateTime(new Date())}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              borderTop: '1px solid #111',
+              paddingTop: '6px',
+              width: '220px',
+            }}
+          >
+            Authorized Signature
+          </div>
+          <div style={{ marginTop: '22px', color: '#475569' }}>
+            {invoice.salesPerson}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Detail drawer ---
 function InvoiceDetailDrawer({
   invoice,
   onRefetch,
+  onEdit,
   onClose,
 }: {
   invoice: Invoice | null;
   onRefetch: () => void;
+  onEdit: (invoice: Invoice) => void;
   onClose: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -305,7 +609,7 @@ function InvoiceDetailDrawer({
     if (!invoice) return;
     setCancelling(true);
     try {
-      await orderApi.updateStatus(invoice.id, 'cancelled');
+      await invoiceApi.update(invoice._id, { status: 'cancelled' });
       toast.success(`Invoice ${invoice.invoiceNumber} cancelled`);
       onClose();
       onRefetch();
@@ -324,32 +628,18 @@ function InvoiceDetailDrawer({
         printWindow.document.write('<html><head><title>Invoice</title>');
         printWindow.document.write('<style>');
         printWindow.document.write(`
+          * { box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 20px; }
-          .invoice-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-          .invoice-title { font-size: 24px; font-weight: bold; }
-          .invoice-number { font-size: 18px; color: #666; }
-          .customer-info { display: flex; gap: 15px; margin-bottom: 20px; }
-          .customer-details h4 { margin: 0 0 5px 0; }
-          .customer-details p { margin: 0; color: #666; }
-          .dates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-          .date-item p { margin: 0 0 5px 0; }
-          .date-item .label { color: #666; font-size: 14px; }
-          .date-item .value { font-weight: 500; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-          th { background-color: #f5f5f5; font-weight: 600; }
-          .totals { margin-top: 20px; }
-          .total-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-          .total-row.final { font-weight: bold; font-size: 18px; border-top: 2px solid #ddd; padding-top: 10px; }
-          .notes { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-top: 20px; }
-          .notes p { margin: 0 0 5px 0; }
-          .notes .label { font-weight: 600; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
         `);
         printWindow.document.write('</style></head><body>');
         printWindow.document.write(printContent);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
-        printWindow.print();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 300);
       }
     }
   };
@@ -357,21 +647,18 @@ function InvoiceDetailDrawer({
   const handleDownloadPDF = () => {
     if (invoiceContentRef.current && invoice) {
       const element = invoiceContentRef.current;
-      
-      // Create a temporary iframe with hex-only CSS
       const iframe = document.createElement('iframe');
       iframe.style.position = 'absolute';
       iframe.style.left = '-9999px';
       iframe.style.top = '0';
       document.body.appendChild(iframe);
-      
+
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) {
         document.body.removeChild(iframe);
         return;
       }
-      
-      // Write the HTML with hex-only CSS
+
       iframeDoc.open();
       iframeDoc.write(`
         <!DOCTYPE html>
@@ -379,17 +666,7 @@ function InvoiceDetailDrawer({
         <head>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: sans-serif; color: #000; background: #fff; padding: 20px; }
-            .invoice-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .invoice-title { font-size: 24px; font-weight: bold; }
-            .invoice-details { margin-bottom: 20px; }
-            .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            .invoice-table th, .invoice-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .invoice-table th { background: #f5f5f5; }
-            .total-row { display: flex; justify-content: space-between; margin-top: 10px; }
-            .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-            .badge-paid { background: #dcfce7; color: #166534; }
-            .badge-pending { background: #fef9c3; color: #854d0e; }
+            body { font-family: Arial, sans-serif; color: #000; background: #fff; padding: 20px; }
           </style>
         </head>
         <body>
@@ -398,30 +675,36 @@ function InvoiceDetailDrawer({
         </html>
       `);
       iframeDoc.close();
-      
-      // Wait for iframe to load, then generate PDF
+
       setTimeout(() => {
         const iframeElement = iframeDoc.body;
-        
         const opt = {
           margin: 10,
           filename: `${invoice.invoiceNumber}.pdf`,
           image: { type: 'jpeg' as const, quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
+          html2canvas: {
+            scale: 2,
             useCORS: true,
           },
-          jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+          jsPDF: {
+            unit: 'mm' as const,
+            format: 'a4' as const,
+            orientation: 'portrait' as const,
+          },
         };
-        
-        html2pdf().set(opt).from(iframeElement).save().then(() => {
-          document.body.removeChild(iframe);
-        }).catch((error) => {
-          console.error('PDF generation failed:', error);
-          document.body.removeChild(iframe);
-          alert('PDF generation failed. Please use the print dialog to save as PDF.');
-          window.print();
-        });
+        html2pdf()
+          .set(opt)
+          .from(iframeElement)
+          .save()
+          .then(() => {
+            document.body.removeChild(iframe);
+          })
+          .catch((error: unknown) => {
+            console.error('PDF generation failed:', error);
+            document.body.removeChild(iframe);
+            alert('PDF generation failed. Please use the print dialog to save as PDF.');
+            window.print();
+          });
       }, 500);
     }
   };
@@ -447,136 +730,38 @@ function InvoiceDetailDrawer({
               <InvoiceStatusBadge status={invoice.status} />
             </div>
             <DrawerDescription>
-              Issued on{' '}
-              {new Date(invoice.date).toLocaleDateString('en-US', {
-                dateStyle: 'long',
-              })}
+              Issued on {formatDate(invoice.issueDate)}
             </DrawerDescription>
           </DrawerHeader>
 
-          <div ref={invoiceContentRef} className="space-y-8">
-            {/* Customer Info */}
-            <div className="flex items-start gap-4">
-              <Avatar className="h-12 w-12">
-                <AvatarFallback className="bg-primary/10 text-lg font-semibold">
-                  {invoice.avatar}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h4 className="font-semibold text-lg">{invoice.customer}</h4>
-                <p className="text-sm text-muted-foreground">{invoice.email}</p>
-              </div>
-            </div>
+          <div ref={invoiceContentRef} className="rounded-lg border p-4">
+            <InvoicePrint invoice={invoice} />
+          </div>
 
-            <Separator />
-
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" /> Issue Date
-                </p>
-                <p className="font-medium">
-                  {new Date(invoice.date).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" /> Due Date
-                </p>
-                <p
-                  className={`font-medium ${
-                    invoice.status === 'overdue' ? 'text-red-600' : ''
-                  }`}
-                >
-                  {new Date(invoice.dueDate).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Items Table */}
-            <div>
-              <h4 className="font-semibold mb-4">Line Items</h4>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoice.items.map((item, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">
-                          {item.description}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {item.quantity}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.unitPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.total)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* Totals */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(invoice.amount)}</span>
-              </div>
-              {invoice.discount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Discount</span>
-                  <span className="text-emerald-600">
-                    -{formatCurrency(invoice.discount)}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span>{formatCurrency(invoice.tax)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span>{formatCurrency(invoice.total)}</span>
-              </div>
-            </div>
-
-            {invoice.notes && (
-              <div className="bg-muted/50 p-4 rounded-lg">
-                <p className="text-sm font-medium mb-1">Notes</p>
-                <p className="text-sm text-muted-foreground">{invoice.notes}</p>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="gap-2" onClick={handlePrint}>
-                  <Printer className="h-4 w-4" /> Print
-                </Button>
-                <Button variant="outline" className="gap-2" onClick={handleDownloadPDF}>
-                  <Download className="h-4 w-4" /> Download PDF
-                </Button>
-              </div>
+          {/* Actions */}
+          <div className="space-y-3 pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="gap-2" onClick={handlePrint}>
+                <Printer className="h-4 w-4" /> Print
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handleDownloadPDF}
+              >
+                <Download className="h-4 w-4" /> Download PDF
+              </Button>
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => onEdit(invoice)}
+              >
+                <Pencil className="h-4 w-4" /> Edit Invoice
+              </Button>
               {canCancel && (
                 <Button
                   variant="destructive"
-                  className="w-full gap-2"
+                  className="gap-2"
                   disabled={cancelling}
                   onClick={handleCancel}
                 >
@@ -598,32 +783,433 @@ function InvoiceDetailDrawer({
   );
 }
 
+// --- Edit dialog ---
+type EditFormItem = {
+  _id: string;
+  product: string;
+  name: string;
+  quantity: string;
+  unitPrice: string;
+  warranty: string;
+  serialNumbers: string;
+};
+
+type EditForm = {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerAddress: string;
+  issueDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  discount: string;
+  deliveryCharge: string;
+  extraCharge: string;
+  note: string;
+  salesPerson: string;
+  items: EditFormItem[];
+};
+
+function EditInvoiceDialog({
+  invoice,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  invoice: Invoice | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (payload: Record<string, unknown>) => Promise<void>;
+}) {
+  const [form, setForm] = useState<EditForm | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (invoice) {
+      setForm({
+        customerName: invoice.customer.name || '',
+        customerPhone: invoice.customer.phone || '',
+        customerEmail: invoice.customer.email || '',
+        customerAddress: invoice.customer.address || '',
+        issueDate: invoice.issueDate.slice(0, 10),
+        dueDate: invoice.dueDate.slice(0, 10),
+        status: invoice.status,
+        discount: String(invoice.discount ?? 0),
+        deliveryCharge: String(invoice.deliveryCharge ?? 0),
+        extraCharge: String(invoice.extraCharge ?? 0),
+        note: invoice.note || '',
+        salesPerson: invoice.salesPerson || 'Apple-it-zone',
+        items: invoice.items.map((it) => ({
+          _id: it._id,
+          product: it.product,
+          name: it.name,
+          quantity: String(it.quantity),
+          unitPrice: String(it.unitPrice),
+          warranty: it.warranty || '',
+          serialNumbers: (it.serialNumbers || []).join('\n'),
+        })),
+      });
+    }
+  }, [invoice, open]);
+
+  if (!form || !invoice) return null;
+
+  const set = (patch: Partial<EditForm>) => setForm((f) => (f ? { ...f, ...patch } : f));
+  const setItem = (idx: number, patch: Partial<EditFormItem>) =>
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            items: f.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+          }
+        : f
+    );
+
+  const handleSubmit = async () => {
+    if (!form || !invoice) return;
+    setSaving(true);
+    try {
+      await onSave({
+        customer: {
+          name: form.customerName,
+          phone: form.customerPhone,
+          email: form.customerEmail,
+          address: form.customerAddress,
+        },
+        issueDate: new Date(form.issueDate).toISOString(),
+        dueDate: new Date(form.dueDate).toISOString(),
+        status: form.status,
+        discount: Number(form.discount) || 0,
+        deliveryCharge: Number(form.deliveryCharge) || 0,
+        extraCharge: Number(form.extraCharge) || 0,
+        note: form.note,
+        salesPerson: form.salesPerson,
+        items: form.items.map((it) => ({
+          _id: it._id,
+          product: it.product,
+          name: it.name,
+          quantity: Number(it.quantity) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          warranty: it.warranty,
+          serialNumbers: it.serialNumbers
+            .split(/[\n,]+/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+        })),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Invoice {invoice.invoiceNumber}</DialogTitle>
+          <DialogDescription>
+            Update customer, items (serial numbers & warranty), charges and
+            status.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Customer */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Customer</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Name</Label>
+                <Input
+                  value={form.customerName}
+                  onChange={(e) => set({ customerName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Mobile</Label>
+                <Input
+                  value={form.customerPhone}
+                  onChange={(e) => set({ customerPhone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Email (Attention)</Label>
+                <Input
+                  value={form.customerEmail}
+                  onChange={(e) => set({ customerEmail: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Address</Label>
+                <Input
+                  value={form.customerAddress}
+                  onChange={(e) => set({ customerAddress: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Invoice meta */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Invoice</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Issue Date</Label>
+                <Input
+                  type="date"
+                  value={form.issueDate}
+                  onChange={(e) => set({ issueDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Due Date</Label>
+                <Input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => set({ dueDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => set({ status: v as InvoiceStatus })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Sales Person</Label>
+                <Input
+                  value={form.salesPerson}
+                  onChange={(e) => set({ salesPerson: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Items */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Items</h4>
+            {form.items.map((item, idx) => (
+              <div
+                key={item._id || idx}
+                className="space-y-3 rounded-lg border p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Item {idx + 1}</span>
+                  {form.items.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600"
+                      onClick={() =>
+                        setForm((f) =>
+                          f
+                            ? { ...f, items: f.items.filter((_, i) => i !== idx) }
+                            : f
+                        )
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Product Title</Label>
+                  <Input
+                    value={item.name}
+                    onChange={(e) => setItem(idx, { name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>Qty</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={item.quantity}
+                      onChange={(e) => setItem(idx, { quantity: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Unit Price (৳)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={item.unitPrice}
+                      onChange={(e) =>
+                        setItem(idx, { unitPrice: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Amount</Label>
+                    <Input
+                      disabled
+                      value={formatCurrency(
+                        (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Warranty</Label>
+                  <Input
+                    placeholder="e.g. 1 Year Manufacturer Warranty"
+                    value={item.warranty}
+                    onChange={(e) => setItem(idx, { warranty: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>
+                    Serial Number(s) - one per line (e.g. 3 routers = 3 SNs)
+                  </Label>
+                  <Textarea
+                    rows={2}
+                    placeholder="SN-0001&#10;SN-0002&#10;SN-0003"
+                    value={item.serialNumbers}
+                    onChange={(e) =>
+                      setItem(idx, { serialNumbers: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={() =>
+                setForm((f) =>
+                  f
+                    ? {
+                        ...f,
+                        items: [
+                          ...f.items,
+                          {
+                            _id: `new_${Date.now()}`,
+                            product: '',
+                            name: '',
+                            quantity: '1',
+                            unitPrice: '0',
+                            warranty: '',
+                            serialNumbers: '',
+                          },
+                        ],
+                      }
+                    : f
+                )
+              }
+            >
+              + Add Item
+            </Button>
+          </div>
+
+          {/* Totals */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Charges</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>Discount (৳)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.discount}
+                  onChange={(e) => set({ discount: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Delivery Charge (৳)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.deliveryCharge}
+                  onChange={(e) => set({ deliveryCharge: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Extra Charge (৳)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.extraCharge}
+                  onChange={(e) => set({ extraCharge: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Note</Label>
+              <Textarea
+                rows={2}
+                value={form.note}
+                onChange={(e) => set({ note: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={saving} onClick={handleSubmit}>
+            {saving ? 'Saving...' : 'Save Invoice'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // --- Main Page ---
 
 export default function InvoiceManagementPage() {
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [stats, setStats] = useState<InvoiceStats>({
+    totalOutstanding: 0,
+    totalPaid: 0,
+    totalOverdue: 0,
+    cancelledCount: 0,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>(
     'all'
   );
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Invoice;
+    key: 'invoiceNumber' | 'issueDate';
     direction: 'asc' | 'desc';
   }>({
-    key: 'date',
+    key: 'issueDate',
     direction: 'desc',
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const itemsPerPage = 5;
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await orderApi.getAllOrders({ limit: 100 });
-      setInvoices((data.orders || []).map(orderToInvoice));
+      const [list, statRes] = await Promise.all([
+        invoiceApi.getAll({ limit: 500 }),
+        invoiceApi.getStats(),
+      ]);
+      setInvoices(list.data.invoices);
+      setStats(statRes.data.stats);
     } catch {
       toast.error('Failed to load invoices');
     } finally {
@@ -632,22 +1218,8 @@ export default function InvoiceManagementPage() {
   }, []);
 
   useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
-
-  // Stats
-  const stats: InvoiceStats = useMemo(() => {
-    return invoices.reduce(
-      (acc, inv) => {
-        if (inv.status === 'paid') acc.totalPaid += inv.total;
-        if (inv.status === 'pending') acc.totalOutstanding += inv.total;
-        if (inv.status === 'overdue') acc.totalOverdue += inv.total;
-        if (inv.status === 'cancelled') acc.cancelledCount += 1;
-        return acc;
-      },
-      { totalOutstanding: 0, totalPaid: 0, totalOverdue: 0, cancelledCount: 0 }
-    );
-  }, [invoices]);
+    fetchData();
+  }, [fetchData]);
 
   // Filter & Sort
   const filteredInvoices = useMemo(() => {
@@ -658,8 +1230,8 @@ export default function InvoiceManagementPage() {
       result = result.filter(
         (inv) =>
           inv.invoiceNumber.toLowerCase().includes(q) ||
-          inv.customer.toLowerCase().includes(q) ||
-          inv.email.toLowerCase().includes(q)
+          inv.customer.name.toLowerCase().includes(q) ||
+          inv.customer.email.toLowerCase().includes(q)
       );
     }
 
@@ -670,7 +1242,6 @@ export default function InvoiceManagementPage() {
     result.sort((a, b) => {
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
-      if (aVal === undefined || bVal === undefined) return 0;
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -680,7 +1251,10 @@ export default function InvoiceManagementPage() {
   }, [invoices, searchQuery, statusFilter, sortConfig]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredInvoices.length / itemsPerPage)
+  );
   const paginatedInvoices = filteredInvoices.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -691,11 +1265,79 @@ export default function InvoiceManagementPage() {
     setTimeout(() => setDetailInvoice(invoice), 0);
   };
 
-  const handleSort = (key: keyof Invoice) => {
+  const handleSort = (key: 'invoiceNumber' | 'issueDate') => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data } = await invoiceApi.syncFromOrders();
+      toast.success(
+        data.created > 0
+          ? `${data.created} invoice(s) created from orders`
+          : 'All orders already have invoices'
+      );
+      await fetchData();
+    } catch {
+      toast.error('Failed to sync invoices from orders');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleUpdateStatus = async (
+    inv: Invoice,
+    status: InvoiceStatus
+  ) => {
+    if (status === inv.status) return;
+    try {
+      await invoiceApi.update(inv._id, { status });
+      toast.success(`${inv.invoiceNumber} marked as ${status}`);
+      await fetchData();
+      setDetailInvoice((prev) =>
+        prev && prev._id === inv._id ? { ...prev, status } : prev
+      );
+    } catch {
+      toast.error('Failed to update invoice status');
+    }
+  };
+
+  const handleDelete = (inv: Invoice) => {
+    setDeleteTarget(inv);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await invoiceApi.remove(deleteTarget._id);
+      toast.success(`Invoice ${deleteTarget.invoiceNumber} deleted`);
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      if (detailInvoice?._id === deleteTarget._id) setDetailInvoice(null);
+      await fetchData();
+    } catch {
+      toast.error('Failed to delete invoice');
+    }
+  };
+
+  const handleSaveEdit = async (payload: Record<string, unknown>) => {
+    if (!editInvoice) return;
+    try {
+      const { data } = await invoiceApi.update(editInvoice._id, payload);
+      toast.success(`Invoice ${data.invoice.invoiceNumber} updated`);
+      setEditInvoice(null);
+      setDetailInvoice((prev) =>
+        prev && prev._id === data.invoice._id ? data.invoice : prev
+      );
+      await fetchData();
+    } catch {
+      toast.error('Failed to save invoice');
+    }
   };
 
   const handleExportCSV = () => {
@@ -704,20 +1346,26 @@ export default function InvoiceManagementPage() {
       'Customer',
       'Email',
       'Date',
-      'Due Date',
       'Status',
-      'Total',
+      'Subtotal',
+      'Discount',
+      'Delivery',
+      'Extra',
+      'Net Payable',
     ];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const rows = filteredInvoices.map((inv) =>
       [
         inv.invoiceNumber,
-        inv.customer,
-        inv.email,
-        inv.date,
-        inv.dueDate,
+        inv.customer.name,
+        inv.customer.email,
+        inv.issueDate,
         inv.status,
-        inv.total.toFixed(2),
+        inv.subtotal,
+        inv.discount,
+        inv.deliveryCharge,
+        inv.extraCharge,
+        inv.netPayable,
       ]
         .map((v) => escape(String(v)))
         .join(',')
@@ -735,23 +1383,36 @@ export default function InvoiceManagementPage() {
     toast.success(`Exported ${filteredInvoices.length} invoices to CSV`);
   };
 
-  const handleChangeInvoiceStatus = async (
-    invoice: Invoice,
-    status: InvoiceStatus
-  ) => {
-    if (status === 'overdue' || status === invoice.status) return;
-    try {
-      if (status === 'cancelled') {
-        await orderApi.updateStatus(invoice.id, 'cancelled');
-      } else {
-        await orderApi.updatePaymentStatus(invoice.id, status);
-      }
-      toast.success(`Invoice ${invoice.invoiceNumber} marked as ${status}`);
-      await fetchInvoices();
-    } catch {
-      toast.error('Failed to update invoice status');
-    }
-  };
+  const statsCards = [
+    {
+      title: 'Total Paid',
+      value: formatCurrency(stats.totalPaid),
+      change: 'All time revenue',
+      icon: <DollarSign className="h-4 w-4" />,
+      color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
+    },
+    {
+      title: 'Outstanding',
+      value: formatCurrency(stats.totalOutstanding),
+      change: 'Awaiting payment',
+      icon: <Clock className="h-4 w-4" />,
+      color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
+    },
+    {
+      title: 'Overdue',
+      value: formatCurrency(stats.totalOverdue),
+      change: 'Requires action',
+      icon: <AlertCircle className="h-4 w-4" />,
+      color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
+    },
+    {
+      title: 'Cancelled',
+      value: stats.cancelledCount.toString(),
+      change: 'Failed or refunded',
+      icon: <XCircle className="h-4 w-4" />,
+      color: 'text-slate-600 bg-slate-50 dark:bg-slate-950/30',
+    },
+  ];
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -760,55 +1421,33 @@ export default function InvoiceManagementPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
           <p className="text-muted-foreground">
-            Track payments from customer orders and export invoices.
+            Generate, edit and print invoices from customer orders.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleSync}
+            disabled={syncing || loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync from Orders'}
+          </Button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <StatCardSkeleton key={i} />
-            ))
-          : [
-              {
-                title: 'Total Paid',
-                value: formatCurrency(stats.totalPaid),
-                change: 'All time revenue',
-                icon: <DollarSign className="h-4 w-4" />,
-                color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
-              },
-              {
-                title: 'Outstanding',
-                value: formatCurrency(stats.totalOutstanding),
-                change: 'Awaiting payment',
-                icon: <Clock className="h-4 w-4" />,
-                color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
-              },
-              {
-                title: 'Overdue',
-                value: formatCurrency(stats.totalOverdue),
-                change: 'Requires action',
-                icon: <AlertCircle className="h-4 w-4" />,
-                color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
-              },
-              {
-                title: 'Cancelled',
-                value: stats.cancelledCount.toString(),
-                change: 'Failed or refunded',
-                icon: <XCircle className="h-4 w-4" />,
-                color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
-              },
-            ].map((stat, i) => (
+          ? Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+          : statsCards.map((stat, i) => (
               <Card key={i}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.color}`}>
-                    {stat.icon}
-                  </div>
+                  <div className={`p-2 rounded-lg ${stat.color}`}>{stat.icon}</div>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stat.value}</div>
@@ -901,7 +1540,7 @@ export default function InvoiceManagementPage() {
                           variant="ghost"
                           size="sm"
                           className="-ml-3 h-8"
-                          onClick={() => handleSort('date')}
+                          onClick={() => handleSort('issueDate')}
                         >
                           Date
                           <ArrowUpDown className="ml-2 h-3 w-3" />
@@ -909,7 +1548,7 @@ export default function InvoiceManagementPage() {
                       </TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Due Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Net Payable</TableHead>
                       <TableHead className="w-12.5"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -924,12 +1563,16 @@ export default function InvoiceManagementPage() {
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
                             <FileText className="h-8 w-8 mb-2 opacity-50" />
                             <p>No invoices found</p>
+                            <p className="text-sm">
+                              Click &quot;Sync from Orders&quot; to generate
+                              invoices.
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
                       paginatedInvoices.map((invoice) => (
-                        <TableRow key={invoice.id}>
+                        <TableRow key={invoice._id}>
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
                               <span>{invoice.invoiceNumber}</span>
@@ -942,28 +1585,26 @@ export default function InvoiceManagementPage() {
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
                                 <AvatarFallback className="text-xs bg-primary/10">
-                                  {invoice.avatar}
+                                  {invoice.customer.name
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .toUpperCase()
+                                    .slice(0, 2) || 'C'}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col">
                                 <span className="text-sm font-medium">
-                                  {invoice.customer}
+                                  {invoice.customer.name}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  {invoice.email}
+                                  {invoice.customer.email}
                                 </span>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {new Date(invoice.date).toLocaleDateString(
-                              'en-US',
-                              {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              }
-                            )}
+                            {formatDate(invoice.issueDate)}
                           </TableCell>
                           <TableCell>
                             <InvoiceStatusBadge status={invoice.status} />
@@ -976,17 +1617,11 @@ export default function InvoiceManagementPage() {
                                   : 'text-muted-foreground'
                               }
                             >
-                              {new Date(invoice.dueDate).toLocaleDateString(
-                                'en-US',
-                                {
-                                  month: 'short',
-                                  day: 'numeric',
-                                }
-                              )}
+                              {formatDate(invoice.dueDate)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatCurrency(invoice.total)}
+                            {formatCurrency(invoice.netPayable)}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -1003,6 +1638,11 @@ export default function InvoiceManagementPage() {
                                 >
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setEditInvoice(invoice)}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" /> Edit
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuGroup>
                                   <DropdownMenuLabel>
@@ -1012,7 +1652,7 @@ export default function InvoiceManagementPage() {
                                 {invoice.status !== 'paid' && (
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      handleChangeInvoiceStatus(invoice, 'paid')
+                                      handleUpdateStatus(invoice, 'paid')
                                     }
                                   >
                                     <CheckCircle2 className="h-4 w-4 mr-2" />{' '}
@@ -1023,10 +1663,7 @@ export default function InvoiceManagementPage() {
                                   invoice.status !== 'overdue' && (
                                     <DropdownMenuItem
                                       onClick={() =>
-                                        handleChangeInvoiceStatus(
-                                          invoice,
-                                          'pending'
-                                        )
+                                        handleUpdateStatus(invoice, 'pending')
                                       }
                                     >
                                       <Clock className="h-4 w-4 mr-2" /> Mark
@@ -1036,10 +1673,7 @@ export default function InvoiceManagementPage() {
                                 {invoice.status !== 'cancelled' && (
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      handleChangeInvoiceStatus(
-                                        invoice,
-                                        'cancelled'
-                                      )
+                                      handleUpdateStatus(invoice, 'cancelled')
                                     }
                                     className="text-red-600"
                                   >
@@ -1047,6 +1681,13 @@ export default function InvoiceManagementPage() {
                                     as Cancelled
                                   </DropdownMenuItem>
                                 )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(invoice)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1079,7 +1720,7 @@ export default function InvoiceManagementPage() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {paginatedInvoices.map((invoice) => (
                     <Card
-                      key={invoice.id}
+                      key={invoice._id}
                       className="hover:shadow-md transition-shadow"
                     >
                       <CardHeader className="pb-3">
@@ -1093,32 +1734,37 @@ export default function InvoiceManagementPage() {
                           <InvoiceStatusBadge status={invoice.status} />
                         </div>
                         <CardDescription>
-                          Due {new Date(invoice.dueDate).toLocaleDateString()}
+                          Due {formatDate(invoice.dueDate)}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="bg-primary/10">
-                              {invoice.avatar}
+                              {invoice.customer.name
+                                .split(' ')
+                                .map((n) => n[0])
+                                .join('')
+                                .toUpperCase()
+                                .slice(0, 2) || 'C'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium text-sm">
-                              {invoice.customer}
+                              {invoice.customer.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {invoice.email}
+                              {invoice.customer.email}
                             </p>
                           </div>
                         </div>
                         <Separator />
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">
-                            Total
+                            Net Payable
                           </span>
                           <span className="text-xl font-bold">
-                            {formatCurrency(invoice.total)}
+                            {formatCurrency(invoice.netPayable)}
                           </span>
                         </div>
                         <div className="flex gap-2">
@@ -1129,6 +1775,14 @@ export default function InvoiceManagementPage() {
                             onClick={() => openDetailDrawer(invoice)}
                           >
                             <Eye className="h-3 w-3" /> View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-1"
+                            onClick={() => setEditInvoice(invoice)}
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
                           </Button>
                         </div>
                       </CardContent>
@@ -1177,11 +1831,44 @@ export default function InvoiceManagementPage() {
 
       {/* Detail Drawer */}
       <InvoiceDetailDrawer
-        key={detailInvoice?.id || 'drawer'}
+        key={detailInvoice?._id || 'drawer'}
         invoice={detailInvoice}
-        onRefetch={fetchInvoices}
+        onRefetch={fetchData}
+        onEdit={setEditInvoice}
         onClose={() => setDetailInvoice(null)}
       />
+
+      {/* Edit Dialog */}
+      <EditInvoiceDialog
+        invoice={editInvoice}
+        open={!!editInvoice}
+        onOpenChange={(open) => !open && setEditInvoice(null)}
+        onSave={handleSaveEdit}
+      />
+
+      {/* Delete Confirmation */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Invoice</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete invoice{' '}
+              {deleteTarget?.invoiceNumber}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

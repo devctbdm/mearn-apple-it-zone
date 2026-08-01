@@ -25,7 +25,7 @@ export interface CartSlice {
   items: CartItem[];
   totalItems: number;
   totalPrice: number;
-  isLoading: boolean;
+  cartLoading: boolean;
   error: string | null;
 
   // Helper
@@ -49,7 +49,7 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
   items: [],
   totalItems: 0,
   totalPrice: 0,
-  isLoading: false,
+  cartLoading: false,
   error: null,
 
   // Helper: Recalculate totals
@@ -64,7 +64,7 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
 
   fetchCart: async () => {
     if (!isAuthed()) return;
-    set({ isLoading: true, error: null });
+    set({ cartLoading: true, error: null });
     try {
       const response = await api.get('/cart');
       if (response.data.success) {
@@ -72,10 +72,10 @@ export const createCartSlice: StateCreator<CartSlice> = (set, get) => ({
           response.data.cart?.items ?? response.data.items ?? []
         );
         const { totalItems, totalPrice } = get().recalculateTotals(items);
-        set({ items, totalItems, totalPrice, isLoading: false });
+        set({ items, totalItems, totalPrice, cartLoading: false });
       }
     } catch (error: any) {
-      set({ error: error.message, isLoading: false });
+      set({ error: error.message, cartLoading: false });
     }
   },
 

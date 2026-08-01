@@ -68,8 +68,8 @@ const NotFound = () => {
               {/* Action Buttons */}
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
                 <Button className="w-full sm:w-auto">
-                  <Link href="/">
-                    <Home className="mr-2 h-4 w-4" />
+                  <Link href="/" className="flex items-center gap-2">
+                    <Home className="h-4 w-4" />
                     Go Home
                   </Link>
                 </Button>

@@ -169,7 +169,7 @@ export function ChartBarLabelCustom({
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className="aspect-auto h-[400px]"
+          className="aspect-auto h-100"
         >
           <BarChart
             accessibilityLayer
