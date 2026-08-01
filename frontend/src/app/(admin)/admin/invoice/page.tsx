@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 import {
   Card,
@@ -13,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import {
   Table,
@@ -39,14 +38,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -70,8 +61,6 @@ import {
   XCircle,
   ChevronLeft,
   ChevronRight,
-  Plus,
-  Mail,
   Printer,
   Trash2,
   ArrowUpDown,
@@ -80,13 +69,13 @@ import {
   Clock,
   FileSpreadsheet,
   Eye,
-  Send,
-  Pencil,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
+import { orderApi, type Order } from '@/lib/api';
 
 // --- Types ---
-type InvoiceStatus = 'paid' | 'pending' | 'overdue' | 'draft' | 'cancelled';
+type InvoiceStatus = 'paid' | 'pending' | 'overdue' | 'cancelled';
 
 interface InvoiceItem {
   description: string;
@@ -102,6 +91,7 @@ interface Invoice {
   email: string;
   avatar: string;
   amount: number;
+  discount: number;
   tax: number;
   total: number;
   status: InvoiceStatus;
@@ -115,202 +105,80 @@ interface InvoiceStats {
   totalOutstanding: number;
   totalPaid: number;
   totalOverdue: number;
-  draftCount: number;
+  cancelledCount: number;
 }
 
-// --- Mock Data ---
-const mockInvoices: Invoice[] = [
-  {
-    id: 'inv_1',
-    invoiceNumber: 'INV-2024-0012',
-    customer: 'Acme Corporation',
-    email: 'billing@acme.com',
-    avatar: 'AC',
-    amount: 2450.0,
-    tax: 245.0,
-    total: 2695.0,
-    status: 'paid',
-    date: '2024-01-15',
-    dueDate: '2024-02-15',
-    items: [
-      {
-        description: 'Premium Plan - Monthly',
-        quantity: 1,
-        unitPrice: 2000,
-        total: 2000,
-      },
-      {
-        description: 'Additional Storage (500GB)',
-        quantity: 1,
-        unitPrice: 450,
-        total: 450,
-      },
-    ],
-    notes: 'Thank you for your business!',
-  },
-  {
-    id: 'inv_2',
-    invoiceNumber: 'INV-2024-0013',
-    customer: 'Stark Industries',
-    email: 'accounts@stark.com',
-    avatar: 'SI',
-    amount: 8750.0,
-    tax: 875.0,
-    total: 9625.0,
-    status: 'pending',
-    date: '2024-01-18',
-    dueDate: '2024-02-18',
-    items: [
-      {
-        description: 'Enterprise License',
-        quantity: 5,
-        unitPrice: 1500,
-        total: 7500,
-      },
-      {
-        description: 'Implementation Fee',
-        quantity: 1,
-        unitPrice: 1250,
-        total: 1250,
-      },
-    ],
-  },
-  {
-    id: 'inv_3',
-    invoiceNumber: 'INV-2024-0014',
-    customer: 'Wayne Enterprises',
-    email: 'finance@wayne.com',
-    avatar: 'WE',
-    amount: 3200.0,
-    tax: 320.0,
-    total: 3520.0,
-    status: 'overdue',
-    date: '2023-12-01',
-    dueDate: '2023-12-31',
-    items: [
-      {
-        description: 'Consulting Services',
-        quantity: 40,
-        unitPrice: 80,
-        total: 3200,
-      },
-    ],
-    notes: 'Payment reminder sent on Jan 5th.',
-  },
-  {
-    id: 'inv_4',
-    invoiceNumber: 'INV-2024-0015',
-    customer: 'Cyberdyne Systems',
-    email: 'ap@cyberdyne.com',
-    avatar: 'CS',
-    amount: 1299.99,
-    tax: 130.0,
-    total: 1429.99,
-    status: 'draft',
-    date: '2024-01-20',
-    dueDate: '2024-02-20',
-    items: [
-      {
-        description: 'Hardware - Server Rack',
-        quantity: 1,
-        unitPrice: 1299.99,
-        total: 1299.99,
-      },
-    ],
-  },
-  {
-    id: 'inv_5',
-    invoiceNumber: 'INV-2024-0016',
-    customer: 'Massive Dynamic',
-    email: 'billing@massivedynamic.com',
-    avatar: 'MD',
-    amount: 5400.0,
-    tax: 540.0,
-    total: 5940.0,
-    status: 'paid',
-    date: '2024-01-10',
-    dueDate: '2024-02-10',
-    items: [
-      {
-        description: 'Annual Subscription',
-        quantity: 1,
-        unitPrice: 5400,
-        total: 5400,
-      },
-    ],
-  },
-  {
-    id: 'inv_6',
-    invoiceNumber: 'INV-2024-0017',
-    customer: 'Umbrella Corp',
-    email: 'finance@umbrella.com',
-    avatar: 'UC',
-    amount: 780.0,
-    tax: 78.0,
-    total: 858.0,
-    status: 'cancelled',
-    date: '2024-01-05',
-    dueDate: '2024-02-05',
-    items: [
-      {
-        description: 'Lab Equipment Rental',
-        quantity: 2,
-        unitPrice: 390,
-        total: 780,
-      },
-    ],
-  },
-  {
-    id: 'inv_7',
-    invoiceNumber: 'INV-2024-0018',
-    customer: 'Soylent Corp',
-    email: 'ap@soylent.com',
-    avatar: 'SC',
-    amount: 4500.0,
-    tax: 450.0,
-    total: 4950.0,
-    status: 'pending',
-    date: '2024-01-22',
-    dueDate: '2024-02-22',
-    items: [
-      {
-        description: 'Raw Materials - Batch #442',
-        quantity: 100,
-        unitPrice: 45,
-        total: 4500,
-      },
-    ],
-  },
-  {
-    id: 'inv_8',
-    invoiceNumber: 'INV-2024-0019',
-    customer: 'Initech',
-    email: 'billing@initech.com',
-    avatar: 'IN',
-    amount: 12500.0,
-    tax: 1250.0,
-    total: 13750.0,
-    status: 'overdue',
-    date: '2023-11-15',
-    dueDate: '2023-12-15',
-    items: [
-      {
-        description: 'Software Development',
-        quantity: 100,
-        unitPrice: 125,
-        total: 12500,
-      },
-    ],
-    notes: '3rd reminder sent. Escalating to collections.',
-  },
-];
+// --- Mappers ---
+const shortId = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+
+const getCustomer = (o: Order) => (typeof o.user === 'object' ? o.user : null);
+
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'NA';
+
+const addDays = (date: string, days: number) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d.toISOString();
+};
+
+const orderToInvoice = (o: Order): Invoice => {
+  const customer = getCustomer(o);
+  const name = customer?.name || 'Customer';
+  const amount = o.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const dueDate = addDays(o.createdAt, 30);
+
+  let status: InvoiceStatus = 'pending';
+  const payStatus = o.payment?.status;
+  if (payStatus === 'paid') {
+    status = 'paid';
+  } else if (
+    payStatus === 'failed' ||
+    payStatus === 'cancelled' ||
+    o.orderStatus === 'cancelled'
+  ) {
+    status = 'cancelled';
+  } else if (new Date() > new Date(dueDate)) {
+    status = 'overdue';
+  }
+
+  return {
+    id: o._id,
+    invoiceNumber: `INV-${o._id.slice(-8).toUpperCase()}`,
+    customer: name,
+    email: customer?.email || '',
+    avatar: initials(name),
+    amount,
+    discount: o.coupon?.discount || 0,
+    tax: 0,
+    total: o.totalAmount,
+    status,
+    date: o.createdAt,
+    dueDate,
+    items: o.items.map((i) => ({
+      description: i.name,
+      quantity: i.quantity,
+      unitPrice: i.price,
+      total: i.price * i.quantity,
+    })),
+    notes: o.note || undefined,
+  };
+};
 
 // --- Utilities ---
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
+  `৳${(amount || 0).toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+  })}`;
+
+const formatDate = (value: string, opts?: Intl.DateTimeFormatOptions) =>
+  new Date(value).toLocaleDateString('en-US', opts);
 
 // --- Components ---
 
@@ -333,12 +201,6 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
       className:
         'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
       icon: <AlertCircle className="h-3 w-3 mr-1" />,
-    },
-    draft: {
-      label: 'Draft',
-      className:
-        'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-950/30 dark:text-slate-400 dark:border-slate-800',
-      icon: <FileText className="h-3 w-3 mr-1" />,
     },
     cancelled: {
       label: 'Cancelled',
@@ -380,9 +242,6 @@ function TableRowSkeleton() {
   return (
     <TableRow>
       <TableCell>
-        <Skeleton className="h-4 w-4" />
-      </TableCell>
-      <TableCell>
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-full" />
           <div className="space-y-1">
@@ -413,245 +272,17 @@ function TableRowSkeleton() {
   );
 }
 
-function CreateInvoiceDialog({
-  open,
-  onOpenChange,
-  onCreateInvoice,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreateInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => void;
-}) {
-  const [formData, setFormData] = useState({
-    customer: '',
-    email: '',
-    avatar: '',
-    amount: 0,
-    tax: 0,
-    total: 0,
-    status: 'draft' as InvoiceStatus,
-    date: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    items: [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
-    notes: '',
-  });
-
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Recalculate item total
-    if (field === 'quantity' || field === 'unitPrice') {
-      newItems[index].total = newItems[index].quantity * newItems[index].unitPrice;
-    }
-    
-    // Recalculate totals
-    const amount = newItems.reduce((sum, item) => sum + item.total, 0);
-    const tax = amount * 0.1; // 10% tax
-    const total = amount + tax;
-    
-    setFormData({ ...formData, items: newItems, amount, tax, total });
-  };
-
-  const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { description: '', quantity: 1, unitPrice: 0, total: 0 }],
-    });
-  };
-
-  const removeItem = (index: number) => {
-    const newItems = formData.items.filter((_, i) => i !== index);
-    const amount = newItems.reduce((sum, item) => sum + item.total, 0);
-    const tax = amount * 0.1;
-    const total = amount + tax;
-    setFormData({ ...formData, items: newItems, amount, tax, total });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onCreateInvoice(formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
-      customer: '',
-      email: '',
-      avatar: '',
-      amount: 0,
-      tax: 0,
-      total: 0,
-      status: 'draft',
-      date: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      items: [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
-      notes: '',
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New Invoice</DialogTitle>
-          <DialogDescription>
-            Fill in the details to create a new invoice.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Customer Name</label>
-              <Input
-                required
-                value={formData.customer}
-                onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                placeholder="Enter customer name"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                required
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="customer@email.com"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Issue Date</label>
-              <Input
-                required
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Due Date</label>
-              <Input
-                required
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Invoice Items</label>
-            <div className="space-y-2">
-              {formData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-5">
-                    <Input
-                      required
-                      placeholder="Description"
-                      value={item.description}
-                      onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      required
-                      type="number"
-                      min="1"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Input
-                      required
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Price"
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-1 text-right font-medium">
-                    ${item.total.toFixed(2)}
-                  </div>
-                  <div className="col-span-1">
-                    {formData.items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addItem}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Item
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Notes</label>
-            <Input
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Optional notes"
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal:</span>
-              <span>${formData.amount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Tax (10%):</span>
-              <span>${formData.tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total:</span>
-              <span>${formData.total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Create Invoice</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function InvoiceDetailDrawer({
   invoice,
-  onStatusChange,
+  onRefetch,
   onClose,
 }: {
   invoice: Invoice | null;
-  onStatusChange: (id: string, status: InvoiceStatus) => void;
+  onRefetch: () => void;
   onClose: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const isMobile = useIsMobile();
   const invoiceContentRef = useRef<HTMLDivElement>(null);
 
@@ -667,6 +298,21 @@ function InvoiceDetailDrawer({
     setOpen(open);
     if (!open) {
       onClose();
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!invoice) return;
+    setCancelling(true);
+    try {
+      await orderApi.updateStatus(invoice.id, 'cancelled');
+      toast.success(`Invoice ${invoice.invoiceNumber} cancelled`);
+      onClose();
+      onRefetch();
+    } catch {
+      toast.error('Failed to cancel invoice');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -782,27 +428,7 @@ function InvoiceDetailDrawer({
 
   if (!invoice) return null;
 
-  const statusActions: {
-    label: string;
-    status: InvoiceStatus;
-    variant: 'default' | 'outline' | 'destructive';
-  }[] = [
-    {
-      label: 'Mark as Paid',
-      status: 'paid' as const,
-      variant: 'default' as const,
-    },
-    {
-      label: 'Mark as Pending',
-      status: 'pending' as const,
-      variant: 'outline' as const,
-    },
-    {
-      label: 'Mark as Overdue',
-      status: 'overdue' as const,
-      variant: 'destructive' as const,
-    },
-  ].filter((a) => a.status !== invoice.status);
+  const canCancel = invoice.status === 'pending' || invoice.status === 'overdue';
 
   return (
     <Drawer
@@ -893,10 +519,10 @@ function InvoiceDetailDrawer({
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${item.unitPrice.toFixed(2)}
+                          {formatCurrency(item.unitPrice)}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${item.total.toFixed(2)}
+                          {formatCurrency(item.total)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -909,16 +535,24 @@ function InvoiceDetailDrawer({
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${invoice.amount.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.amount)}</span>
               </div>
+              {invoice.discount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span className="text-emerald-600">
+                    -{formatCurrency(invoice.discount)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax (10%)</span>
-                <span>${invoice.tax.toFixed(2)}</span>
+                <span className="text-muted-foreground">Tax</span>
+                <span>{formatCurrency(invoice.tax)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span>${invoice.total.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.total)}</span>
               </div>
             </div>
 
@@ -939,28 +573,17 @@ function InvoiceDetailDrawer({
                   <Download className="h-4 w-4" /> Download PDF
                 </Button>
               </div>
-              {statusActions.length > 0 && (
-                <div className="grid grid-cols-1 gap-2">
-                  {statusActions.map((action) => (
-                    <Button
-                      key={action.status}
-                      variant={action.variant}
-                      className="gap-2"
-                      onClick={() => {
-                        onStatusChange(invoice.id, action.status);
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4" /> {action.label}
-                    </Button>
-                  ))}
-                </div>
+              {canCancel && (
+                <Button
+                  variant="destructive"
+                  className="w-full gap-2"
+                  disabled={cancelling}
+                  onClick={handleCancel}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {cancelling ? 'Cancelling...' : 'Cancel Invoice'}
+                </Button>
               )}
-              <Button
-                variant="ghost"
-                className="w-full gap-2 text-red-600 hover:text-red-600 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" /> Delete Invoice
-              </Button>
             </div>
           </div>
 
@@ -984,9 +607,6 @@ export default function InvoiceManagementPage() {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>(
     'all'
   );
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(
-    new Set()
-  );
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Invoice;
     direction: 'asc' | 'desc';
@@ -996,19 +616,24 @@ export default function InvoiceManagementPage() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const itemsPerPage = 5;
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInvoices(mockInvoices);
+  const fetchInvoices = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await orderApi.getAllOrders({ limit: 100 });
+      setInvoices((data.orders || []).map(orderToInvoice));
+    } catch {
+      toast.error('Failed to load invoices');
+    } finally {
       setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   // Stats
   const stats: InvoiceStats = useMemo(() => {
@@ -1017,10 +642,10 @@ export default function InvoiceManagementPage() {
         if (inv.status === 'paid') acc.totalPaid += inv.total;
         if (inv.status === 'pending') acc.totalOutstanding += inv.total;
         if (inv.status === 'overdue') acc.totalOverdue += inv.total;
-        if (inv.status === 'draft') acc.draftCount += 1;
+        if (inv.status === 'cancelled') acc.cancelledCount += 1;
         return acc;
       },
-      { totalOutstanding: 0, totalPaid: 0, totalOverdue: 0, draftCount: 0 }
+      { totalOutstanding: 0, totalPaid: 0, totalOverdue: 0, cancelledCount: 0 }
     );
   }, [invoices]);
 
@@ -1066,21 +691,6 @@ export default function InvoiceManagementPage() {
     setTimeout(() => setDetailInvoice(invoice), 0);
   };
 
-  const toggleSelection = (id: string) => {
-    const next = new Set(selectedInvoices);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedInvoices(next);
-  };
-
-  const toggleAll = () => {
-    if (selectedInvoices.size === paginatedInvoices.length) {
-      setSelectedInvoices(new Set());
-    } else {
-      setSelectedInvoices(new Set(paginatedInvoices.map((i) => i.id)));
-    }
-  };
-
   const handleSort = (key: keyof Invoice) => {
     setSortConfig((prev) => ({
       key,
@@ -1088,57 +698,59 @@ export default function InvoiceManagementPage() {
     }));
   };
 
-  const handleStatusChange = (id: string, status: InvoiceStatus) => {
-    setInvoices((prev) =>
-      prev.map((inv) => (inv.id === id ? { ...inv, status } : inv))
+  const handleExportCSV = () => {
+    const headers = [
+      'Invoice',
+      'Customer',
+      'Email',
+      'Date',
+      'Due Date',
+      'Status',
+      'Total',
+    ];
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const rows = filteredInvoices.map((inv) =>
+      [
+        inv.invoiceNumber,
+        inv.customer,
+        inv.email,
+        inv.date,
+        inv.dueDate,
+        inv.status,
+        inv.total.toFixed(2),
+      ]
+        .map((v) => escape(String(v)))
+        .join(',')
     );
+    const csv = [headers.map((h) => escape(h)).join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filteredInvoices.length} invoices to CSV`);
   };
 
-  const handleCreateInvoice = (invoiceData: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
-    const newInvoice: Invoice = {
-      ...invoiceData,
-      id: `inv_${Date.now()}`,
-      invoiceNumber: `INV-2024-${String(invoices.length + 1).padStart(4, '0')}`,
-      avatar: invoiceData.customer
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2),
-    };
-    setInvoices((prev) => [newInvoice, ...prev]);
-  };
-
-  const handleDelete = (id: string) => {
-    setInvoiceToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (invoiceToDelete) {
-      setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceToDelete));
-      setSelectedInvoices((prev) => {
-        const next = new Set(prev);
-        next.delete(invoiceToDelete);
-        return next;
-      });
+  const handleChangeInvoiceStatus = async (
+    invoice: Invoice,
+    status: InvoiceStatus
+  ) => {
+    if (status === 'overdue' || status === invoice.status) return;
+    try {
+      if (status === 'cancelled') {
+        await orderApi.updateStatus(invoice.id, 'cancelled');
+      } else {
+        await orderApi.updatePaymentStatus(invoice.id, status);
+      }
+      toast.success(`Invoice ${invoice.invoiceNumber} marked as ${status}`);
+      await fetchInvoices();
+    } catch {
+      toast.error('Failed to update invoice status');
     }
-    setDeleteDialogOpen(false);
-    setInvoiceToDelete(null);
-  };
-
-  const handleBulkDelete = () => {
-    setInvoices((prev) => prev.filter((inv) => !selectedInvoices.has(inv.id)));
-    setSelectedInvoices(new Set());
-  };
-
-  const handleBulkStatusChange = (status: InvoiceStatus) => {
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        selectedInvoices.has(inv.id) ? { ...inv, status } : inv
-      )
-    );
-    setSelectedInvoices(new Set());
   };
 
   return (
@@ -1148,12 +760,9 @@ export default function InvoiceManagementPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
           <p className="text-muted-foreground">
-            Manage your invoices, track payments, and send reminders.
+            Track payments from customer orders and export invoices.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4" /> Create Invoice
-        </Button>
       </div>
 
       {/* Stats */}
@@ -1185,11 +794,11 @@ export default function InvoiceManagementPage() {
                 color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
               },
               {
-                title: 'Drafts',
-                value: stats.draftCount.toString(),
-                change: 'Unsent invoices',
-                icon: <FileText className="h-4 w-4" />,
-                color: 'text-slate-600 bg-slate-50 dark:bg-slate-950/30',
+                title: 'Cancelled',
+                value: stats.cancelledCount.toString(),
+                change: 'Failed or refunded',
+                icon: <XCircle className="h-4 w-4" />,
+                color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
               },
             ].map((stat, i) => (
               <Card key={i}>
@@ -1244,48 +853,19 @@ export default function InvoiceManagementPage() {
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex items-center gap-2">
-              {selectedInvoices.size > 0 && (
-                <>
-                  <span className="text-sm text-muted-foreground">
-                    {selectedInvoices.size} selected
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-                      Bulk Actions
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                      </DropdownMenuGroup>
-                      <DropdownMenuItem
-                        onClick={() => handleBulkStatusChange('paid')}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Paid
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleBulkStatusChange('pending')}
-                      >
-                        <Clock className="h-4 w-4 mr-2" /> Mark as Pending
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={handleBulkDelete}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete Selected
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleExportCSV}
+                disabled={filteredInvoices.length === 0}
+              >
                 <FileSpreadsheet className="h-4 w-4" /> Export
               </Button>
             </div>
@@ -1304,15 +884,6 @@ export default function InvoiceManagementPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={
-                            paginatedInvoices.length > 0 &&
-                            selectedInvoices.size === paginatedInvoices.length
-                          }
-                          onCheckedChange={toggleAll}
-                        />
-                      </TableHead>
                       <TableHead>
                         <Button
                           variant="ghost"
@@ -1349,7 +920,7 @@ export default function InvoiceManagementPage() {
                       ))
                     ) : paginatedInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-32 text-center">
+                        <TableCell colSpan={7} className="h-32 text-center">
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
                             <FileText className="h-8 w-8 mb-2 opacity-50" />
                             <p>No invoices found</p>
@@ -1359,14 +930,6 @@ export default function InvoiceManagementPage() {
                     ) : (
                       paginatedInvoices.map((invoice) => (
                         <TableRow key={invoice.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedInvoices.has(invoice.id)}
-                              onCheckedChange={() =>
-                                toggleSelection(invoice.id)
-                              }
-                            />
-                          </TableCell>
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
                               <span>{invoice.invoiceNumber}</span>
@@ -1440,33 +1003,50 @@ export default function InvoiceManagementPage() {
                                 >
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Pencil className="h-4 w-4 mr-2" /> Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Mail className="h-4 w-4 mr-2" /> Send Email
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Download className="h-4 w-4 mr-2" /> Download
-                                  PDF
-                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuGroup>
+                                  <DropdownMenuLabel>
+                                    Change Status
+                                  </DropdownMenuLabel>
+                                </DropdownMenuGroup>
                                 {invoice.status !== 'paid' && (
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      handleStatusChange(invoice.id, 'paid')
+                                      handleChangeInvoiceStatus(invoice, 'paid')
                                     }
                                   >
                                     <CheckCircle2 className="h-4 w-4 mr-2" />{' '}
                                     Mark as Paid
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem
-                                  onClick={() => handleDelete(invoice.id)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                </DropdownMenuItem>
+                                {invoice.status !== 'pending' &&
+                                  invoice.status !== 'overdue' && (
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleChangeInvoiceStatus(
+                                          invoice,
+                                          'pending'
+                                        )
+                                      }
+                                    >
+                                      <Clock className="h-4 w-4 mr-2" /> Mark
+                                      as Pending
+                                    </DropdownMenuItem>
+                                  )}
+                                {invoice.status !== 'cancelled' && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleChangeInvoiceStatus(
+                                        invoice,
+                                        'cancelled'
+                                      )
+                                    }
+                                    className="text-red-600"
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" /> Mark
+                                    as Cancelled
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1550,13 +1130,6 @@ export default function InvoiceManagementPage() {
                           >
                             <Eye className="h-3 w-3" /> View
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 gap-1"
-                          >
-                            <Send className="h-3 w-3" /> Send
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -1606,39 +1179,8 @@ export default function InvoiceManagementPage() {
       <InvoiceDetailDrawer
         key={detailInvoice?.id || 'drawer'}
         invoice={detailInvoice}
-        onStatusChange={handleStatusChange}
+        onRefetch={fetchInvoices}
         onClose={() => setDetailInvoice(null)}
-      />
-
-      {/* Delete Confirmation */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Invoice</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this invoice? This action cannot
-              be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Invoice Dialog */}
-      <CreateInvoiceDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onCreateInvoice={handleCreateInvoice}
       />
     </div>
   );

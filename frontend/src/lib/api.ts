@@ -387,6 +387,15 @@ export const orderApi = {
       status,
     }),
 
+  updatePaymentStatus: (
+    id: string,
+    status: 'pending' | 'paid' | 'failed' | 'cancelled'
+  ) =>
+    api.put<{ success: boolean; order: Order }>(
+      `/orders/${id}/payment-status`,
+      { status }
+    ),
+
   create: (data: {
     items: { product: string; quantity: number }[];
     shippingAddress: Order['shippingAddress'];

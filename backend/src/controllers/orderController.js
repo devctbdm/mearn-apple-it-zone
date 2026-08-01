@@ -234,3 +234,36 @@ export const updateOrderStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update payment status (invoice status) of an order
+// @route   PUT /api/orders/:id/payment-status
+// @access  Private/Admin
+export const updatePaymentStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ['pending', 'paid', 'failed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.payment.status = status;
+    if (status === 'paid') {
+      order.payment.paidAt = order.payment.paidAt || new Date();
+    } else {
+      order.payment.paidAt = undefined;
+    }
+    await order.save();
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -5,6 +5,7 @@ import {
   getOrderById,
   getAllOrders, // admin only
   updateOrderStatus, // admin only
+  updatePaymentStatus, // admin only
   getOrderStats, // admin only
 } from '../controllers/orderController.js';
 import { protect, adminOnly } from '../middleware/auth.js';
@@ -20,5 +21,6 @@ router.get('/:id', protect, getOrderById); // get specific order (user or admin)
 // ---- Admin-only routes ----
 router.get('/', protect, adminOnly, getAllOrders); // list all orders
 router.put('/:id/status', protect, adminOnly, updateOrderStatus);
+router.put('/:id/payment-status', protect, adminOnly, updatePaymentStatus);
 
 export default router;
