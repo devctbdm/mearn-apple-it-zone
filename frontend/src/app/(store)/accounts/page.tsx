@@ -55,9 +55,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
-import { useWishlist, useCart } from '@/store';
+import { useWishlist, useCart, useAuth } from '@/store';
 import { authApi, orderApi, SavedAddress } from '@/lib/api';
+import RequireAuth from '@/components/store/layout/RequireAuth';
 
 type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
 type OrderItem = {
@@ -164,7 +164,7 @@ const addressSchema = z.object({
   country: z.string().trim().min(1).max(80),
 });
 
-export default function AccountPage() {
+function AccountContent() {
   const { user } = useAuth();
   const [profile, setProfile] = useState({
     name: user?.name || 'Guest',
@@ -1136,5 +1136,13 @@ function Field({
       />
       {e && <p className="text-xs text-destructive">{e}</p>}
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <RequireAuth>
+      <AccountContent />
+    </RequireAuth>
   );
 }

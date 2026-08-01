@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth, useCart } from '@/store';
+import { useAppStore, useAuth, useCart } from '@/store';
 import Link from 'next/link';
 
 const loginSchema = z.object({
@@ -39,7 +39,7 @@ const initialValues: FormValues = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { fetchUser } = useAuth();
+  const { fetchUser, isAuthenticated, isLoading, user } = useAuth();
   const { syncCartWithBackend } = useCart();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<
@@ -47,6 +47,22 @@ export default function LoginPage() {
   >({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!user && !isAuthenticated) {
+      fetchUser().catch(() => {});
+    }
+  }, [user, isAuthenticated, fetchUser]);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace(
+        user?.role === 'admin' || user?.role === 'super_admin'
+          ? '/admin/dashboard'
+          : '/'
+      );
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   const update = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -86,10 +102,25 @@ export default function LoginPage() {
       }
 
       await fetchUser().catch(() => {});
+
+      // Fallback: if /auth/me failed, still populate the store from the login response
+      if (!useAppStore.getState().user && data.user) {
+        useAppStore.setState({
+          user: data.user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      }
+
       await syncCartWithBackend().catch(() => {});
 
+      const role = data.user?.role || useAppStore.getState().user?.role;
       toast.success(`Welcome back, ${data.user?.name || 'User'}!`);
-      router.push('/');
+      if (role === 'admin' || role === 'super_admin') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

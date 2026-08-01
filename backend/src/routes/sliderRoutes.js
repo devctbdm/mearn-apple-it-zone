@@ -8,15 +8,18 @@ import {
   reorderSliders,
 } from '../controllers/sliderController.js';
 import { uploadSliderImage } from '../middleware/upload.js';
+import { protect, adminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// ---- Public routes (storefront) ----
 router.get('/', getAllSliders);
 router.get('/:id', getSliderById);
 
-router.post('/', uploadSliderImage, createSlider);
-router.put('/reorder', reorderSliders);
-router.put('/:id', uploadSliderImage, updateSlider);
-router.delete('/:id', deleteSlider);
+// ---- Admin-only routes ----
+router.post('/', protect, adminOnly, uploadSliderImage, createSlider);
+router.put('/reorder', protect, adminOnly, reorderSliders);
+router.put('/:id', protect, adminOnly, uploadSliderImage, updateSlider);
+router.delete('/:id', protect, adminOnly, deleteSlider);
 
 export default router;

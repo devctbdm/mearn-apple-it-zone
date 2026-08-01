@@ -1,7 +1,7 @@
 // src/app/(admin)/analytics/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { formatBDT } from '@/utils/currency';
 import {
   Card,
@@ -50,98 +50,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SiteHeader } from '@/components/site-header';
-
-// ------------------------------------------------------------
-// DUMMY ANALYTICS DATA
-// ------------------------------------------------------------
-
-// Monthly sales data (last 12 months)
-const monthlySalesData = [
-  { month: 'Jan', revenue: 45000, orders: 12, avgOrderValue: 3750 },
-  { month: 'Feb', revenue: 52000, orders: 15, avgOrderValue: 3467 },
-  { month: 'Mar', revenue: 68000, orders: 18, avgOrderValue: 3778 },
-  { month: 'Apr', revenue: 49000, orders: 14, avgOrderValue: 3500 },
-  { month: 'May', revenue: 73000, orders: 22, avgOrderValue: 3318 },
-  { month: 'Jun', revenue: 89000, orders: 25, avgOrderValue: 3560 },
-  { month: 'Jul', revenue: 95000, orders: 28, avgOrderValue: 3393 },
-  { month: 'Aug', revenue: 82000, orders: 24, avgOrderValue: 3417 },
-  { month: 'Sep', revenue: 105000, orders: 30, avgOrderValue: 3500 },
-  { month: 'Oct', revenue: 112000, orders: 32, avgOrderValue: 3500 },
-  { month: 'Nov', revenue: 98000, orders: 27, avgOrderValue: 3630 },
-  { month: 'Dec', revenue: 125000, orders: 35, avgOrderValue: 3571 },
-];
-
-// Category performance data
-const categoryData = [
-  { name: 'Desktop', revenue: 285000, orders: 45, percentage: 28 },
-  { name: 'Laptop', revenue: 220000, orders: 38, percentage: 22 },
-  { name: 'Components', revenue: 165000, orders: 52, percentage: 16 },
-  { name: 'Monitor', revenue: 98000, orders: 25, percentage: 10 },
-  { name: 'Accessories', revenue: 82000, orders: 78, percentage: 8 },
-  { name: 'Storage', revenue: 65000, orders: 42, percentage: 6 },
-  { name: 'Networking', revenue: 45000, orders: 18, percentage: 4 },
-  { name: 'Gaming', revenue: 38000, orders: 12, percentage: 3 },
-  { name: 'Others', revenue: 32000, orders: 15, percentage: 3 },
-];
-
-// Top selling products
-const topProducts = [
-  {
-    name: 'Gaming PC - Star Xtreme',
-    sku: 'GP-001',
-    revenue: 255000,
-    unitsSold: 3,
-    price: 85000,
-  },
-  {
-    name: 'Gaming Laptop - Pro Gamer X',
-    sku: 'LP-015',
-    revenue: 190000,
-    unitsSold: 2,
-    price: 95000,
-  },
-  {
-    name: '27" 4K UHD Monitor',
-    sku: 'MN-012',
-    revenue: 128000,
-    unitsSold: 4,
-    price: 32000,
-  },
-  {
-    name: 'RTX 4060 Graphics Card',
-    sku: 'GC-008',
-    revenue: 126000,
-    unitsSold: 3,
-    price: 42000,
-  },
-  {
-    name: 'Wireless Mechanical Keyboard',
-    sku: 'KB-042',
-    revenue: 27000,
-    unitsSold: 6,
-    price: 4500,
-  },
-];
-
-// Order status distribution
-const orderStatusData = [
-  { name: 'Delivered', value: 72, color: '#22c55e' },
-  { name: 'Processing', value: 18, color: '#3b82f6' },
-  { name: 'Shipped', value: 8, color: '#8b5cf6' },
-  { name: 'Pending', value: 5, color: '#eab308' },
-  { name: 'Cancelled', value: 3, color: '#ef4444' },
-];
-
-// Daily sales (last 30 days - simplified)
-const dailySalesData = Array.from({ length: 30 }, (_, i) => {
-  const date = new Date();
-  date.setDate(date.getDate() - (29 - i));
-  return {
-    date: date.toLocaleDateString('en-BD', { day: 'numeric', month: 'short' }),
-    revenue: Math.floor(Math.random() * 15000) + 2000,
-    orders: Math.floor(Math.random() * 8) + 1,
-  };
-});
+import { Spinner } from '@/components/ui/spinner';
+import {
+  analyticsApi,
+  type AnalyticsStats,
+  type AnalyticsPoint,
+} from '@/lib/api';
 
 // ------------------------------------------------------------
 // CUSTOM COMPONENTS
@@ -210,49 +124,111 @@ export default function AnalyticsPage() {
   const [view, setView] = useState<
     'overview' | 'sales' | 'products' | 'categories'
   >('overview');
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<AnalyticsStats | null>(null);
 
-  // Calculate totals
-  const totalRevenue = monthlySalesData.reduce((sum, d) => sum + d.revenue, 0);
-  const totalOrders = monthlySalesData.reduce((sum, d) => sum + d.orders, 0);
-  const avgOrderValue = totalRevenue / totalOrders;
-  const totalProducts = 156;
-  const totalCustomers = 89;
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await analyticsApi.getStats();
+        if (mounted && data.success) setAnalytics(data.data);
+      } catch {
+        // leave null; page shows empty states
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  // Current month vs last month growth
-  const currentMonth = monthlySalesData[monthlySalesData.length - 1];
-  const previousMonth = monthlySalesData[monthlySalesData.length - 2];
-  const revenueGrowth = (
-    ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) *
-    100
-  ).toFixed(1);
-  const ordersGrowth = (
-    ((currentMonth.orders - previousMonth.orders) / previousMonth.orders) *
-    100
-  ).toFixed(1);
+  const stats = analytics?.stats;
 
   // Format currency
   const formatCurrency = (value: number) => formatBDT(value);
 
   // Filter data based on time range
-  const filteredData = useMemo(() => {
-    const count =
-      timeRange === '7d'
-        ? 7
-        : timeRange === '30d'
-          ? 30
-          : timeRange === '90d'
-            ? 90
-            : 12;
-    return monthlySalesData.slice(-count);
-  }, [timeRange]);
+  const filteredData: AnalyticsPoint[] = useMemo(() => {
+    if (!analytics) return [];
+    if (timeRange === '12m') return analytics.monthly;
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    return analytics.daily.slice(-days);
+  }, [timeRange, analytics]);
 
-  // Custom tooltip formatter
-  const currencyTooltip = (value: number) => [
-    `৳${value.toLocaleString()}`,
-    'Revenue',
-  ];
+  // Growth for stat cards (current month vs previous, from monthly series)
+  const growth = useMemo(() => {
+    if (!analytics || analytics.monthly.length < 2) return null;
+    const list = analytics.monthly;
+    let cur = list[list.length - 1];
+    let prev = list[list.length - 2];
+    // skip trailing zero months if the current month has no data yet
+    if (cur.revenue === 0) {
+      cur = prev;
+      prev = list[list.length - 3];
+    }
+    if (!prev || prev.revenue === 0) return null;
+    return {
+      revenue: (
+        ((cur.revenue - prev.revenue) / prev.revenue) *
+        100
+      ).toFixed(1),
+      orders:
+        prev.orders > 0
+          ? (((cur.orders - prev.orders) / prev.orders) * 100).toFixed(1)
+          : null,
+    };
+  }, [analytics]);
 
-  // COLORS for pie chart
+  // Export current view as CSV
+  const handleExport = () => {
+    if (!filteredData.length) return;
+    const rows = [
+      ['Period', 'Revenue', 'Orders', 'Avg. Order'],
+      ...filteredData.map((d) => [
+        d.month,
+        String(d.revenue),
+        String(d.orders),
+        String(d.avgOrderValue),
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'analytics.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Order status distribution (real counts)
+  const orderStatusData = stats
+    ? [
+        {
+          name: 'Processing',
+          value: stats.ordersByStatus.processing,
+          color: '#3b82f6',
+        },
+        {
+          name: 'Shipped',
+          value: stats.ordersByStatus.shipped,
+          color: '#8b5cf6',
+        },
+        {
+          name: 'Delivered',
+          value: stats.ordersByStatus.delivered,
+          color: '#22c55e',
+        },
+        {
+          name: 'Cancelled',
+          value: stats.ordersByStatus.cancelled,
+          color: '#ef4444',
+        },
+      ].filter((s) => s.value > 0)
+    : [];
+
   const COLORS = [
     '#22c55e',
     '#3b82f6',
@@ -265,9 +241,28 @@ export default function AnalyticsPage() {
     '#6366f1',
   ];
 
+  if (loading) {
+    return (
+      <>
+        <SiteHeader
+          title="Analytics"
+          description="Track your store performance and sales metrics."
+        />
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      </>
+    );
+  }
+
+  const totalRevenue = stats?.revenue || 0;
+  const totalOrders = stats?.orders || 0;
+  const avgOrderValue = stats?.avgOrderValue || 0;
+  const totalProducts = stats?.products || 0;
+  const totalCustomers = stats?.customers || 0;
+
   return (
     <>
-      {' '}
       <SiteHeader
         title="Analytics"
         description="Track your store performance and sales metrics."
@@ -292,7 +287,7 @@ export default function AnalyticsPage() {
                 <SelectItem value="12m">Last 12 Months</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" onClick={handleExport}>
               <Download className="h-4 w-4" />
             </Button>
           </div>
@@ -308,17 +303,17 @@ export default function AnalyticsPage() {
             subValue={`${totalOrders} orders placed`}
             icon={<DollarSign className="h-4 w-4 text-white" />}
             color="bg-green-600"
-            trend="up"
-            trendValue={`${revenueGrowth}%`}
+            trend={growth && Number(growth.revenue) >= 0 ? 'up' : 'down'}
+            trendValue={growth ? `${growth.revenue}%` : '0%'}
           />
           <StatCard
             title="Total Orders"
             value={totalOrders.toString()}
-            subValue={`Avg. ${avgOrderValue.toFixed(0)} per order`}
+            subValue={`Avg. ${avgOrderValue.toLocaleString()} per order`}
             icon={<ShoppingCart className="h-4 w-4 text-white" />}
             color="bg-blue-600"
-            trend="up"
-            trendValue={`${ordersGrowth}%`}
+            trend={growth?.orders && Number(growth.orders) >= 0 ? 'up' : 'down'}
+            trendValue={growth?.orders ? `${growth.orders}%` : '0%'}
           />
           <StatCard
             title="Products"
@@ -333,8 +328,6 @@ export default function AnalyticsPage() {
             subValue="Registered users"
             icon={<Users className="h-4 w-4 text-white" />}
             color="bg-orange-600"
-            trend="up"
-            trendValue="12.5%"
           />
         </div>
 
@@ -362,56 +355,64 @@ export default function AnalyticsPage() {
               <CardHeader>
                 <CardTitle>Revenue & Orders Overview</CardTitle>
                 <CardDescription>
-                  Monthly revenue and order volume trends
+                  {timeRange === '12m'
+                    ? 'Monthly revenue and order volume trends'
+                    : 'Daily revenue and order volume trends'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-87.5">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={filteredData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis
-                        yAxisId="left"
-                        tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
-                      />
-                      <YAxis yAxisId="right" orientation="right" />
-                      <Tooltip
-                        formatter={(value, name) => {
-                          if (name === 'Revenue')
-                            return [
-                              `৳${Number(value).toLocaleString()}`,
-                              'Revenue',
-                            ];
-                          return [value, 'Orders'];
-                        }}
-                      />
-                      <Legend />
-                      <Line
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="revenue"
-                        name="Revenue"
-                        stroke="#22c55e"
-                        strokeWidth={2}
-                        dot={{ fill: '#22c55e' }}
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="orders"
-                        name="Orders"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        dot={{ fill: '#3b82f6' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {filteredData.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-muted-foreground">
+                    No sales data in this period yet.
+                  </p>
+                ) : (
+                  <div className="h-87.5">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={filteredData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis
+                          yAxisId="left"
+                          tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
+                        />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <Tooltip
+                          formatter={(value, name) => {
+                            if (name === 'Revenue')
+                              return [
+                                `৳${Number(value).toLocaleString()}`,
+                                'Revenue',
+                              ];
+                            return [value, 'Orders'];
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="revenue"
+                          name="Revenue"
+                          stroke="#22c55e"
+                          strokeWidth={2}
+                          dot={{ fill: '#22c55e' }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="orders"
+                          name="Orders"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={{ fill: '#3b82f6' }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Two-column: Order Status + Daily Sales */}
+            {/* Two-column: Order Status + Quick Stats */}
             <div className="grid gap-4 md:grid-cols-2">
               {/* Order Status Distribution */}
               <Card>
@@ -420,29 +421,39 @@ export default function AnalyticsPage() {
                   <CardDescription>Current order breakdown</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-62.5">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={orderStatusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {orderStatusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [`${value} orders`, '']}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {orderStatusData.length === 0 ? (
+                    <p className="py-16 text-center text-sm text-muted-foreground">
+                      No orders yet.
+                    </p>
+                  ) : (
+                    <div className="h-62.5">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={orderStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                            nameKey="name"
+                          >
+                            {orderStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value) => [
+                              `${value} orders`,
+                              'Orders',
+                            ]}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -457,11 +468,13 @@ export default function AnalyticsPage() {
                     <div className="flex items-center justify-between border-b pb-3">
                       <div className="flex items-center gap-2">
                         <div className="rounded-full bg-green-100 p-1">
-                          <TrendingUp className="h-4 w-4 text-green-600" />
+                          <Package className="h-4 w-4 text-green-600" />
                         </div>
-                        <span className="text-sm">Conversion Rate</span>
+                        <span className="text-sm">Units Sold</span>
                       </div>
-                      <span className="font-semibold">3.2%</span>
+                      <span className="font-semibold">
+                        {(stats?.productsSold || 0).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between border-b pb-3">
                       <div className="flex items-center gap-2">
@@ -481,7 +494,9 @@ export default function AnalyticsPage() {
                         </div>
                         <span className="text-sm">Items Per Order</span>
                       </div>
-                      <span className="font-semibold">2.4</span>
+                      <span className="font-semibold">
+                        {stats?.avgItemsPerOrder || 0}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -490,7 +505,9 @@ export default function AnalyticsPage() {
                         </div>
                         <span className="text-sm">Repeat Customers</span>
                       </div>
-                      <span className="font-semibold">34%</span>
+                      <span className="font-semibold">
+                        {stats?.repeatCustomerRate || 0}%
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -506,112 +523,136 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Revenue Trend</CardTitle>
-                <CardDescription>Monthly revenue performance</CardDescription>
+                <CardDescription>
+                  {timeRange === '12m'
+                    ? 'Monthly revenue performance'
+                    : 'Daily revenue performance'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-75">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={filteredData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis
-                        tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        formatter={(value) => [
-                          `৳${Number(value).toLocaleString()}`,
-                          'Revenue',
-                        ]}
-                      />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        name="Revenue"
-                        stroke="#22c55e"
-                        fill="#22c55e"
-                        fillOpacity={0.2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                {filteredData.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-muted-foreground">
+                    No sales data in this period yet.
+                  </p>
+                ) : (
+                  <div className="h-75">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={filteredData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis
+                          tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          formatter={(value) => [
+                            `৳${Number(value).toLocaleString()}`,
+                            'Revenue',
+                          ]}
+                        />
+                        <Legend />
+                        <Area
+                          type="monotone"
+                          dataKey="revenue"
+                          name="Revenue"
+                          stroke="#22c55e"
+                          fill="#22c55e"
+                          fillOpacity={0.2}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Monthly Summary Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Monthly Summary</CardTitle>
+                <CardTitle>Sales Summary</CardTitle>
                 <CardDescription>
-                  Detailed monthly performance metrics
+                  {timeRange === '12m'
+                    ? 'Detailed monthly performance metrics'
+                    : 'Detailed daily performance metrics'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="px-4 py-3 text-left font-medium">
-                          Month
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Revenue
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Orders
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Avg. Order
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Growth
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredData.map((row, idx) => {
-                        const growth =
-                          idx > 0
-                            ? ((row.revenue - filteredData[idx - 1].revenue) /
-                                filteredData[idx - 1].revenue) *
-                              100
-                            : 0;
-                        return (
-                          <tr key={idx} className="border-b hover:bg-muted/50">
-                            <td className="px-4 py-3 font-medium">
-                              {row.month}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatCurrency(row.revenue)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {row.orders}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatCurrency(row.avgOrderValue)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {idx > 0 ? (
-                                <span
-                                  className={
-                                    growth >= 0
-                                      ? 'text-green-600'
-                                      : 'text-red-600'
-                                  }
-                                >
-                                  {growth >= 0 ? '+' : ''}
-                                  {growth.toFixed(1)}%
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {filteredData.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    No sales data in this period yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-3 text-left font-medium">
+                            Period
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Revenue
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Orders
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Avg. Order
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Growth
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredData.map((row, idx) => {
+                          const growthPct =
+                            idx > 0
+                              ? ((row.revenue -
+                                  filteredData[idx - 1].revenue) /
+                                  (filteredData[idx - 1].revenue || 1)) *
+                                100
+                              : 0;
+                          return (
+                            <tr
+                              key={idx}
+                              className="border-b hover:bg-muted/50"
+                            >
+                              <td className="px-4 py-3 font-medium">
+                                {row.month}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {formatCurrency(row.revenue)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {row.orders}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {formatCurrency(row.avgOrderValue)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {idx > 0 ? (
+                                  <span
+                                    className={
+                                      growthPct >= 0
+                                        ? 'text-green-600'
+                                        : 'text-red-600'
+                                    }
+                                  >
+                                    {growthPct >= 0 ? '+' : ''}
+                                    {growthPct.toFixed(1)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -628,56 +669,65 @@ export default function AnalyticsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="px-4 py-3 text-left font-medium">#</th>
-                        <th className="px-4 py-3 text-left font-medium">
-                          Product
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          SKU
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Price
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Units Sold
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Revenue
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topProducts.map((product, idx) => (
-                        <tr key={idx} className="border-b hover:bg-muted/50">
-                          <td className="px-4 py-3 font-medium text-muted-foreground">
-                            <Badge variant="outline" className="font-mono">
-                              #{idx + 1}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 font-medium">
-                            {product.name}
-                          </td>
-                          <td className="px-4 py-3 text-right text-muted-foreground">
-                            {product.sku}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {formatCurrency(product.price)}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {product.unitsSold}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold">
-                            {formatCurrency(product.revenue)}
-                          </td>
+                {!analytics || analytics.topProducts.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    No products sold yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-3 text-left font-medium">#</th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            Product
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            SKU
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Price
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Units Sold
+                          </th>
+                          <th className="px-4 py-3 text-right font-medium">
+                            Revenue
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {analytics.topProducts.map((product, idx) => (
+                          <tr
+                            key={product._id}
+                            className="border-b hover:bg-muted/50"
+                          >
+                            <td className="px-4 py-3 font-medium text-muted-foreground">
+                              <Badge variant="outline" className="font-mono">
+                                #{idx + 1}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 font-medium">
+                              {product.name}
+                            </td>
+                            <td className="px-4 py-3 text-right text-muted-foreground">
+                              {product.productCode || product.sku || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {formatCurrency(product.price)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {product.unitsSold}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold">
+                              {formatCurrency(product.revenue)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -686,95 +736,108 @@ export default function AnalyticsPage() {
             CATEGORIES TAB
             ------------------------------------------------------------ */}
           <TabsContent value="categories" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Category Revenue Chart */}
+            {!analytics || analytics.categories.length === 0 ? (
               <Card>
-                <CardHeader>
-                  <CardTitle>Revenue by Category</CardTitle>
-                  <CardDescription>
-                    Which categories drive the most revenue
-                  </CardDescription>
-                </CardHeader>
                 <CardContent>
-                  <div className="h-75">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={categoryData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
-                        />
-                        <YAxis type="category" dataKey="name" width={80} />
-                        <Tooltip
-                          formatter={(value) => [
-                            `৳${Number(value).toLocaleString()}`,
-                            'Revenue',
-                          ]}
-                        />
-                        <Bar
-                          dataKey="revenue"
-                          fill="#3b82f6"
-                          radius={[0, 4, 4, 0]}
-                        >
-                          {categoryData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    No category sales data yet.
+                  </p>
                 </CardContent>
               </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Category Revenue Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue by Category</CardTitle>
+                    <CardDescription>
+                      Which categories drive the most revenue
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-75">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={analytics.categories}
+                          layout="vertical"
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            type="number"
+                            tickFormatter={(v) =>
+                              `৳${(v / 1000).toFixed(0)}k`
+                            }
+                          />
+                          <YAxis type="category" dataKey="name" width={80} />
+                          <Tooltip
+                            formatter={(value) => [
+                              `৳${Number(value).toLocaleString()}`,
+                              'Revenue',
+                            ]}
+                          />
+                          <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
+                            {analytics.categories.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Category Performance */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Category Performance</CardTitle>
-                  <CardDescription>
-                    Revenue breakdown by percentage
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {categoryData.slice(0, 6).map((cat, idx) => (
-                      <div key={idx} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2">
+                {/* Category Performance */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Category Performance</CardTitle>
+                    <CardDescription>
+                      Revenue breakdown by percentage
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {analytics.categories.slice(0, 6).map((cat, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2">
+                              <div
+                                className="h-3 w-3 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    COLORS[idx % COLORS.length],
+                                }}
+                              />
+                              {cat.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {formatCurrency(cat.revenue)}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {cat.percentage}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted">
                             <div
-                              className="h-3 w-3 rounded-full"
+                              className="h-2 rounded-full transition-all"
                               style={{
-                                backgroundColor: COLORS[idx % COLORS.length],
+                                width: `${cat.percentage}%`,
+                                backgroundColor:
+                                  COLORS[idx % COLORS.length],
                               }}
                             />
-                            {cat.name}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              {formatCurrency(cat.revenue)}
-                            </span>
-                            <span className="text-muted-foreground text-xs">
-                              {cat.percentage}%
-                            </span>
                           </div>
                         </div>
-                        <div className="h-2 w-full rounded-full bg-muted">
-                          <div
-                            className="h-2 rounded-full transition-all"
-                            style={{
-                              width: `${cat.percentage}%`,
-                              backgroundColor: COLORS[idx % COLORS.length],
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

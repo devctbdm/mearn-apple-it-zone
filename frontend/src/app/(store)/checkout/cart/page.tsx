@@ -6,8 +6,9 @@ import { ArrowLeft, ArrowRight, ShoppingBag, Trash2 } from 'lucide-react';
 import { useCart } from '@/store';
 import { CartItemCard } from '@/components/store/cart/CartItem';
 import { Button } from '@/components/button/Button';
+import RequireAuth from '@/components/store/layout/RequireAuth';
 
-const CartPage = () => {
+const CartContent = () => {
   const { items, totalItems, totalPrice, clearCart } = useCart();
 
   const totalSavings = items.reduce(
@@ -127,4 +128,10 @@ const CartPage = () => {
   );
 };
 
-export default CartPage;
+export default function CartPage() {
+  return (
+    <RequireAuth>
+      <CartContent />
+    </RequireAuth>
+  );
+}

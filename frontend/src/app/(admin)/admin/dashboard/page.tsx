@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -19,24 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import {
   Drawer,
@@ -46,197 +32,65 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from '@/components/ui/drawer';
 
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   ShoppingCart,
   Users,
   Package,
-  MoreHorizontal,
   ArrowUpRight,
   ArrowDownRight,
-  CreditCard,
-  Activity,
-  Eye,
-  Download,
-  Calendar,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  dashboardApi,
+  type DashboardStats,
+  type Order,
+  type OrderStatus,
+} from '@/lib/api';
 
-// --- Types ---
-interface StatCard {
-  title: string;
-  value: string;
-  change: string;
-  trend: 'up' | 'down';
-  icon: React.ReactNode;
-  color: string;
-}
+import { TrendingUp } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 
-interface Order {
-  id: string;
-  customer: string;
-  email: string;
-  avatar: string;
-  amount: number;
-  status: 'completed' | 'pending' | 'processing' | 'cancelled';
-  date: string;
-  items: number;
-}
+export const description = "A bar chart with a custom label"
 
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  sales: number;
-  revenue: number;
-  stock: number;
-  image: string;
-}
+const chartConfig = {
+  value: {
+    label: "Sales",
+    color: "var(--chart-2)",
+  },
+} satisfies ChartConfig
 
-// --- Mock Data ---
-const stats: StatCard[] = [
-  {
-    title: 'Total Revenue',
-    value: '$45,231.89',
-    change: '+20.1% from last month',
-    trend: 'up',
-    icon: <DollarSign className="h-4 w-4" />,
-    color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
-  },
-  {
-    title: 'Orders',
-    value: '+2,350',
-    change: '+15.2% from last month',
-    trend: 'up',
-    icon: <ShoppingCart className="h-4 w-4" />,
-    color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',
-  },
-  {
-    title: 'Active Customers',
-    value: '+12,234',
-    change: '+8.4% from last month',
-    trend: 'up',
-    icon: <Users className="h-4 w-4" />,
-    color: 'text-violet-600 bg-violet-50 dark:bg-violet-950/30',
-  },
-  {
-    title: 'Products Sold',
-    value: '+4,231',
-    change: '-3.2% from last month',
-    trend: 'down',
-    icon: <Package className="h-4 w-4" />,
-    color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
-  },
-];
+// --- Helpers ---
+const formatTaka = (n: number) =>
+  `৳${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-const recentOrders: Order[] = [
-  {
-    id: 'ORD-7523',
-    customer: 'Sarah Chen',
-    email: 'sarah.chen@email.com',
-    avatar: 'SC',
-    amount: 1250.0,
-    status: 'completed',
-    date: '2024-01-15',
-    items: 3,
-  },
-  {
-    id: 'ORD-7524',
-    customer: 'Marcus Johnson',
-    email: 'marcus.j@email.com',
-    avatar: 'MJ',
-    amount: 89.99,
-    status: 'pending',
-    date: '2024-01-15',
-    items: 1,
-  },
-  {
-    id: 'ORD-7525',
-    customer: 'Emily Davis',
-    email: 'emily.d@email.com',
-    avatar: 'ED',
-    amount: 567.5,
-    status: 'processing',
-    date: '2024-01-14',
-    items: 5,
-  },
-  {
-    id: 'ORD-7526',
-    customer: 'James Wilson',
-    email: 'j.wilson@email.com',
-    avatar: 'JW',
-    amount: 2340.0,
-    status: 'completed',
-    date: '2024-01-14',
-    items: 8,
-  },
-  {
-    id: 'ORD-7527',
-    customer: 'Anna Martinez',
-    email: 'anna.m@email.com',
-    avatar: 'AM',
-    amount: 129.99,
-    status: 'cancelled',
-    date: '2024-01-13',
-    items: 2,
-  },
-];
+const formatShort = (n: number) =>
+  n >= 1000000
+    ? `${(n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1)}M`
+    : n >= 1000
+      ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K`
+      : `${n}`;
 
-const topProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Wireless Headphones Pro',
-    category: 'Electronics',
-    sales: 1240,
-    revenue: 148760,
-    stock: 45,
-    image: '/products/headphones.jpg',
-  },
-  {
-    id: '2',
-    name: 'Organic Cotton T-Shirt',
-    category: 'Fashion',
-    sales: 980,
-    revenue: 29400,
-    stock: 12,
-    image: '/products/tshirt.jpg',
-  },
-  {
-    id: '3',
-    name: 'Smart Watch Series 5',
-    category: 'Electronics',
-    sales: 856,
-    revenue: 171200,
-    stock: 78,
-    image: '/products/watch.jpg',
-  },
-  {
-    id: '4',
-    name: 'Ceramic Coffee Mug Set',
-    category: 'Home',
-    sales: 743,
-    revenue: 22290,
-    stock: 156,
-    image: '/products/mugs.jpg',
-  },
-  {
-    id: '5',
-    name: 'Leather Weekend Bag',
-    category: 'Fashion',
-    sales: 621,
-    revenue: 93150,
-    stock: 8,
-    image: '/products/bag.jpg',
-  },
-];
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
-// --- Components ---
+const shortId = (id: string) => `ORD-${id.slice(-5).toUpperCase()}`;
+
+// --- Skeleton Components ---
 
 function StatCardSkeleton() {
   return (
@@ -253,19 +107,7 @@ function StatCardSkeleton() {
   );
 }
 
-function ChartSkeleton() {
-  return (
-    <Card className="col-span-4">
-      <CardHeader>
-        <Skeleton className="h-6 w-37.5 mb-2" />
-        <Skeleton className="h-4 w-62.5" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-75 w-full" />
-      </CardContent>
-    </Card>
-  );
-}
+
 
 function TableSkeleton() {
   return (
@@ -285,14 +127,16 @@ function TableSkeleton() {
   );
 }
 
-function OrderStatusBadge({ status }: { status: Order['status'] }) {
-  const variants = {
-    completed:
-      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-    pending:
-      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
+// --- Badges ---
+
+function OrderStatusBadge({ status }: { status: OrderStatus }) {
+  const variants: Record<OrderStatus, string> = {
     processing:
       'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
+    shipped:
+      'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800',
+    delivered:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
     cancelled:
       'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
   };
@@ -304,70 +148,129 @@ function OrderStatusBadge({ status }: { status: Order['status'] }) {
   );
 }
 
-function RevenueChart() {
-  // Simulated chart using div bars for zero-dependency
-  const data = [
-    { label: 'Jan', value: 65, prev: 45 },
-    { label: 'Feb', value: 78, prev: 52 },
-    { label: 'Mar', value: 52, prev: 48 },
-    { label: 'Apr', value: 89, prev: 60 },
-    { label: 'May', value: 95, prev: 75 },
-    { label: 'Jun', value: 72, prev: 68 },
-    { label: 'Jul', value: 85, prev: 70 },
-  ];
+// --- Revenue Chart ---
+
+export function ChartBarLabelCustom({
+  data,
+  className,
+}: {
+  data: { label: string; value: number }[];
+  className?: string;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const year = new Date().getFullYear();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">
-            Revenue Overview
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">$45,231</span>
-            <span className="text-sm text-emerald-600 font-medium flex items-center">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +12.5%
-            </span>
-          </div>
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>Sales by Month</CardTitle>
+        <CardDescription>Total sales for {year} (Jan - Dec)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={chartConfig}
+          className="aspect-auto h-[400px]"
+        >
+          <BarChart
+            accessibilityLayer
+            data={data}
+            layout="vertical"
+            margin={{
+              right: 16,
+            }}
+          >
+            <CartesianGrid horizontal={false} />
+            <YAxis
+              dataKey="label"
+              type="category"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+              tickFormatter={(value) => value.slice(0, 3)}
+              width={40}
+            />
+            <XAxis dataKey="value" type="number" hide />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  indicator="line"
+                  formatter={(value) => formatTaka(Number(value))}
+                />
+              }
+            />
+            <Bar dataKey="value" fill="var(--color-value)" radius={4}>
+              <LabelList
+                dataKey="value"
+                position="right"
+                offset={8}
+                className="fill-foreground"
+                fontSize={12}
+                formatter={(value) => `৳${formatShort(Number(value))}`}
+              />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+      <CardFooter className="flex-col items-start gap-2 text-sm">
+        <div className="flex gap-2 leading-none font-medium">
+          Total: {formatTaka(total)} <TrendingUp className="h-4 w-4" />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-primary" />
-            <span className="text-xs text-muted-foreground">This Year</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-muted" />
-            <span className="text-xs text-muted-foreground">Last Year</span>
-          </div>
+        <div className="leading-none text-muted-foreground">
+          Showing total sales for {year} — updates automatically each month
         </div>
-      </div>
+      </CardFooter>
+    </Card>
+  );
+}
+// --- Stat Card ---
 
-      <div className="relative h-75 w-full">
-        <div className="absolute inset-0 flex items-end justify-between gap-2">
-          {data.map((item, i) => (
-            <div
-              key={i}
-              className="flex-1 flex flex-col justify-end gap-1 group"
-            >
-              <div className="relative w-full flex flex-col justify-end gap-1">
-                <div
-                  className="w-full bg-muted rounded-t-sm transition-all duration-500"
-                  style={{ height: `${item.prev * 2.5}px` }}
-                />
-                <div
-                  className="w-full bg-primary rounded-t-sm transition-all duration-500 group-hover:opacity-80"
-                  style={{ height: `${item.value * 2.5}px` }}
-                />
-              </div>
-              <span className="text-xs text-center text-muted-foreground mt-2">
-                {item.label}
-              </span>
-            </div>
-          ))}
+function StatCard({
+  title,
+  value,
+  change,
+  trend,
+  icon,
+  color,
+}: {
+  title: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down' | 'flat';
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <Card className="relative overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+        <div className={`p-2 rounded-lg ${color}`}>{icon}</div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <div className="flex items-center text-xs text-muted-foreground mt-1">
+          {trend === 'up' && (
+            <ArrowUpRight className="mr-1 h-3 w-3 text-emerald-600" />
+          )}
+          {trend === 'down' && (
+            <ArrowDownRight className="mr-1 h-3 w-3 text-red-600" />
+          )}
+          <span
+            className={
+              trend === 'up'
+                ? 'text-emerald-600'
+                : trend === 'down'
+                  ? 'text-red-600'
+                  : undefined
+            }
+          >
+            {change}
+          </span>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -375,16 +278,92 @@ function RevenueChart() {
 
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('7d');
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [open, setOpen] = useState(false);
-  const [deliveryTime, setDeliveryTime] = useState('asap');
+  const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    // Simulate data fetching
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await dashboardApi.getStats();
+        if (mounted && data.success) setStats(data.stats);
+      } catch {
+        // leave stats null; UI shows empty states
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  const revenueMoM = (() => {
+    const m = stats?.monthlyRevenue || [];
+    if (m.length < 2) return null;
+    const cur = m[m.length - 1].value;
+    const prev = m[m.length - 2].value;
+    if (prev === 0)
+      return {
+        change: cur > 0 ? 'New revenue this month' : 'No revenue yet',
+        trend: 'flat' as const,
+      };
+    const pct = ((cur - prev) / prev) * 100;
+    return {
+      change: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs last month`,
+      trend: (pct >= 0 ? 'up' : 'down') as 'up' | 'down',
+    };
+  })();
+
+  const statCards = stats
+    ? [
+        {
+          title: 'Total Revenue',
+          value: formatTaka(stats.revenue),
+          change: revenueMoM?.change ?? 'All time revenue',
+          trend: revenueMoM?.trend ?? ('flat' as const),
+          icon: <DollarSign className="h-4 w-4" />,
+          color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
+        },
+        {
+          title: 'Orders',
+          value: stats.orders.toLocaleString(),
+          change: `${stats.ordersByStatus.processing} processing · ${stats.ordersByStatus.delivered} delivered`,
+          trend: 'flat' as const,
+          icon: <ShoppingCart className="h-4 w-4" />,
+          color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',
+        },
+        {
+          title: 'Customers',
+          value: stats.customers.toLocaleString(),
+          change: 'Registered customers',
+          trend: 'flat' as const,
+          icon: <Users className="h-4 w-4" />,
+          color: 'text-violet-600 bg-violet-50 dark:bg-violet-950/30',
+        },
+        {
+          title: 'Products Sold',
+          value: stats.productsSold.toLocaleString(),
+          change: `${stats.products} active products`,
+          trend: 'flat' as const,
+          icon: <Package className="h-4 w-4" />,
+          color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
+        },
+      ]
+    : [];
+
+  const categoryColors = [
+    'bg-blue-500',
+    'bg-violet-500',
+    'bg-amber-500',
+    'bg-emerald-500',
+    'bg-rose-500',
+  ];
+
+  const topProducts = stats?.topProducts || [];
+  const recentOrders = stats?.recentOrders || [];
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -396,23 +375,6 @@ export default function AdminDashboardPage() {
             Welcome back! Here's what's happening with your store.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={timeRange} onValueChange={(value) => setTimeRange(value || '7d')}>
-            <SelectTrigger className="w-40">
-              <Calendar className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Select range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Last 24 hours</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 3 months</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon">
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Stats Grid */}
@@ -421,59 +383,30 @@ export default function AdminDashboardPage() {
           ? Array.from({ length: 4 }).map((_, i) => (
               <StatCardSkeleton key={i} />
             ))
-          : stats.map((stat, i) => (
-              <Card key={i} className="relative overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.color}`}>
-                    {stat.icon}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <div className="flex items-center text-xs text-muted-foreground mt-1">
-                    {stat.trend === 'up' ? (
-                      <ArrowUpRight className="mr-1 h-3 w-3 text-emerald-600" />
-                    ) : (
-                      <ArrowDownRight className="mr-1 h-3 w-3 text-red-600" />
-                    )}
-                    <span
-                      className={
-                        stat.trend === 'up'
-                          ? 'text-emerald-600'
-                          : 'text-red-600'
-                      }
-                    >
-                      {stat.change}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
       </div>
 
       {/* Main Content Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Revenue Chart */}
+        {/* Sales by Month chart */}
         {loading ? (
-          <ChartSkeleton />
-        ) : (
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Revenue Analytics</CardTitle>
-              <CardDescription>
-                Monthly revenue comparison with previous period
-              </CardDescription>
+              <Skeleton className="h-6 w-37.5 mb-2" />
+              <Skeleton className="h-4 w-62.5" />
             </CardHeader>
             <CardContent>
-              <RevenueChart />
+              <Skeleton className="h-75 w-full" />
             </CardContent>
           </Card>
+        ) : (
+          <ChartBarLabelCustom
+            data={stats?.monthlyRevenue || []}
+            className="col-span-4"
+          />
         )}
 
-        {/* Recent Activity / Sales Breakdown */}
+        {/* Sales by Category */}
         {loading ? (
           <Card className="col-span-3">
             <CardHeader>
@@ -495,27 +428,30 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {[
-                { name: 'Electronics', value: 45, color: 'bg-blue-500' },
-                { name: 'Fashion', value: 32, color: 'bg-violet-500' },
-                { name: 'Home & Garden', value: 15, color: 'bg-amber-500' },
-                { name: 'Sports', value: 8, color: 'bg-emerald-500' },
-              ].map((category) => (
-                <div key={category.name} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{category.name}</span>
-                    <span className="text-muted-foreground">
-                      {category.value}%
-                    </span>
+              {stats?.salesByCategory.length ? (
+                stats.salesByCategory.map((category, i) => (
+                  <div key={category.name} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{category.name}</span>
+                      <span className="text-muted-foreground">
+                        {category.value}%
+                      </span>
+                    </div>
+                    <Progress value={category.value} className="h-2">
+                      <div
+                        className={`h-full ${
+                          categoryColors[i % categoryColors.length]
+                        } rounded-full`}
+                        style={{ width: `${category.value}%` }}
+                      />
+                    </Progress>
                   </div>
-                  <Progress value={category.value} className="h-2">
-                    <div
-                      className={`h-full ${category.color} rounded-full`}
-                      style={{ width: `${category.value}%` }}
-                    />
-                  </Progress>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No sales data yet.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -535,7 +471,7 @@ export default function AdminDashboardPage() {
               <div>
                 <CardTitle>Recent Orders</CardTitle>
                 <CardDescription>
-                  You have {recentOrders.length} orders this week
+                  Latest {recentOrders.length} orders
                 </CardDescription>
               </div>
               <Link href="/admin/orders">
@@ -547,6 +483,10 @@ export default function AdminDashboardPage() {
             <CardContent>
               {loading ? (
                 <TableSkeleton />
+              ) : recentOrders.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No orders yet.
+                </p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -560,122 +500,64 @@ export default function AdminDashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentOrders.map((order) => (
-                      <TableRow key={order.id} className="group">
-                        <TableCell className="font-medium">
-                          {order.id}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src="" />
-                              <AvatarFallback className="text-xs bg-primary/10">
-                                {order.avatar}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {order.customer}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {order.email}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <OrderStatusBadge status={order.status} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(order.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${order.amount.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Drawer
-                            open={open}
-                            onOpenChange={setOpen}
-                            showSwipeHandle={isMobile}
-                            swipeDirection={isMobile ? 'down' : 'right'}
-                          >
-                            <DrawerTrigger>
-                              <span>View</span>
-                            </DrawerTrigger>
-                            <DrawerContent>
-                              <DrawerHeader>
-                                <DrawerTitle>Order {order.id}</DrawerTitle>
-                                <DrawerDescription>
-                                  Order details for {order.customer}
-                                </DrawerDescription>
-                              </DrawerHeader>
-                              <div className="p-4 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Customer
-                                    </p>
-                                    <p className="text-sm font-medium">
-                                      {order.customer}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Email
-                                    </p>
-                                    <p className="text-sm">{order.email}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Status
-                                    </p>
-                                    <OrderStatusBadge status={order.status} />
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Date
-                                    </p>
-                                    <p className="text-sm">
-                                      {new Date(order.date).toLocaleDateString(
-                                        'en-US',
-                                        {
-                                          month: 'short',
-                                          day: 'numeric',
-                                          year: 'numeric',
-                                        }
-                                      )}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Items
-                                    </p>
-                                    <p className="text-sm">{order.items}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                      Amount
-                                    </p>
-                                    <p className="text-sm font-medium">
-                                      ${order.amount.toFixed(2)}
-                                    </p>
-                                  </div>
-                                </div>
+                    {recentOrders.map((order) => {
+                      const customer =
+                        typeof order.user === 'object' && order.user
+                          ? order.user
+                          : null;
+                      return (
+                        <TableRow key={order._id} className="group">
+                          <TableCell className="font-medium">
+                            {shortId(order._id)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs bg-primary/10">
+                                  {customer ? initials(customer.name) : '??'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                  {customer?.name || 'Unknown customer'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {customer?.email || '—'}
+                                </span>
                               </div>
-                              <DrawerFooter>
-                                <DrawerClose>
-                                  Close
-                                </DrawerClose>
-                              </DrawerFooter>
-                            </DrawerContent>
-                          </Drawer>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <OrderStatusBadge status={order.orderStatus} />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(order.createdAt).toLocaleDateString(
+                              'en-US',
+                              {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              }
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatTaka(order.totalAmount)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setViewOrder(order);
+                                setOpen(true);
+                              }}
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -690,63 +572,59 @@ export default function AdminDashboardPage() {
               <div>
                 <CardTitle>Top Products</CardTitle>
                 <CardDescription>
-                  Best performing products this month
+                  Best performing products by units sold
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                View All
-              </Button>
+              <Link href="/admin/products">
+                <Button variant="outline" size="sm">
+                  View All
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <TableSkeleton />
+              ) : topProducts.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No products sold yet.
+                </p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Units Sold</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead>Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {topProducts.map((product) => (
-                      <TableRow key={product.id}>
+                      <TableRow key={product._id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-lg">
-                              📦
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+                              {product.image ? (
+                                <Image
+                                  src={product.image}
+                                  alt={product.name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="40px"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-lg">
+                                  📦
+                                </div>
+                              )}
                             </div>
                             <span className="font-medium">{product.name}</span>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{product.category}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {product.sales.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${product.revenue.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={(product.stock / 200) * 100}
-                              className="h-2 w-15"
-                            />
-                            <span
-                              className={`text-xs ${
-                                product.stock < 20
-                                  ? 'text-red-600 font-medium'
-                                  : 'text-muted-foreground'
-                              }`}
-                            >
-                              {product.stock}
-                            </span>
-                          </div>
+                          {formatTaka(product.revenue)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -757,6 +635,113 @@ export default function AdminDashboardPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Order details drawer */}
+      <Drawer
+        open={open}
+        onOpenChange={setOpen}
+        showSwipeHandle={isMobile}
+        swipeDirection={isMobile ? 'down' : 'right'}
+      >
+        <DrawerContent>
+          {viewOrder && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle>{shortId(viewOrder._id)}</DrawerTitle>
+                <DrawerDescription>
+                  Order details for{' '}
+                  {typeof viewOrder.user === 'object' && viewOrder.user
+                    ? viewOrder.user.name
+                    : 'Customer'}
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Customer
+                    </p>
+                    <p className="text-sm font-medium">
+                      {typeof viewOrder.user === 'object' && viewOrder.user
+                        ? viewOrder.user.name
+                        : 'Unknown'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Email
+                    </p>
+                    <p className="text-sm">
+                      {typeof viewOrder.user === 'object' && viewOrder.user
+                        ? viewOrder.user.email
+                        : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </p>
+                    <OrderStatusBadge status={viewOrder.orderStatus} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Date
+                    </p>
+                    <p className="text-sm">
+                      {new Date(viewOrder.createdAt).toLocaleDateString(
+                        'en-US',
+                        {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        }
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Items
+                    </p>
+                    <p className="text-sm">
+                      {viewOrder.items.reduce((s, it) => s + it.quantity, 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Amount
+                    </p>
+                    <p className="text-sm font-medium">
+                      {formatTaka(viewOrder.totalAmount)}
+                    </p>
+                  </div>
+                </div>
+                {viewOrder.items.length > 0 && (
+                  <div className="rounded-lg border">
+                    <div className="divide-y">
+                      {viewOrder.items.map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between px-3 py-2 text-sm"
+                        >
+                          <span className="truncate">
+                            {item.quantity}x {item.name}
+                          </span>
+                          <span className="ml-2 shrink-0 font-medium">
+                            {formatTaka(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DrawerFooter>
+                <DrawerClose>Close</DrawerClose>
+              </DrawerFooter>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

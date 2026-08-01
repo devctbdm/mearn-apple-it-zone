@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import RequireAuth from '@/components/store/layout/RequireAuth';
 
 const PAYMENT_METHODS = [
   { value: 'sslcommerz', label: 'SSLCommerz', hint: 'Card / Online payment', icon: CreditCard },
@@ -40,7 +41,7 @@ const DELIVERY_METHODS = [
 type DeliveryValue = (typeof DELIVERY_METHODS)[number]['value'];
 type PaymentValue = (typeof PAYMENT_METHODS)[number]['value'];
 
-const CheckoutPage = () => {
+const CheckoutContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { items, totalItems, totalPrice, clearCart, fetchCart } = useCart();
   const { paymentMethod, setPaymentMethod, notes, setNotes } = useCheckout();
@@ -632,4 +633,10 @@ const CheckoutPage = () => {
   );
 };
 
-export default CheckoutPage;
+export default function CheckoutPage() {
+  return (
+    <RequireAuth>
+      <CheckoutContent />
+    </RequireAuth>
+  );
+}

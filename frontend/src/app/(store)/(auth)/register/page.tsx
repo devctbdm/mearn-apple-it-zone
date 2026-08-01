@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -57,11 +57,23 @@ const initialValues: FormValues = {
 
 function RegisterPage() {
   const router = useRouter();
-  const { fetchUser } = useAuth();
+  const { fetchUser, isAuthenticated, isLoading, user } = useAuth();
   const { syncCartWithBackend } = useCart();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!user && !isAuthenticated) {
+      fetchUser().catch(() => {});
+    }
+  }, [user, isAuthenticated, fetchUser]);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const update = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));

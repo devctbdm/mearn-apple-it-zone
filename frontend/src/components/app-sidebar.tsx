@@ -97,72 +97,9 @@ const data = {
       icon: <Images />,
     }
   ],
-  navClouds: [
-    {
-      title: 'Capture',
-      icon: <CameraIcon />,
-      isActive: true,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Proposal',
-      icon: <FileTextIcon />,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Prompts',
-      icon: <FileTextIcon />,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-  ],
+ 
 
-  documents: [
-    {
-      name: 'Data Library',
-      url: '#',
-      icon: <DatabaseIcon />,
-    },
-    {
-      name: 'Reports',
-      url: '#',
-      icon: <FileChartColumnIcon />,
-    },
-    {
-      name: 'Word Assistant',
-      url: '#',
-      icon: <FileIcon />,
-    },
-  ],
+  
 
   navSuperadmin: [
     {
@@ -200,8 +137,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavMain items={data.navMain} />        
         <SuperAdminNav items={data.navSuperadmin} />
       </SidebarContent>
       <SidebarFooter>

@@ -22,6 +22,8 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import promoRoutes from './routes/promoRoutes.js';
 import sliderRoutes from './routes/sliderRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -32,6 +34,9 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
+
+// Disable ETag so cached API responses don't come back as 304 (breaks axios validateStatus)
+app.set('etag', false);
 
 // ------- Middlewares -------
 
@@ -52,6 +57,12 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
+
+// Never cache API responses (auth data must stay fresh; avoids 304 breaking axios)
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 // 3. Rate limiting (prevent brute force)
 // General API limit: generous for a storefront (products, categories, cart, user, etc.)
@@ -101,6 +112,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/sliders', sliderRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

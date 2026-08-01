@@ -370,7 +370,6 @@ export type OrderStats = {
 export const orderApi = {
   getMyOrders: () =>
     api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
-
   getAllOrders: (params?: { page?: number; limit?: number; status?: string }) =>
     api.get<{
       success: boolean;
@@ -395,6 +394,84 @@ export const orderApi = {
     note?: string;
     couponCode?: string;
   }) => api.post<{ success: boolean; order: Order }>('/orders', data),
+};
+
+export type DashboardStats = {
+  revenue: number;
+  orders: number;
+  customers: number;
+  productsSold: number;
+  products: number;
+  ordersByStatus: {
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+  };
+  recentOrders: Order[];
+  topProducts: {
+    _id: string;
+    name: string;
+    image: string;
+    sales: number;
+    revenue: number;
+  }[];
+  salesByCategory: { name: string; value: number }[];
+  monthlyRevenue: { label: string; value: number }[];
+};
+
+export const dashboardApi = {
+  getStats: () =>
+    api.get<{ success: boolean; stats: DashboardStats }>('/dashboard'),
+};
+
+export type AnalyticsPoint = {
+  month: string;
+  revenue: number;
+  orders: number;
+  avgOrderValue: number;
+};
+
+export type AnalyticsStats = {
+  stats: {
+    revenue: number;
+    orders: number;
+    customers: number;
+    products: number;
+    productsSold: number;
+    avgOrderValue: number;
+    avgItemsPerOrder: number;
+    repeatCustomerRate: number;
+    ordersByStatus: {
+      processing: number;
+      shipped: number;
+      delivered: number;
+      cancelled: number;
+    };
+  };
+  monthly: AnalyticsPoint[];
+  daily: AnalyticsPoint[];
+  topProducts: {
+    _id: string;
+    name: string;
+    image: string;
+    price: number;
+    sku?: string;
+    productCode?: string;
+    unitsSold: number;
+    revenue: number;
+  }[];
+  categories: {
+    name: string;
+    revenue: number;
+    orders: number;
+    percentage: number;
+  }[];
+};
+
+export const analyticsApi = {
+  getStats: () =>
+    api.get<{ success: boolean; data: AnalyticsStats }>('/analytics'),
 };
 
 export type ProductFormData = {
