@@ -12,13 +12,13 @@ import productRoutes from './routes/productRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
+
 import categoryRoutes from './routes/categoryRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
-import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
+
 import reviewRoutes from './routes/reviewRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import promoRoutes from './routes/promoRoutes.js';
@@ -103,13 +103,13 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/invoices', invoiceRoutes);
-app.use('/api/payment', paymentRoutes);
+
 app.use('/api/categories', categoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/store', storeRoutes);
-app.use('/api/payment-settings', paymentSettingsRoutes);
+
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/promo', promoRoutes);

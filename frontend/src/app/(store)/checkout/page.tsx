@@ -90,10 +90,7 @@ const CheckoutContent = () => {
       .then(({ data }) => {
         setGateways(data.gateways || []);
         if (data.gateways?.length) {
-          setPaymentMethod(
-            data.gateways[0].name.toLowerCase() as
-              'sslcommerz' | 'cod' | 'bkash' | 'nagad'
-          );
+          setPaymentMethod(data.gateways[0].name.toLowerCase());
         }
       })
       .catch(() => {});
@@ -205,7 +202,7 @@ const CheckoutContent = () => {
           postcode: selectedAddress.postcode,
           country: selectedAddress.country,
         },
-        paymentMethod: paymentMethod as string,
+        paymentMethod,
         note: notes,
         couponCode: appliedCoupon?.code,
       });
@@ -650,11 +647,7 @@ const CheckoutContent = () => {
                 <button
                   key={p.name}
                   type="button"
-                  onClick={() =>
-                    setPaymentMethod(
-                      value as 'sslcommerz' | 'cod' | 'bkash' | 'nagad'
-                    )
-                  }
+                  onClick={() => setPaymentMethod(value)}
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                     active
                       ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'

@@ -18,6 +18,6 @@ export interface ShippingAddress {
 
 export interface CheckoutData {
   shippingAddress: ShippingAddress;
-  paymentMethod: 'sslcommerz' | 'cod' | 'bkash' | 'nagad';
+  paymentMethod: string;
   notes?: string;
 }

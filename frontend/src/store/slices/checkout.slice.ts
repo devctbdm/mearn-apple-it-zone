@@ -4,12 +4,12 @@ import { ShippingAddress } from '../types';
 
 export interface CheckoutSlice {
   shippingAddress: ShippingAddress;
-  paymentMethod: 'sslcommerz' | 'cod' | 'bkash' | 'nagad';
+  paymentMethod: string;
   notes: string;
   step: 1 | 2 | 3; // 1: Address, 2: Payment, 3: Confirm
 
   setShippingAddress: (address: ShippingAddress) => void;
-  setPaymentMethod: (method: 'sslcommerz' | 'cod' | 'bkash' | 'nagad') => void;
+  setPaymentMethod: (method: string) => void;
   setNotes: (notes: string) => void;
   goToStep: (step: 1 | 2 | 3) => void;
   resetCheckout: () => void;
@@ -31,7 +31,7 @@ export const createCheckoutSlice: StateCreator<CheckoutSlice> = (set) => ({
 
   setShippingAddress: (address: ShippingAddress) =>
     set({ shippingAddress: address }),
-  setPaymentMethod: (method: 'sslcommerz' | 'cod' | 'bkash' | 'nagad') =>
+  setPaymentMethod: (method: string) =>
     set({ paymentMethod: method }),
   setNotes: (notes: string) => set({ notes }),
   goToStep: (step: 1 | 2 | 3) => set({ step }),

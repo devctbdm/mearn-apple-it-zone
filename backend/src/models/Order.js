@@ -54,7 +54,6 @@ const orderSchema = new mongoose.Schema(
     payment: {
       method: {
         type: String,
-        enum: ['sslcommerz', 'cod', 'bkash', 'nagad'],
         default: 'sslcommerz',
       },
       tran_id: { type: String, unique: true, sparse: true }, // SSLCommerz transaction ID
