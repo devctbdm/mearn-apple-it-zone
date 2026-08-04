@@ -79,7 +79,6 @@ const invoiceSchema = new mongoose.Schema(
 );
 
 // ---- Indexes ----
-invoiceSchema.index({ invoiceNumber: 1 });
 invoiceSchema.index({ order: 1 });
 invoiceSchema.index({ status: 1 });
 

@@ -79,10 +79,18 @@ const promoSchema = new mongoose.Schema(
 
 // ---- Check whether the code is currently redeemable ----
 promoSchema.methods.isActive = function (now = new Date()) {
-  if (this.status !== 'active') return false;
-  if (this.startDate && new Date(this.startDate) > now) return false;
-  if (this.endDate && new Date(this.endDate) < now) return false;
-  if (this.maxUses > 0 && this.usageCount >= this.maxUses) return false;
+  if (this.status !== 'active') {
+    return false;
+  }
+  if (this.startDate && new Date(this.startDate) > now) {
+    return false;
+  }
+  if (this.endDate && new Date(this.endDate) < now) {
+    return false;
+  }
+  if (this.maxUses > 0 && this.usageCount >= this.maxUses) {
+    return false;
+  }
   return true;
 };
 
@@ -112,7 +120,6 @@ promoSchema.methods.computeDiscount = function (subtotal) {
 };
 
 // ---- Indexes ----
-promoSchema.index({ code: 1 });
 promoSchema.index({ status: 1, createdAt: -1 });
 
 const PromoCode = mongoose.model('PromoCode', promoSchema);

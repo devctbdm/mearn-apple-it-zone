@@ -18,7 +18,15 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth, useCart, useCheckout, useUI } from '@/store';
-import { authApi, orderApi, promoApi, type SavedAddress } from '@/lib/api';
+import {
+  authApi,
+  orderApi,
+  paymentApi,
+  paymentSettingsApi,
+  promoApi,
+  type ActivePaymentGateway,
+  type SavedAddress,
+} from '@/lib/api';
 import { Button } from '@/components/button/Button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,20 +34,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import RequireAuth from '@/components/store/layout/RequireAuth';
 
-const PAYMENT_METHODS = [
-  { value: 'sslcommerz', label: 'SSLCommerz', hint: 'Card / Online payment', icon: CreditCard },
-  { value: 'bkash', label: 'bKash', hint: 'Mobile banking', icon: Smartphone },
-  { value: 'nagad', label: 'Nagad', hint: 'Mobile banking', icon: Wallet },
-  { value: 'cod', label: 'Cash on Delivery', hint: 'Pay at your door', icon: Banknote },
+const DELIVERY_METHODS = [
+  {
+    value: 'standard',
+    label: 'Standard Delivery',
+    eta: '3–5 business days',
+    cost: 0,
+  },
+  {
+    value: 'express',
+    label: 'Express Delivery',
+    eta: '1–2 business days',
+    cost: 100,
+  },
 ] as const;
 
-const DELIVERY_METHODS = [
-  { value: 'standard', label: 'Standard Delivery', eta: '3–5 business days', cost: 0 },
-  { value: 'express', label: 'Express Delivery', eta: '1–2 business days', cost: 100 },
-] as const;
+const GATEWAY_ICONS: Record<string, typeof CreditCard> = {
+  sslcommerz: CreditCard,
+  bkash: Smartphone,
+};
 
 type DeliveryValue = (typeof DELIVERY_METHODS)[number]['value'];
-type PaymentValue = (typeof PAYMENT_METHODS)[number]['value'];
 
 const CheckoutContent = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -60,11 +75,30 @@ const CheckoutContent = () => {
   } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
 
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryValue>('standard');
+  const [deliveryMethod, setDeliveryMethod] =
+    useState<DeliveryValue>('standard');
   const [agreed, setAgreed] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [placedOrder, setPlacedOrder] = useState<string | null>(null);
+
+  const [gateways, setGateways] = useState<ActivePaymentGateway[]>([]);
+
+  useEffect(() => {
+    paymentSettingsApi
+      .getActive()
+      .then(({ data }) => {
+        setGateways(data.gateways || []);
+        if (data.gateways?.length) {
+          setPaymentMethod(
+            data.gateways[0].name.toLowerCase() as
+              'sslcommerz' | 'cod' | 'bkash' | 'nagad'
+          );
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -125,9 +159,15 @@ const CheckoutContent = () => {
       if (data.promo.type === 'free_shipping') {
         showToast('Coupon applied! Free shipping on this order', 'success');
       } else if (data.discount > 0) {
-        showToast(`Coupon applied! You saved ৳${data.discount.toLocaleString()}`, 'success');
+        showToast(
+          `Coupon applied! You saved ৳${data.discount.toLocaleString()}`,
+          'success'
+        );
       } else {
-        showToast('Coupon applied but it offers no discount on your cart', 'info');
+        showToast(
+          'Coupon applied but it offers no discount on your cart',
+          'info'
+        );
       }
     } catch (e: any) {
       showToast(e?.response?.data?.message || 'Invalid coupon code', 'error');
@@ -145,14 +185,19 @@ const CheckoutContent = () => {
       return;
     }
     if (!agreed) {
-      setOrderError('Please read and agree to the Terms & Conditions, Privacy Policy and Refund & Return Policy.');
+      setOrderError(
+        'Please read and agree to the Terms & Conditions, Privacy Policy and Refund & Return Policy.'
+      );
       return;
     }
 
     setPlacing(true);
     try {
       const { data } = await orderApi.create({
-        items: items.map((i) => ({ product: i.productId, quantity: i.quantity })),
+        items: items.map((i) => ({
+          product: i.productId,
+          quantity: i.quantity,
+        })),
         shippingAddress: {
           street: selectedAddress.street,
           city: selectedAddress.city,
@@ -164,12 +209,53 @@ const CheckoutContent = () => {
         note: notes,
         couponCode: appliedCoupon?.code,
       });
+
+      // SSLCommerz online payment: redirect to the payment gateway page.
+      if (paymentMethod === 'sslcommerz') {
+        const customer = {
+          name: selectedAddress.fullName || user.name,
+          email: user.email,
+          phone: selectedAddress.phone || user.phone,
+          address: selectedAddress.street,
+          city: selectedAddress.city,
+          state: selectedAddress.state,
+          postcode: selectedAddress.postcode,
+        };
+        try {
+          const payRes = await paymentApi.initiate({
+            orderId: data.order._id,
+            amount: grandTotal,
+            customer,
+          });
+          if (payRes.data.success && payRes.data.gatewayUrl) {
+            await clearCart();
+            setAppliedCoupon(null);
+            window.location.href = payRes.data.gatewayUrl;
+            return;
+          }
+          throw new Error(
+            payRes.data.gatewayUrl
+              ? 'Payment gateway could not be reached. Please try again.'
+              : 'Payment initiation failed. Please try again.'
+          );
+        } catch (payErr: any) {
+          setOrderError(
+            payErr?.response?.data?.message ||
+              'Your order was created, but the payment gateway could not be reached. Please try again or pay from your orders.'
+          );
+          return;
+        }
+      }
+
       await clearCart();
       setAppliedCoupon(null);
       setPlacedOrder(data.order._id);
       showToast('Order placed successfully!', 'success');
     } catch (e: any) {
-      setOrderError(e?.response?.data?.message || 'Failed to place your order. Please try again.');
+      setOrderError(
+        e?.response?.data?.message ||
+          'Failed to place your order. Please try again.'
+      );
     } finally {
       setPlacing(false);
     }
@@ -186,7 +272,9 @@ const CheckoutContent = () => {
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             Thank you for shopping with Apple IT Zone. Your order
-            <span className="mx-1 font-semibold text-gray-900">#{placedOrder}</span>
+            <span className="mx-1 font-semibold text-gray-900">
+              #{placedOrder}
+            </span>
             has been received and is being processed.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -259,7 +347,9 @@ const CheckoutContent = () => {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <MapPin size={18} className="text-blue-600" />
-              <h2 className="text-lg font-bold text-gray-900">Shipping Address</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                Shipping Address
+              </h2>
             </div>
 
             {addressesLoading ? (
@@ -305,7 +395,9 @@ const CheckoutContent = () => {
                         )}
                       </div>
                       <div className="mt-2 space-y-0.5 text-sm text-gray-600">
-                        <p className="font-medium text-gray-800">{a.fullName}</p>
+                        <p className="font-medium text-gray-800">
+                          {a.fullName}
+                        </p>
                         <p>{a.phone}</p>
                         <p>{a.street}</p>
                         <p>
@@ -498,15 +590,24 @@ const CheckoutContent = () => {
               />
               <span className="text-xs leading-relaxed text-gray-600">
                 I have read and agree to the{' '}
-                <Link href="/terms" className="font-medium text-blue-600 hover:underline">
+                <Link
+                  href="/terms"
+                  className="font-medium text-blue-600 hover:underline"
+                >
                   Terms and Conditions
                 </Link>
                 ,{' '}
-                <Link href="/privacy" className="font-medium text-blue-600 hover:underline">
+                <Link
+                  href="/privacy"
+                  className="font-medium text-blue-600 hover:underline"
+                >
                   Privacy Policy
                 </Link>{' '}
                 and{' '}
-                <Link href="/refund" className="font-medium text-blue-600 hover:underline">
+                <Link
+                  href="/refund"
+                  className="font-medium text-blue-600 hover:underline"
+                >
                   Refund and Return Policy
                 </Link>
                 .
@@ -538,19 +639,22 @@ const CheckoutContent = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-blue-600" />
-            <h2 className="text-lg font-bold text-gray-900">
-              Payment Method
-            </h2>
+            <h2 className="text-lg font-bold text-gray-900">Payment Method</h2>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {PAYMENT_METHODS.map((p) => {
-              const active = paymentMethod === p.value;
-              const Icon = p.icon;
+            {gateways.map((p) => {
+              const value = p.name.toLowerCase();
+              const active = paymentMethod === value;
+              const Icon = GATEWAY_ICONS[value] || Wallet;
               return (
                 <button
-                  key={p.value}
+                  key={p.name}
                   type="button"
-                  onClick={() => setPaymentMethod(p.value as PaymentValue)}
+                  onClick={() =>
+                    setPaymentMethod(
+                      value as 'sslcommerz' | 'cod' | 'bkash' | 'nagad'
+                    )
+                  }
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                     active
                       ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
@@ -565,11 +669,20 @@ const CheckoutContent = () => {
                     <span className="block text-sm font-medium text-gray-900">
                       {p.label}
                     </span>
-                    <span className="block text-xs text-gray-500">{p.hint}</span>
+                    {p.description && (
+                      <span className="block text-xs text-gray-500">
+                        {p.description}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
             })}
+            {gateways.length === 0 && (
+              <p className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
+                No payment methods are available right now.
+              </p>
+            )}
           </div>
 
           <div className="mt-5 border-t border-gray-200 pt-4">
@@ -578,11 +691,16 @@ const CheckoutContent = () => {
             </Label>
             <p className="mt-1.5 text-sm text-gray-600">
               <span className="font-semibold text-gray-900">
-                {DELIVERY_METHODS.find((d) => d.value === deliveryMethod)?.label}
+                {
+                  DELIVERY_METHODS.find((d) => d.value === deliveryMethod)
+                    ?.label
+                }
               </span>{' '}
               · {DELIVERY_METHODS.find((d) => d.value === deliveryMethod)?.eta}
               {' · '}
-              {deliveryCost === 0 ? 'Free' : `৳${deliveryCost.toLocaleString()}`}
+              {deliveryCost === 0
+                ? 'Free'
+                : `৳${deliveryCost.toLocaleString()}`}
             </p>
           </div>
         </div>
@@ -595,7 +713,10 @@ const CheckoutContent = () => {
           {items.length === 0 ? (
             <p className="mt-4 text-sm text-gray-500">
               Your cart is empty.{' '}
-              <Link href="/" className="font-medium text-blue-600 hover:underline">
+              <Link
+                href="/"
+                className="font-medium text-blue-600 hover:underline"
+              >
                 Continue shopping
               </Link>
             </p>

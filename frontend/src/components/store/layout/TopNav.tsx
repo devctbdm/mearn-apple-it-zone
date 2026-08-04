@@ -1,17 +1,18 @@
 'use client';
 import Link from 'next/link';
-import { Search, Gift, Sparkles, User, ShoppingCart } from 'lucide-react';
+import { Search, Gift, Sparkles, User, ShoppingCart, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/store';
+import { SearchBar } from '@/components/store/layout/SearchBar';
 
 import { useState, useEffect } from 'react';
 import Logo from '@/components/store/logo/Logo';
 
 const TopNav = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
   const { totalItems } = useCart();
 
   useEffect(() => {
@@ -19,29 +20,17 @@ const TopNav = () => {
   }, []);
 
   return (
-    <header className="w-full border-b border-white/10 bg-slate-900 overflow-hidden">
+    <header className="w-full border-b border-white/10 bg-slate-900">
       <div className="w-full max-w-7xl mx-auto flex h-16 items-center justify-between gap-4 lg:h-20 px-2">
-        {/* Mobile Menu Toggle
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-1 h-9 w-9 rounded-xl text-slate-300 transition-all duration-300 hover:bg-white/10 hover:text-white xl:hidden"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </Button> */}
         <Logo />
 
         <div className="xl:hidden items-center justify-center flex flex-row gap-x-2">
-          {/* Search button */}
+          {/* Search button mobile */}
           <Button
             type="button"
             className="h-10 w-10 rounded-full p-0 hover:scale-105 transition-transform"
-            onClick={() => console.log('Open search')}
+            onClick={() => setMobileSearchOpen(true)}
+            aria-label="Open search"
           >
             <Search className="h-4 w-4" />
           </Button>
@@ -63,18 +52,10 @@ const TopNav = () => {
           </Button>
         </div>
 
-        {/* Search Bar - Desktop (unchanged) */}
+        {/* Search Bar - Desktop */}
         <div className="hidden flex-1 max-w-xl xl:block">
           <div className="relative group">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-purple-400" />
-            <Input
-              type="text"
-              placeholder="Search for products, brands & more..."
-              className="h-10 w-full rounded-xl border-white/10 bg-white/5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 transition-all duration-300 focus:border-purple-500/50 focus:bg-white/10 focus:ring-2 focus:ring-purple-500/20 hover:border-white/20"
-            />
-            <kbd className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 hidden items-center gap-0.5 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 sm:flex">
-              <span className="text-[9px]">⌘</span>K
-            </kbd>
+            <SearchBar variant="desktop" commandKeyShortcut />
           </div>
         </div>
 
@@ -164,6 +145,31 @@ const TopNav = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Search Panel */}
+      {mobileSearchOpen && (
+        <div className="xl:hidden border-t border-white/10 bg-slate-900 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchBar
+                variant="mobile"
+                autoFocus
+                onClose={() => setMobileSearchOpen(false)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-full text-slate-400 hover:bg-white/10 hover:text-white"
+              onClick={() => setMobileSearchOpen(false)}
+              aria-label="Close search"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

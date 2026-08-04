@@ -2,6 +2,42 @@
 
 import SSLCommerzPayment from 'sslcommerz-lts';
 import Order from '../models/Order.js';
+import PaymentGateway from '../models/PaymentGateway.js';
+
+// Load SSLCommerz credentials/settings from the DB gateway config (set in admin
+// dashboard), falling back to env vars when not configured.
+const getSSLCommerzConfig = async () => {
+  let config = {};
+  try {
+    const gateway = await PaymentGateway.findOne({ name: 'SSLCommerz' });
+    if (gateway && gateway.config) {
+      config = gateway.config;
+    }
+  } catch (error) {
+    console.error('Failed to load SSLCommerz gateway config:', error.message);
+  }
+  return {
+    storeId: config.storeId || process.env.SSL_STORE_ID,
+    storePassword: config.storePassword || process.env.SSL_STORE_PASSWORD,
+    // sandbox === true => test mode (is_live = false)
+    sandbox:
+      typeof config.sandbox === 'boolean' ? config.sandbox : process.env.SSL_IS_LIVE !== 'true',
+
+    isLocalhost: typeof config.isLocalhost === 'boolean' ? config.isLocalhost : false,
+  };
+};
+
+// Choose the frontend URL to redirect to based on localhost/test settings.
+const getSslUrls = (isLocalhost) => {
+  const base = isLocalhost
+    ? 'http://localhost:3000'
+    : process.env.FRONTEND_URL || 'http://localhost:3000';
+  return {
+    success_url: `${base}/payment-success`,
+    fail_url: `${base}/payment-fail`,
+    cancel_url: `${base}/payment-cancel`,
+  };
+};
 
 // Helper: update order payment status
 const updateOrderPayment = async (tran_id, status, data = {}) => {
@@ -51,9 +87,10 @@ export const initiatePayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Order already paid' });
     }
 
-    const store_id = process.env.SSL_STORE_ID;
-    const store_passwd = process.env.SSL_STORE_PASSWORD;
-    const is_live = process.env.SSL_IS_LIVE === 'true';
+    const sslConfig = await getSSLCommerzConfig();
+    const store_id = sslConfig.storeId;
+    const store_passwd = sslConfig.storePassword;
+    const is_live = !sslConfig.sandbox;
 
     const tran_id = `ORDER_${orderId}_${Date.now()}`;
 
@@ -61,9 +98,7 @@ export const initiatePayment = async (req, res) => {
       total_amount: amount,
       currency: 'BDT',
       tran_id: tran_id,
-      success_url: process.env.SSL_SUCCESS_URL,
-      fail_url: process.env.SSL_FAIL_URL,
-      cancel_url: process.env.SSL_CANCEL_URL,
+      ...getSslUrls(sslConfig.isLocalhost),
       ipn_url: process.env.SSL_IPN_URL,
       shipping_method: 'Courier',
       product_name: 'Apple IT Zone Product',
@@ -128,9 +163,10 @@ export const validatePayment = async (req, res) => {
     const { val_id, tran_id, status } = req.body;
 
     if (status === 'VALID') {
-      const store_id = process.env.SSL_STORE_ID;
-      const store_passwd = process.env.SSL_STORE_PASSWORD;
-      const is_live = process.env.SSL_IS_LIVE === 'true';
+      const sslConfig = await getSSLCommerzConfig();
+      const store_id = sslConfig.storeId;
+      const store_passwd = sslConfig.storePassword;
+      const is_live = !sslConfig.sandbox;
 
       const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
       const validation = await sslcz.validate({ val_id });
@@ -144,18 +180,17 @@ export const validatePayment = async (req, res) => {
         });
 
         // Redirect to frontend success page
-        return res.redirect(
-          `${process.env.FRONTEND_URL}/payment-success?tran_id=${tran_id}&status=success`
-        );
+        const urls = getSslUrls(sslConfig.isLocalhost);
+        return res.redirect(`${urls.success_url}?tran_id=${tran_id}&status=success`);
       }
     }
 
     // Payment failed
     await updateOrderPayment(tran_id, 'failed');
-    return res.redirect(`${process.env.FRONTEND_URL}/payment-fail?tran_id=${tran_id}`);
+    return res.redirect(`${(await getSslUrls()).fail_url}?tran_id=${tran_id}`);
   } catch (error) {
     console.error('Validation Error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/payment-fail`);
+    res.redirect(`${(await getSslUrls()).fail_url}`);
   }
 };
 
@@ -169,9 +204,10 @@ export const ipnListener = async (req, res) => {
     console.log('IPN Received:', { tran_id, status, amount, card_type });
 
     if (status === 'VALID') {
-      const store_id = process.env.SSL_STORE_ID;
-      const store_passwd = process.env.SSL_STORE_PASSWORD;
-      const is_live = process.env.SSL_IS_LIVE === 'true';
+      const sslConfig = await getSSLCommerzConfig();
+      const store_id = sslConfig.storeId;
+      const store_passwd = sslConfig.storePassword;
+      const is_live = !sslConfig.sandbox;
 
       const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
       const validation = await sslcz.validate({ val_id });
@@ -205,9 +241,9 @@ export const cancelPayment = async (req, res) => {
     if (tran_id) {
       await updateOrderPayment(tran_id, 'cancelled');
     }
-    res.redirect(`${process.env.FRONTEND_URL}/payment-cancel?tran_id=${tran_id}`);
+    res.redirect(`${getSslUrls().cancel_url}?tran_id=${tran_id}`);
   } catch (error) {
     console.error('Cancel Error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/payment-cancel`);
+    res.redirect(`${getSslUrls().cancel_url}`);
   }
 };

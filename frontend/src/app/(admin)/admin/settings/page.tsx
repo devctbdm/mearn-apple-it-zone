@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -49,6 +50,9 @@ import {
   KeyRound,
   CheckCircle2,
   X,
+  Pencil,
+  Settings2,
+  FlaskConical,
 } from 'lucide-react';
 import {
   teamApi,
@@ -307,6 +311,113 @@ export default function SettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
+
+  const [editingGateway, setEditingGateway] = useState<PaymentGateway | null>(
+    null
+  );
+  const [gatewayForm, setGatewayForm] = useState({
+    enabled: false,
+    label: '',
+    description: '',
+    sandbox: false,
+    storeId: '',
+    storePassword: '',
+    isLocalhost: false,
+    appKey: '',
+    appSecret: '',
+    username: '',
+    password: '',
+  });
+  const [savingGateway, setSavingGateway] = useState(false);
+
+  const openGatewayEditor = (gateway: PaymentGateway) => {
+    const cfg = gateway.config || {};
+    setEditingGateway(gateway);
+    setGatewayForm({
+      enabled: !!gateway.enabled,
+      label: cfg.label || gateway.name,
+      description: cfg.description || '',
+      sandbox: cfg.sandbox === undefined ? true : !!cfg.sandbox,
+      storeId: cfg.storeId || '',
+      storePassword: cfg.storePassword || '',
+      isLocalhost: !!cfg.isLocalhost,
+      appKey: cfg.appKey || '',
+      appSecret: cfg.appSecret || '',
+      username: cfg.username || '',
+      password: cfg.password || '',
+    });
+  };
+
+  const handleSaveGateway = async () => {
+    if (!editingGateway) return;
+    const isSSL = editingGateway.name === 'SSLCommerz';
+    const isBKash = editingGateway.name === 'bKash';
+
+    if (isSSL && gatewayForm.enabled && !gatewayForm.storeId) {
+      toast.error('Store ID is required when SSLCommerz is enabled');
+      return;
+    }
+    if (isSSL && gatewayForm.enabled && !gatewayForm.storePassword) {
+      toast.error('Store Password is required when SSLCommerz is enabled');
+      return;
+    }
+    if (isBKash && gatewayForm.enabled && !gatewayForm.appKey) {
+      toast.error('App Key is required when bKash is enabled');
+      return;
+    }
+    if (isBKash && gatewayForm.enabled && !gatewayForm.appSecret) {
+      toast.error('App Secret is required when bKash is enabled');
+      return;
+    }
+    if (isBKash && gatewayForm.enabled && !gatewayForm.username) {
+      toast.error('Username is required when bKash is enabled');
+      return;
+    }
+    if (isBKash && gatewayForm.enabled && !gatewayForm.password) {
+      toast.error('Password is required when bKash is enabled');
+      return;
+    }
+
+    setSavingGateway(true);
+    try {
+      const config: Record<string, any> = {
+        ...(editingGateway.config || {}),
+        label: gatewayForm.label,
+        description: gatewayForm.description,
+      };
+      if (isSSL) {
+        config.sandbox = gatewayForm.sandbox;
+        config.storeId = gatewayForm.storeId;
+        config.storePassword = gatewayForm.storePassword;
+        config.isLocalhost = gatewayForm.isLocalhost;
+      }
+      if (isBKash) {
+        config.appKey = gatewayForm.appKey;
+        config.appSecret = gatewayForm.appSecret;
+        config.username = gatewayForm.username;
+        config.password = gatewayForm.password;
+      }
+      const { data } = await paymentSettingsApi.update(editingGateway._id, {
+        enabled: gatewayForm.enabled,
+        config,
+      });
+      if (data.success) {
+        setGateways((prev) =>
+          prev.map((g) =>
+            g._id === editingGateway._id
+              ? { ...g, enabled: data.gateway.enabled, config: data.gateway.config }
+              : g
+          )
+        );
+        toast.success(`${editingGateway.name} settings updated`);
+        setEditingGateway(null);
+      }
+    } catch {
+      toast.error('Failed to update gateway settings');
+    } finally {
+      setSavingGateway(false);
+    }
+  };
 
   const getPasswordStrength = (pw: string) => {
     let score = 0;
@@ -606,6 +717,8 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 {gateways.map((gateway) => {
                   const isBKash = gateway.name === 'bKash';
+                  const isSSL = gateway.name === 'SSLCommerz';
+                  const cfg = gateway.config || {};
                   return (
                     <div
                       key={gateway._id}
@@ -620,10 +733,27 @@ export default function SettingsPage() {
                           )}
                         </div>
                         <div>
-                          <div className="font-medium">{gateway.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {gateway.enabled ? 'Connected' : 'Setup Required'}
+                          <div className="font-medium">
+                            {cfg.label || gateway.name}
+                            {isSSL && cfg.sandbox && (
+                              <Badge
+                                variant="secondary"
+                                className="ml-2 gap-1 text-[10px]"
+                              >
+                                <FlaskConical className="h-3 w-3" />
+                                Sandbox
+                              </Badge>
+                            )}
                           </div>
+                          {cfg.description ? (
+                            <div className="text-sm text-muted-foreground line-clamp-1 max-w-sm">
+                              {cfg.description}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">
+                              {gateway.enabled ? 'Connected' : 'Setup Required'}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -638,6 +768,14 @@ export default function SettingsPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => openGatewayEditor(gateway)}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleToggleGateway(gateway)}
                         >
                           {gateway.enabled ? 'Disable' : 'Enable'}
@@ -648,6 +786,268 @@ export default function SettingsPage() {
                 })}
               </CardContent>
             </Card>
+
+            {/* Gateway Edit Dialog */}
+            <Dialog
+              open={!!editingGateway}
+              onOpenChange={(o) => {
+                if (!o) setEditingGateway(null);
+              }}
+            >
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Configure {editingGateway?.name}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Customize this payment gateway and its connection settings.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <div className="text-sm font-medium">Status</div>
+                      <div className="text-xs text-muted-foreground">
+                        {gatewayForm.enabled
+                          ? 'This gateway is active and accepting payments.'
+                          : 'This gateway is disabled.'}
+                      </div>
+                    </div>
+                    <Switch
+                      checked={gatewayForm.enabled}
+                      onCheckedChange={(checked) =>
+                        setGatewayForm((prev) => ({ ...prev, enabled: checked }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gatewayLabel">Label</Label>
+                    <Input
+                      id="gatewayLabel"
+                      placeholder={editingGateway?.name || 'Gateway label'}
+                      value={gatewayForm.label}
+                      onChange={(e) =>
+                        setGatewayForm((prev) => ({
+                          ...prev,
+                          label: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gatewayDescription">Description</Label>
+                    <Textarea
+                      id="gatewayDescription"
+                      rows={2}
+                      placeholder="Short description shown to customers"
+                      value={gatewayForm.description}
+                      onChange={(e) =>
+                        setGatewayForm((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  {editingGateway?.name === 'SSLCommerz' && (
+                    <>
+                      <Separator />
+                      <div className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <div className="text-sm font-medium">
+                            Sandbox / Test Mode
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Use test credentials and sandbox payment page.
+                          </div>
+                        </div>
+                        <Checkbox
+                          checked={gatewayForm.sandbox}
+                          onCheckedChange={(checked) =>
+                            setGatewayForm((prev) => ({
+                              ...prev,
+                              sandbox: !!checked,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      {gatewayForm.enabled && (
+                        <>
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayStoreId">
+                                Store ID <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayStoreId"
+                                placeholder="SSLCommerz store ID"
+                                value={gatewayForm.storeId}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    storeId: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayStorePassword">
+                                Store Password{' '}
+                                <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayStorePassword"
+                                type="password"
+                                placeholder="SSLCommerz store password"
+                                value={gatewayForm.storePassword}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    storePassword: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between rounded-lg border p-3">
+                            <div className="space-y-0.5">
+                              <div className="text-sm font-medium">
+                                Is Localhost?
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Check if running on localhost for local testing.
+                              </div>
+                            </div>
+                            <Checkbox
+                              checked={gatewayForm.isLocalhost}
+                              onCheckedChange={(checked) =>
+                                setGatewayForm((prev) => ({
+                                  ...prev,
+                                  isLocalhost: !!checked,
+                                }))
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {!gatewayForm.enabled && (
+                        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-3">
+                          Credentials are hidden because this gateway is
+                          disabled. Enable it to configure the Store ID and
+                          Store Password.
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {editingGateway?.name === 'bKash' && (
+                    <>
+                      {gatewayForm.enabled ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayAppKey">
+                                App Key <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayAppKey"
+                                placeholder="bKash app key"
+                                value={gatewayForm.appKey}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    appKey: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayAppSecret">
+                                App Secret <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayAppSecret"
+                                type="password"
+                                placeholder="bKash app secret"
+                                value={gatewayForm.appSecret}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    appSecret: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayUsername">
+                                Username <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayUsername"
+                                placeholder="bKash merchant username"
+                                value={gatewayForm.username}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    username: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="gatewayPassword">
+                                Password <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="gatewayPassword"
+                                type="password"
+                                placeholder="bKash merchant password"
+                                value={gatewayForm.password}
+                                onChange={(e) =>
+                                  setGatewayForm((prev) => ({
+                                    ...prev,
+                                    password: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-3">
+                          Credentials are hidden because this gateway is
+                          disabled. Enable it to configure the bKash
+                          credentials.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingGateway(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveGateway}
+                    disabled={savingGateway}
+                  >
+                    {savingGateway ? 'Saving...' : 'Save Settings'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             <Card>
               <CardHeader>

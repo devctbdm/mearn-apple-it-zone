@@ -87,7 +87,7 @@ const data = {
       icon: <CircleHelpIcon />,
     },
     {
-      title: 'Promo Managements',
+      title: 'Coupons',
       url: '/admin/promo',
       icon: <Gem />,
     },

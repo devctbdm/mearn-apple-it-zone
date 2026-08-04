@@ -250,8 +250,33 @@ export type PaymentGateway = {
 
 export const paymentSettingsApi = {
   getAll: () => api.get<{ success: boolean; gateways: PaymentGateway[] }>('/payment-settings'),
+  getActive: () =>
+    api.get<{ success: boolean; gateways: ActivePaymentGateway[] }>('/payment-settings/active'),
   update: (id: string, data: { enabled?: boolean; config?: Record<string, any> }) =>
     api.put<{ success: boolean; gateway: PaymentGateway }>(`/payment-settings/${id}`, data),
+};
+
+export type ActivePaymentGateway = {
+  name: string;
+  label: string;
+  description: string;
+};
+
+export const paymentApi = {
+  initiate: (data: {
+    orderId: string;
+    amount: number;
+    customer: {
+      name: string;
+      email: string;
+      phone: string;
+      address?: string;
+      address2?: string;
+      city?: string;
+      state?: string;
+      postcode?: string;
+    };
+  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string }>('/payment/initiate', data),
 };
 
 export type AuthMe = {
