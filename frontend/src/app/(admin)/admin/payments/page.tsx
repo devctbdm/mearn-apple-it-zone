@@ -226,44 +226,44 @@ export default function AdminPaymentPage() {
       );
       setSettings({
         sslcommerz: {
-          status: byName['SSLCommerz']?.enabled ?? true,
+          status: byName['sslcommerz']?.enabled ?? true,
           description:
-            byName['SSLCommerz']?.config?.description ??
+            byName['sslcommerz']?.config?.description ??
             'Pay with cards and mobile wallets.',
-          sandbox: byName['SSLCommerz']?.config?.sandbox ?? true,
-          storeId: byName['SSLCommerz']?.config?.storeId ?? '',
-          storePassword: byName['SSLCommerz']?.config?.storePassword ?? '',
+          sandbox: byName['sslcommerz']?.config?.sandbox ?? true,
+          storeId: byName['sslcommerz']?.config?.storeId ?? '',
+          storePassword: byName['sslcommerz']?.config?.storePassword ?? '',
         },
         bkash: {
-          status: byName['bKash']?.enabled ?? true,
-          label: byName['bKash']?.config?.label ?? 'bKash',
-          sandbox: byName['bKash']?.config?.sandbox ?? true,
-          appKey: byName['bKash']?.config?.appKey ?? '',
-          appSecret: byName['bKash']?.config?.appSecret ?? '',
-          username: byName['bKash']?.config?.username ?? '',
-          password: byName['bKash']?.config?.password ?? '',
+          status: byName['bkash']?.enabled ?? true,
+          label: byName['bkash']?.config?.label ?? 'bKash',
+          sandbox: byName['bkash']?.config?.sandbox ?? true,
+          appKey: byName['bkash']?.config?.appKey ?? '',
+          appSecret: byName['bkash']?.config?.appSecret ?? '',
+          username: byName['bkash']?.config?.username ?? '',
+          password: byName['bkash']?.config?.password ?? '',
         },
         nagad: {
-          status: byName['Nagad']?.enabled ?? false,
-          label: byName['Nagad']?.config?.label ?? 'Nagad',
+          status: byName['nagad']?.enabled ?? false,
+          label: byName['nagad']?.config?.label ?? 'Nagad',
           description:
-            byName['Nagad']?.config?.description ??
+            byName['nagad']?.config?.description ??
             'Pay with your Nagad mobile wallet.',
-          sandbox: byName['Nagad']?.config?.sandbox ?? true,
-          merchantId: byName['Nagad']?.config?.merchantId ?? '',
-          merchantNumber: byName['Nagad']?.config?.merchantNumber ?? '',
-          publicKey: byName['Nagad']?.config?.publicKey ?? '',
-          privateKey: byName['Nagad']?.config?.privateKey ?? '',
+          sandbox: byName['nagad']?.config?.sandbox ?? true,
+          merchantId: byName['nagad']?.config?.merchantId ?? '',
+          merchantNumber: byName['nagad']?.config?.merchantNumber ?? '',
+          publicKey: byName['nagad']?.config?.publicKey ?? '',
+          privateKey: byName['nagad']?.config?.privateKey ?? '',
         },
         cod: {
-          status: byName['COD']?.enabled ?? true,
-          label: byName['COD']?.config?.label ?? 'Cash on Delivery',
+          status: byName['cod']?.enabled ?? true,
+          label: byName['cod']?.config?.label ?? 'Cash on Delivery',
           description:
-            byName['COD']?.config?.description ??
+            byName['cod']?.config?.description ??
             'Pay in cash when the order is delivered to your address.',
-          minOrder: byName['COD']?.config?.minOrder ?? '0',
-          maxOrder: byName['COD']?.config?.maxOrder ?? '50000',
-          extraCharge: byName['COD']?.config?.extraCharge ?? '0',
+          minOrder: byName['cod']?.config?.minOrder ?? '0',
+          maxOrder: byName['cod']?.config?.maxOrder ?? '50000',
+          extraCharge: byName['cod']?.config?.extraCharge ?? '0',
         },
       });
     } catch {

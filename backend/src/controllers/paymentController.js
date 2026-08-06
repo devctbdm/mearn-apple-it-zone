@@ -2,10 +2,20 @@
 
 import SSLCommerzPayment from "sslcommerz-lts";
 import Order from "../models/Order.js";
+import PaymentGateway from "../models/PaymentGateway.js";
 
-const store_id = process.env.SSL_STORE_ID || "testbox";
-const store_passwd = process.env.SSL_STORE_PASSWORD || "qwerty";
-const is_live = process.env.SSL_IS_LIVE === "true";
+// @desc    Load SSLCommerz credentials from DB config, falling back to env
+const getSSLCommerzConfig = async () => {
+  const gateway = await PaymentGateway.findOne({ name: "sslcommerz" });
+  const cfg = gateway?.config || {};
+  return {
+    storeId: cfg.storeId || process.env.SSL_STORE_ID || "testbox",
+    storePassword: cfg.storePassword || process.env.SSL_STORE_PASSWORD || "qwerty",
+    isLive: cfg.sandbox === undefined
+      ? process.env.SSL_IS_LIVE === "true"
+      : !cfg.sandbox,
+  };
+};
 
 // @desc    Initiate SSLCommerz payment for an order
 // @route   POST /api/payment/initiate
@@ -42,7 +52,8 @@ export const initiatePayment = async (req, res) => {
 
     const tran_id = `${order._id}_${Date.now()}`;
 
-    const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+    const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+    const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
 
     const data = {
       total_amount: Number(amount),
@@ -51,12 +62,11 @@ export const initiatePayment = async (req, res) => {
       success_url: `${process.env.FRONTEND_URL}/payment/success?tran_id=${tran_id}`,
       fail_url: `${process.env.FRONTEND_URL}/payment/fail?tran_id=${tran_id}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?tran_id=${tran_id}`,
-      ipn_url: `${process.env.FRONTEND_URL}/payment/ipn?tran_id=${tran_id}`,
+      ipn_url: `${process.env.BACKEND_URL || "http://localhost:5000"}/api/payment/ipn?tran_id=${tran_id}`,
       productcategory: "General",
       product_name: "Apple IT Zone Order",
       product_category: "Electronics",
       product_profile: "general",
-      num_of_item: order.items.length,
       shipping_method: "COURIER",
       num_of_item: order.items.length,
       ship_name: customer.name || "Customer",
@@ -129,7 +139,8 @@ export const validatePayment = async (req, res) => {
 
     let validation = null;
     if (val_id) {
-      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+      const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
       validation = await sslcz.validate({ val_id });
     }
 
@@ -181,7 +192,8 @@ export const ipnListener = async (req, res) => {
     let success = status === "VALID" || status === "VALIDATED";
 
     if (!success && val_id) {
-      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+      const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
       const validation = await sslcz.validate({ val_id });
       success =
         validation?.status === "VALID" || validation?.status === "VALIDATED";
