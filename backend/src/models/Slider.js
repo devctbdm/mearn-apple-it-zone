@@ -1,5 +1,3 @@
-// backend/src/models/Slider.js
-
 import mongoose from 'mongoose';
 
 const sliderSchema = new mongoose.Schema(

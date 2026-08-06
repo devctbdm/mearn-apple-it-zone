@@ -2,7 +2,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://api.appleitzone.com.bd/api/v1';
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/';
 
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,

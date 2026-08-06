@@ -37,7 +37,9 @@ export const updatePaymentGateway = async (req, res) => {
         config: config ?? {},
       });
     } else {
-      if (typeof enabled === 'boolean') gateway.enabled = enabled;
+      if (typeof enabled === 'boolean') {
+        gateway.enabled = enabled;
+      }
       if (config && typeof config === 'object') {
         gateway.config = { ...gateway.config, ...config };
       }

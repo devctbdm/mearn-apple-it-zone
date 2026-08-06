@@ -1,5 +1,3 @@
-// backend/src/models/Product.js
-
 import mongoose from 'mongoose';
 import slugify from 'slugify';
 
@@ -48,7 +46,8 @@ const productSchema = new mongoose.Schema(
       type: [String],
       default: [],
       validate: {
-        validator: (v) => !v || v.length === 0 || v.every((c) => typeof c === 'string' && c.trim().length > 0),
+        validator: (v) =>
+          !v || v.length === 0 || v.every((c) => typeof c === 'string' && c.trim().length > 0),
         message: 'Categories must be a non-empty string array',
       },
     },

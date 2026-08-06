@@ -5,20 +5,17 @@ import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-
 // Import route files (with .js extension)
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
-
 import categoryRoutes from './routes/categoryRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
-
 import reviewRoutes from './routes/reviewRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import promoRoutes from './routes/promoRoutes.js';
@@ -29,7 +26,7 @@ import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
-setServers(['8.8.8.8', '1.1.1.1']);
+setServers(['8.8.8.8', '1.1.1.1', '9.9.9.9']);
 
 // Load environment variables
 dotenv.config();
