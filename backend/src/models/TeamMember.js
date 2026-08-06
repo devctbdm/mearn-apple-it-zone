@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const teamMemberSchema = new mongoose.Schema(
   {
@@ -6,17 +7,28 @@ const teamMemberSchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true, lowercase: true },
     role: {
       type: String,
-      enum: ['Admin', 'Manager', 'Team', 'Viewer'],
-      default: 'Viewer',
+      enum: ['admin', 'manager', 'super_admin'],
+      default: 'manager',
     },
-    status: {
-      type: String,
-      enum: ['Active', 'Pending', 'Inactive'],
-      default: 'Active',
-    },
+    active: { type: Boolean, default: true },
+    lastLogin: { type: Date },
+    password: { type: String, select: false },
   },
   { timestamps: true }
 );
+
+// ---- Hash password before saving ----
+teamMemberSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+// ---- Compare entered password with hashed password ----
+teamMemberSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 const TeamMember = mongoose.model('TeamMember', teamMemberSchema);
 export default TeamMember;

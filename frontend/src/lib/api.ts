@@ -193,18 +193,29 @@ export type TeamMember = {
   _id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Manager' | 'Team' | 'Viewer';
-  status: 'Active' | 'Pending' | 'Inactive';
+  role: 'admin' | 'manager' | 'super_admin';
+  active: boolean;
+  password?: string;
   createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
+};
+
+export type TeamMemberPayload = {
+  name?: string;
+  email?: string;
+  role?: string;
+  active?: boolean;
+  password?: string;
 };
 
 export const teamApi = {
   getAll: () => api.get<{ success: boolean; members: TeamMember[] }>('/team'),
 
-  create: (data: { name: string; email: string; role: string }) =>
+  create: (data: { name: string; email: string; role: string; password?: string; active?: boolean }) =>
     api.post<{ success: boolean; member: TeamMember }>('/team', data),
 
-  update: (id: string, data: Partial<{ name: string; email: string; role: string; status: string }>) =>
+  update: (id: string, data: TeamMemberPayload) =>
     api.put<{ success: boolean; member: TeamMember }>(`/team/${id}`, data),
 
   delete: (id: string) =>
@@ -277,6 +288,14 @@ export const paymentApi = {
       postcode?: string;
     };
   }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string }>('/payment/initiate', data),
+};
+
+export type ActiveTeamMember = {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
 };
 
 export type AuthMe = {

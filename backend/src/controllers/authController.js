@@ -2,6 +2,7 @@
 
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import TeamMember from '../models/TeamMember.js';
 import Session from '../models/Session.js';
 import { parseUserAgent } from '../utils/parseUA.js';
 
@@ -66,19 +67,69 @@ export const login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
     const email = req.body.email || identifier;
+    const lookup = email.toLowerCase().trim();
 
+    // 1) Try a regular customer/admin User account
     const user = await User.findOne({
-      $or: [{ email: email.toLowerCase().trim() }, { phone: email.trim() }],
+      $or: [{ email: lookup }, { phone: email.trim() }],
     }).select('+password');
 
-    if (!user) {
+    if (user) {
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email/phone or password',
+        });
+      }
+      // Generate token
+      const token = generateToken(user._id);
+      // Record session
+      try {
+        await Session.updateMany({ user: user._id }, { isCurrent: false });
+        const ua = parseUserAgent(req.headers['user-agent'] || '');
+        await Session.create({
+          user: user._id,
+          device: ua.device,
+          browser: ua.browser,
+          os: ua.os,
+          ip: req.ip || req.connection?.remoteAddress || '',
+          lastActive: new Date(),
+          isCurrent: true,
+        });
+      } catch (e) {
+        // non-blocking
+      }
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          address: user.address,
+          isTeam: false,
+        },
+      });
+    }
+
+    // 2) Try a TeamMember (staff / team collection)
+    const member = await TeamMember.findOne({ email: lookup }).select('+password');
+    if (!member) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email/phone or password',
       });
     }
-
-    const isMatch = await user.comparePassword(password);
+    if (!member.active) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is inactive. Contact an administrator.',
+      });
+    }
+    const isMatch = await member.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -87,35 +138,23 @@ export const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
-
-    // Record session
-    try {
-      await Session.updateMany({ user: user._id }, { isCurrent: false });
-      const ua = parseUserAgent(req.headers['user-agent'] || '');
-      await Session.create({
-        user: user._id,
-        device: ua.device,
-        browser: ua.browser,
-        os: ua.os,
-        ip: req.ip || req.connection?.remoteAddress || '',
-        lastActive: new Date(),
-        isCurrent: true,
-      });
-    } catch (e) {
-      // non-blocking
-    }
+    const token = generateToken(member._id);
+    // Update last login time
+    member.lastLogin = new Date();
+    await member.save();
 
     res.json({
       success: true,
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        address: user.address,
+        id: member._id,
+        name: member.name,
+        email: member.email,
+        role: member.role,
+        phone: '',
+        address: {},
+        isTeam: true,
+        active: member.active,
       },
     });
   } catch (error) {
@@ -129,6 +168,21 @@ export const login = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
   try {
+    if (req.isTeam) {
+      return res.json({
+        success: true,
+        user: {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.user.role,
+          phone: '',
+          address: {},
+          isTeam: true,
+          active: req.user.active,
+        },
+      });
+    }
     const user = await User.findById(req.user._id);
     res.json({
       success: true,
@@ -139,6 +193,7 @@ export const getMe = async (req, res) => {
         role: user.role,
         phone: user.phone,
         address: user.address,
+        isTeam: false,
       },
     });
   } catch (error) {

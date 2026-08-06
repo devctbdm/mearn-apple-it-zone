@@ -1,8 +1,6 @@
 'use client';
 
 import * as React from 'react';
-
-import { NavDocuments } from '@/components/nav-documents';
 import { NavMain } from '@/components/nav-main';
 import { SuperAdminNav } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
@@ -22,19 +20,16 @@ import {
   ChartBarIcon,
   FolderIcon,
   UsersIcon,
-  CameraIcon,
   FileTextIcon,
   Settings2Icon,
   CircleHelpIcon,
-  SearchIcon,
-  DatabaseIcon,
   FileChartColumnIcon,
-  FileIcon,
-  CommandIcon,
   Apple,
   ShoppingBasket,
   Gem,
   Images,
+  User,
+  HandCoins,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -70,7 +65,7 @@ const data = {
       url: '/admin/customers',
       icon: <UsersIcon />,
     },
-    
+
     {
       title: 'Invoices',
       url: '/admin/invoice',
@@ -95,18 +90,26 @@ const data = {
       title: 'Sliders',
       url: '/admin/slider',
       icon: <Images />,
-    }
+    },
   ],
- 
-
-  
 
   navSuperadmin: [
     {
       title: 'Users',
       url: '/admin/users',
+      icon: <User />,
+    },
+    {
+      title: 'Team',
+      url: '/admin/team',
       icon: <UsersIcon />,
     },
+    {
+      title: 'Payments',
+      url: '/admin/payments',
+      icon: <HandCoins />
+    },
+
     {
       title: 'Settings',
       url: '/admin/settings',
@@ -137,7 +140,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />        
+        <NavMain items={data.navMain} />
         <SuperAdminNav items={data.navSuperadmin} />
       </SidebarContent>
       <SidebarFooter>

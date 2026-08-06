@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { mongoose } from '../config/database.js';
 
 const User = mongoose.model('User');
+const TeamMember = mongoose.model('TeamMember');
 
 export const protect = async (req, res, next) => {
   let token;
@@ -15,18 +16,39 @@ export const protect = async (req, res, next) => {
   }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password');
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+
+    const [user, member] = await Promise.all([
+      User.findById(decoded.id).select('-password'),
+      TeamMember.findById(decoded.id).select('-password'),
+    ]);
+
+    if (user) {
+      req.user = user;
+      req.isTeam = false;
+      return next();
     }
-    next();
+    if (member) {
+      if (!member.active) {
+        return res.status(403).json({ success: false, message: 'Account is inactive' });
+      }
+      req.user = member;
+      req.isTeam = true;
+      return next();
+    }
+
+    return res.status(401).json({ success: false, message: 'User not found' });
   } catch {
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };
 
 export const adminOnly = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'super_admin')) {
+  if (
+    req.user &&
+    (req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.role === 'manager')
+  ) {
     next();
   } else {
     res.status(403).json({ success: false, message: 'Admin access required' });
