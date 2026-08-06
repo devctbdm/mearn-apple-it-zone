@@ -37,12 +37,27 @@ type TreeCategory = {
   children: TreeCategory[];
 };
 
-function buildTree(categories: { _id: string; name: string; slug: string; parentId: string | null; active: boolean; sortOrder: number }[]): TreeCategory[] {
+function buildTree(
+  categories: {
+    _id: string;
+    name: string;
+    slug: string;
+    parentId: string | null;
+    active: boolean;
+    sortOrder: number;
+  }[]
+): TreeCategory[] {
   const map = new Map<string, TreeCategory>();
   const roots: TreeCategory[] = [];
 
   for (const cat of categories.filter((c) => c.active !== false)) {
-    map.set(cat._id, { id: cat._id, name: cat.name, slug: cat.slug, parentId: cat.parentId, children: [] });
+    map.set(cat._id, {
+      id: cat._id,
+      name: cat.name,
+      slug: cat.slug,
+      parentId: cat.parentId,
+      children: [],
+    });
   }
 
   for (const cat of categories.filter((c) => c.active !== false)) {
@@ -59,16 +74,21 @@ function buildTree(categories: { _id: string; name: string; slug: string; parent
 
 export const CategoryNav = () => {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  );
   const [categories, setCategories] = useState<TreeCategory[]>([]);
 
   useEffect(() => {
-    categoryApi.getAll().then(({ data }) => {
-      if (data.success) {
-        setCategories(buildTree(data.categories));
-      }
-    }).catch(() => {});
+    categoryApi
+      .getAll()
+      .then(({ data }) => {
+        if (data.success) {
+          setCategories(buildTree(data.categories));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const toggleCategory = (categoryId: string) => {
@@ -198,7 +218,7 @@ export const CategoryNav = () => {
           <SheetTrigger>
             <MenuIcon className="h-5 w-5" />
           </SheetTrigger>
-          <SheetContent side="left" className="w-80">
+          <SheetContent side="left" className="w-80 overflow-y-auto px-4">
             <SheetHeader>
               <SheetTitle>Categories</SheetTitle>
             </SheetHeader>

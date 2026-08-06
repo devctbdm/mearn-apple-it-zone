@@ -1,5 +1,4 @@
-// src/app/(store)/[...slug]/page.tsx
-'use client'; // Using client for loading states
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { notFound } from 'next/navigation';
@@ -96,8 +95,7 @@ export default function CategoryPage({ params }: Props) {
   const isValidPath = path.length === 0 || matchedCount === path.length;
 
   const scopeNames = useMemo(
-    () =>
-      scopeId ? new Set(collectCategoryNames(categories, scopeId)) : null,
+    () => (scopeId ? new Set(collectCategoryNames(categories, scopeId)) : null),
     [categories, scopeId]
   );
 
@@ -108,7 +106,9 @@ export default function CategoryPage({ params }: Props) {
         .filter((p) => {
           if (!scopeNames) return true;
           const names =
-            p.categories && p.categories.length > 0 ? p.categories : [p.category];
+            p.categories && p.categories.length > 0
+              ? p.categories
+              : [p.category];
           return names.some((n) => scopeNames.has(n));
         })
         .map(toProductShape),

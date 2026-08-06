@@ -1,4 +1,3 @@
-// src/app/(store)/product/[slug]/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -10,6 +9,7 @@ import { toProductShape, type RawProduct } from '@/lib/productMapper';
 import type { Product } from '@/types/product';
 import { useAuth } from '@/hooks/useAuth';
 import { Breadcrumb } from '@/components/store/layout/Breadcrumb';
+import { ProductShareBar } from '@/components/store/product/ProductShareBar';
 import { AddToCartButton } from '@/components/store/cart/AddToCartButton';
 import { Button } from '@/components/button/Button';
 import { Textarea } from '@/components/ui/textarea';
@@ -166,6 +166,7 @@ function renderContentBlocks(
                 alt={block.alt || fallbackAlt}
                 width={800}
                 height={450}
+                loading="eager"
                 className="rounded-lg w-auto h-auto"
               />
             );
@@ -456,6 +457,9 @@ export default function ProductDetailPage({ params }: Props) {
       {/* Breadcrumb */}
       <Breadcrumb slug={categorySlugs} />
 
+      {/* Share + Compare header */}
+      <ProductShareBar product={product} />
+
       <div className="mt-4">
         <Link
           href={`/products/${categorySlugs.join('/')}`}
@@ -470,7 +474,7 @@ export default function ProductDetailPage({ params }: Props) {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Left Column: Image Slider */}
         <div className="space-y-4">
-          <div className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden shadow-lg">
+          <div className="relative aspect-square w-full max-w-md mx-auto bg-gray-100 rounded-2xl overflow-hidden shadow-lg">
             <Image
               src={images[activeImage]}
               alt={product.name}
@@ -486,7 +490,7 @@ export default function ProductDetailPage({ params }: Props) {
             )}
           </div>
           {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex justify-center gap-2 overflow-x-auto pb-2">
               {images.map((img, idx) => (
                 <button
                   key={idx}
@@ -503,6 +507,7 @@ export default function ProductDetailPage({ params }: Props) {
                     alt={`${product.name} - view ${idx + 1}`}
                     fill
                     className="object-cover"
+                    loading="eager"
                     sizes="80px"
                   />
                 </button>

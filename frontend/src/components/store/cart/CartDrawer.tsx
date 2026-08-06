@@ -3,6 +3,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart, useUI } from '@/store';
 import {
@@ -14,6 +15,12 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+
+const listSpring = {
+  type: 'spring' as const,
+  stiffness: 260,
+  damping: 26,
+};
 
 export const CartDrawer = () => {
   const { items, totalItems, totalPrice, removeItem, updateQuantity } =
@@ -35,27 +42,60 @@ export const CartDrawer = () => {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4">
+        <div className="flex-1 overflow-y-none px-4">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <ShoppingBag size={44} className="text-muted-foreground/40" />
-              <p className="mt-4 font-medium text-foreground">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={listSpring}
+              className="flex flex-col items-center justify-center py-16 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.5, rotate: -10 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              >
+                <ShoppingBag size={44} className="text-muted-foreground/40" />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+                className="mt-4 font-medium text-foreground"
+              >
                 Your cart is empty
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.16, duration: 0.3 }}
+                className="mt-1 text-sm text-muted-foreground"
+              >
                 Add some products to get started.
-              </p>
-              <Link href="/" onClick={toggleCartDrawer} className="mt-5">
-                <Button>Browse Products</Button>
-              </Link>
-            </div>
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.22, duration: 0.3 }}
+              >
+                <Link href="/" onClick={toggleCartDrawer} className="mt-5">
+                  <Button>Browse Products</Button>
+                </Link>
+              </motion.div>
+            </motion.div>
           ) : (
             <div className="space-y-3 pb-2">
-              {items.map((item) => (
-                <div
-                  key={item.productId}
-                  className="flex gap-3 rounded-xl border border-border bg-background p-3"
-                >
+              <AnimatePresence mode="popLayout">
+                {items.map((item, index) => (
+                  <motion.div
+                    key={item.productId}
+                    layout
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 40, scale: 0.95 }}
+                    transition={{ ...listSpring, delay: index * 0.05 }}
+                    className="flex gap-3 rounded-xl border border-border bg-background p-3"
+                  >
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                     <Image
                       src={item.image || '/placeholder-image.png'}
@@ -70,7 +110,18 @@ export const CartDrawer = () => {
                       {item.name}
                     </p>
                     <p className="mt-0.5 text-sm font-semibold text-green-700">
-                      ৳{(item.price * item.quantity).toLocaleString()}
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={item.price * item.quantity}
+                          initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.9 }}
+                          transition={listSpring}
+                          className="inline-block"
+                        >
+                          ৳{(item.price * item.quantity).toLocaleString()}
+                        </motion.span>
+                      </AnimatePresence>
                       {item.quantity > 1 && (
                         <span className="ml-1 text-xs font-normal text-muted-foreground">
                           (৳{item.price.toLocaleString()} × {item.quantity})
@@ -91,8 +142,9 @@ export const CartDrawer = () => {
                     )}
                     <div className="mt-2 flex items-center justify-between">
                       <div className="flex items-center rounded-lg border border-border">
-                        <button
+                        <motion.button
                           type="button"
+                          whileTap={{ scale: 0.8 }}
                           onClick={() =>
                             updateQuantity(item.productId, item.quantity - 1)
                           }
@@ -100,10 +152,19 @@ export const CartDrawer = () => {
                           aria-label="Decrease quantity"
                         >
                           <Minus size={13} />
-                        </button>
-                        <span className="w-8 text-center text-sm font-medium text-foreground">
-                          {item.quantity}
-                        </span>
+                        </motion.button>
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          <motion.span
+                            key={item.quantity}
+                            initial={{ opacity: 0, y: 6, scale: 0.7 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.7 }}
+                            transition={listSpring}
+                            className="w-8 text-center text-sm font-medium text-foreground"
+                          >
+                            {item.quantity}
+                          </motion.span>
+                        </AnimatePresence>
                         <button
                           type="button"
                           onClick={() =>
@@ -116,44 +177,70 @@ export const CartDrawer = () => {
                           <Plus size={13} />
                         </button>
                       </div>
-                      <button
+                      <motion.button
                         type="button"
+                        whileTap={{ scale: 0.8, rotate: -12 }}
                         onClick={() => removeItem(item.productId)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-red-50 hover:text-red-600"
                         aria-label={`Remove ${item.name}`}
                       >
                         <Trash2 size={15} />
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
 
-        {items.length > 0 && (
-          <SheetFooter className="border-t border-border">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="text-lg font-bold text-foreground">
-                ৳{totalPrice.toLocaleString()}
-              </span>
-            </div>
-            <Link
-              href="/checkout/cart"
-              onClick={toggleCartDrawer}
-              className="w-full"
+        <AnimatePresence>
+          {items.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={listSpring}
             >
-              <Button className="w-full" size="lg">
-                Proceed to Checkout
-              </Button>
-            </Link>
-            <p className="text-center text-xs text-muted-foreground">
-              Shipping and promo codes are applied at checkout.
-            </p>
-          </SheetFooter>
-        )}
+              <SheetFooter className="border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                      key={totalPrice}
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                      transition={listSpring}
+                      className="text-lg font-bold text-foreground"
+                    >
+                      ৳{totalPrice.toLocaleString()}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full"
+                >
+                  <Link
+                    href="/checkout/cart"
+                    onClick={toggleCartDrawer}
+                    className="w-full"
+                  >
+                    <Button className="w-full" size="lg">
+                      View Cart
+                    </Button>
+                  </Link>
+                </motion.div>
+                <p className="text-center text-xs text-muted-foreground">
+                  Shipping and promo codes are applied at checkout.
+                </p>
+              </SheetFooter>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </SheetContent>
     </Sheet>
   );

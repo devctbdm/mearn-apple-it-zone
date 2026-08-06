@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   AlertCircle,
   Banknote,
@@ -52,6 +53,12 @@ const DELIVERY_METHODS = [
 const GATEWAY_ICONS: Record<string, typeof CreditCard> = {
   sslcommerz: CreditCard,
   bkash: Smartphone,
+};
+
+const listSpring = {
+  type: 'spring' as const,
+  stiffness: 220,
+  damping: 28,
 };
 
 type DeliveryValue = (typeof DELIVERY_METHODS)[number]['value'];
@@ -261,12 +268,34 @@ const CheckoutContent = () => {
   // ---- Success screen ----
   if (placedOrder) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-          <CheckCircle2 size={56} className="mx-auto text-green-600" />
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35 }}
+        className="mx-auto max-w-7xl px-4 py-10"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={listSpring}
+          className="mx-auto max-w-xl rounded-2xl border border-green-200 bg-green-50 p-8 text-center"
+        >
+          <motion.div
+            initial={{ scale: 0.5, rotate: -12 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="inline-block"
+          >
+            <CheckCircle2 size={56} className="text-green-600" />
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.3 }}
+            className="mt-4 text-2xl font-bold text-gray-900"
+          >
             Order Placed Successfully!
-          </h1>
+          </motion.h1>
           <p className="mt-2 text-sm text-gray-600">
             Thank you for shopping with Apple IT Zone. Your order
             <span className="mx-1 font-semibold text-gray-900">
@@ -274,7 +303,12 @@ const CheckoutContent = () => {
             </span>
             has been received and is being processed.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center"
+          >
             <Link href="/accounts">
               <Button fullWidth>View My Orders</Button>
             </Link>
@@ -283,9 +317,9 @@ const CheckoutContent = () => {
                 Continue Shopping
               </Button>
             </Link>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     );
   }
 
@@ -293,7 +327,12 @@ const CheckoutContent = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          className="h-10 w-10 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"
+        />
       </div>
     );
   }
@@ -301,15 +340,44 @@ const CheckoutContent = () => {
   // ---- Not logged in ----
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <AlertCircle size={48} className="mx-auto text-amber-500" />
-          <h1 className="mt-4 text-xl font-bold text-gray-900">Checkout</h1>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35 }}
+        className="mx-auto max-w-7xl px-4 py-10"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={listSpring}
+          className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-8 text-center"
+        >
+          <motion.div
+            initial={{ scale: 0.5, rotate: -12 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="inline-block"
+          >
+            <AlertCircle size={48} className="text-amber-500" />
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.3 }}
+            className="mt-4 text-xl font-bold text-gray-900"
+          >
+            Checkout
+          </motion.h1>
           <p className="mt-2 text-sm text-gray-600">
             You need to be signed in to checkout. Your saved address and orders
             will be available in your account.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center"
+          >
             <Link href="/login">
               <Button fullWidth>Login</Button>
             </Link>
@@ -318,30 +386,53 @@ const CheckoutContent = () => {
                 Create Account
               </Button>
             </Link>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">Checkout</h1>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+      className="mx-auto max-w-7xl px-4 py-8"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+      >
+        <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
+          Checkout
+        </h1>
+      </motion.div>
 
       {/* Company notice */}
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.35 }}
+        className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      >
         <ShieldCheck size={20} className="mt-0.5 shrink-0 text-amber-600" />
         <p className="text-sm text-amber-800">
           <span className="font-semibold">Apple IT Zone</span> — if anything
           goes wrong with your order, we may cancel it at any time. You will be
           notified immediately and any payment will be refunded.
         </p>
-      </div>
+      </motion.div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ---------- Left: Address + Special requirements ---------- */}
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-center gap-2">
               <MapPin size={18} className="text-blue-600" />
               <h2 className="text-lg font-bold text-gray-900">
@@ -355,7 +446,12 @@ const CheckoutContent = () => {
                 <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
               </div>
             ) : addresses.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={listSpring}
+                className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center"
+              >
                 <MapPin size={32} className="mx-auto text-gray-300" />
                 <p className="mt-3 text-sm font-medium text-gray-700">
                   Please update your profile and fill up your address.
@@ -366,14 +462,19 @@ const CheckoutContent = () => {
                 <Link href="/accounts" className="mt-4 inline-block">
                   <Button size="sm">Go to Profile</Button>
                 </Link>
-              </div>
+              </motion.div>
             ) : (
               <>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {addresses.map((a) => (
-                    <button
+                  {addresses.map((a, index) => (
+                    <motion.button
                       key={a._id}
                       type="button"
+                      layout
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...listSpring, delay: 0.1 + index * 0.07 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => setSelectedAddressId(a._id)}
                       className={`rounded-xl border p-4 text-left transition ${
                         selectedAddress?._id === a._id
@@ -402,7 +503,7 @@ const CheckoutContent = () => {
                         </p>
                         <p>{a.country}</p>
                       </div>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
                 <Link
@@ -413,10 +514,15 @@ const CheckoutContent = () => {
                 </Link>
               </>
             )}
-          </div>
+          </motion.div>
 
           {/* Special requirements */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-center gap-2">
               <Tag size={18} className="text-blue-600" />
               <h2 className="text-lg font-bold text-gray-900">
@@ -433,12 +539,17 @@ const CheckoutContent = () => {
               className="mt-3"
               placeholder="e.g. Deliver after 6 PM, gift wrapping, call before delivery..."
             />
-          </div>
+          </motion.div>
         </div>
 
         {/* ---------- Right: Order Summary ---------- */}
         <div className="space-y-6 lg:col-span-1">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-4">
+          <motion.div
+            initial={{ opacity: 0, x: 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.12, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-4"
+          >
             <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
 
             {/* Coupon */}
@@ -446,48 +557,66 @@ const CheckoutContent = () => {
               <Label className="text-sm font-medium text-gray-700">
                 Coupon code
               </Label>
-              {appliedCoupon ? (
-                <div className="mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-semibold text-green-700">
-                      {appliedCoupon.code}
-                    </p>
-                    {appliedCoupon.description && (
-                      <p className="text-xs text-green-600">
-                        {appliedCoupon.description}
+              <AnimatePresence initial={false} mode="popLayout">
+                {appliedCoupon ? (
+                  <motion.div
+                    key="applied"
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={listSpring}
+                    className="mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2.5"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-green-700">
+                        {appliedCoupon.code}
                       </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAppliedCoupon(null);
-                      showToast('Coupon removed', 'info');
-                    }}
-                    className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                      {appliedCoupon.description && (
+                        <p className="text-xs text-green-600">
+                          {appliedCoupon.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        showToast('Coupon removed', 'info');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                    >
+                      <XCircle size={14} /> Remove
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="input"
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={listSpring}
+                    className="mt-2 flex gap-2"
                   >
-                    <XCircle size={14} /> Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={couponInput}
-                    onChange={(e) => setCouponInput(e.target.value)}
-                    placeholder="Enter coupon code"
-                    className="flex-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                  />
-                  <Button
-                    variant="outline"
-                    size="md"
-                    onClick={handleApplyCoupon}
-                    disabled={couponLoading || !couponInput.trim()}
-                  >
-                    {couponLoading ? '...' : 'Apply'}
-                  </Button>
-                </div>
-              )}
+                    <Input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value)}
+                      placeholder="Enter coupon code"
+                      className="flex-1"
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                    />
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Sub-total */}
@@ -500,26 +629,46 @@ const CheckoutContent = () => {
                   ৳{subtotal.toLocaleString()}
                 </span>
               </div>
-              {couponDiscount > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Coupon ({appliedCoupon?.code})
-                  </span>
-                  <span className="font-semibold text-green-600">
-                    -৳{couponDiscount.toLocaleString()}
-                  </span>
-                </div>
-              )}
-              {appliedCoupon?.type === 'free_shipping' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Coupon ({appliedCoupon.code})
-                  </span>
-                  <span className="font-semibold text-green-600">
-                    Free shipping
-                  </span>
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {couponDiscount > 0 && (
+                  <motion.div
+                    key="discount"
+                    initial={{ opacity: 0, height: 0, y: -4 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">
+                        Coupon ({appliedCoupon?.code})
+                      </span>
+                      <span className="font-semibold text-green-600">
+                        -৳{couponDiscount.toLocaleString()}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+                {appliedCoupon?.type === 'free_shipping' && (
+                  <motion.div
+                    key="free-shipping"
+                    initial={{ opacity: 0, height: 0, y: -4 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">
+                        Coupon ({appliedCoupon.code})
+                      </span>
+                      <span className="font-semibold text-green-600">
+                        Free shipping
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Delivery fee</span>
                 <span className="font-medium text-gray-900">
@@ -536,12 +685,16 @@ const CheckoutContent = () => {
                 Delivery method
               </Label>
               <div className="mt-2 space-y-2">
-                {DELIVERY_METHODS.map((d) => {
+                {DELIVERY_METHODS.map((d, index) => {
                   const active = deliveryMethod === d.value;
                   return (
-                    <button
+                    <motion.button
                       key={d.value}
                       type="button"
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ ...listSpring, delay: 0.24 + index * 0.06 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setDeliveryMethod(d.value)}
                       className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
                         active
@@ -564,7 +717,7 @@ const CheckoutContent = () => {
                       <span className="text-sm font-semibold text-gray-900">
                         {d.cost === 0 ? 'Free' : `৳${d.cost}`}
                       </span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -573,9 +726,18 @@ const CheckoutContent = () => {
             {/* Total */}
             <div className="mt-5 flex items-center justify-between border-t border-gray-200 pt-4">
               <span className="font-semibold text-gray-900">Total</span>
-              <span className="text-xl font-bold text-gray-900">
-                ৳{grandTotal.toLocaleString()}
-              </span>
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={grandTotal}
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                  transition={listSpring}
+                  className="text-xl font-bold text-gray-900"
+                >
+                  ৳{grandTotal.toLocaleString()}
+                </motion.span>
+              </AnimatePresence>
             </div>
 
             {/* Terms */}
@@ -611,42 +773,61 @@ const CheckoutContent = () => {
               </span>
             </label>
 
-            {orderError && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                {orderError}
-              </p>
-            )}
+            <AnimatePresence>
+              {orderError && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0, y: -4 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  className="mt-3 overflow-hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
+                >
+                  {orderError}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
-            <Button
-              fullWidth
-              size="lg"
-              className="mt-4"
-              loading={placing}
-              onClick={handlePlaceOrder}
-              disabled={items.length === 0}
-            >
-              Confirm Order
-            </Button>
-          </div>
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                fullWidth
+                size="lg"
+                className="mt-4"
+                loading={placing}
+                onClick={handlePlaceOrder}
+                disabled={items.length === 0}
+              >
+                Confirm Order
+              </Button>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
 
       {/* ---------- Bottom: Payment + Delivery ---------- */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, ...listSpring }}
+          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2"
+        >
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-blue-600" />
             <h2 className="text-lg font-bold text-gray-900">Payment Method</h2>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {gateways.map((p) => {
+            {gateways.map((p, index) => {
               const value = p.name.toLowerCase();
               const active = paymentMethod === value;
               const Icon = GATEWAY_ICONS[value] || Wallet;
               return (
-                <button
+                <motion.button
                   key={p.name}
                   type="button"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...listSpring, delay: 0.16 + index * 0.06 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setPaymentMethod(value)}
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                     active
@@ -668,7 +849,7 @@ const CheckoutContent = () => {
                       </span>
                     )}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
             {gateways.length === 0 && (
@@ -696,10 +877,15 @@ const CheckoutContent = () => {
                 : `৳${deliveryCost.toLocaleString()}`}
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* ---------- Bottom: Selected products ---------- */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-1">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.16, ...listSpring }}
+          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-1"
+        >
           <h2 className="text-lg font-bold text-gray-900">
             Selected Products ({totalItems})
           </h2>
@@ -715,35 +901,45 @@ const CheckoutContent = () => {
             </p>
           ) : (
             <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
-              {items.map((item) => (
-                <div key={item.productId} className="flex items-center gap-3">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                    <Image
-                      src={item.image || '/placeholder-image.png'}
-                      alt={item.name}
-                      fill
-                      className="object-contain"
-                      sizes="56px"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-medium text-gray-900">
-                      {item.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      ৳{item.price.toLocaleString()} × {item.quantity}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    ৳{(item.price * item.quantity).toLocaleString()}
-                  </span>
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {items.map((item, index) => (
+                  <motion.div
+                    key={item.productId}
+                    layout
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ ...listSpring, delay: 0.06 * index }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      <Image
+                        src={item.image || '/placeholder-image.png'}
+                        alt={item.name}
+                        fill
+                        className="object-contain"
+                        sizes="56px"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-medium text-gray-900">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ৳{item.price.toLocaleString()} × {item.quantity}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">
+                      ৳{(item.price * item.quantity).toLocaleString()}
+                    </span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
