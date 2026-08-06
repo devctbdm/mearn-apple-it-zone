@@ -288,6 +288,13 @@ export const paymentApi = {
       postcode?: string;
     };
   }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string }>('/payment/initiate', data),
+  validate: (data: {
+    tran_id: string;
+    val_id?: string;
+    status?: string;
+    amount?: number;
+    card_type?: string;
+  }) => api.post<{ success: boolean; valid: boolean; order?: string }>('/payment/validate', data),
 };
 
 export type ActiveTeamMember = {

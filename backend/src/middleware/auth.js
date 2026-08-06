@@ -1,5 +1,3 @@
-// backend/src/middleware/auth.js
-
 import jwt from 'jsonwebtoken';
 import { mongoose } from '../config/database.js';
 
@@ -45,9 +43,7 @@ export const protect = async (req, res, next) => {
 export const adminOnly = (req, res, next) => {
   if (
     req.user &&
-    (req.user.role === 'admin' ||
-      req.user.role === 'super_admin' ||
-      req.user.role === 'manager')
+    (req.user.role === 'admin' || req.user.role === 'super_admin' || req.user.role === 'manager')
   ) {
     next();
   } else {

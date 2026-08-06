@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, XCircle, Ban, Loader2 } from 'lucide-react';
+import { paymentApi } from '@/lib/api';
 
 const STYLES = {
   success: {
@@ -36,11 +38,32 @@ const STYLES = {
 export function PaymentResult({ kind }: { kind: keyof typeof STYLES }) {
   const params = useSearchParams();
   const tranId = params.get('tran_id') || '';
+  const [validating, setValidating] = useState(false);
   const style = STYLES[kind];
   const Icon = style.icon;
 
+  useEffect(() => {
+    if (!tranId) return;
+    setValidating(true);
+    paymentApi
+      .validate({
+        tran_id: tranId,
+        val_id: params.get('val_id') || undefined,
+        status: params.get('status') || undefined,
+        amount: params.get('amount') ? Number(params.get('amount')) : undefined,
+        card_type: params.get('card_type') || undefined,
+      })
+      .catch(() => {})
+      .finally(() => setValidating(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tranId]);
+
+  if (validating) {
+    return <PaymentResultLoading />;
+  }
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
+    <div className="min-h-[80vh] mx-auto max-w-7xl px-4 py-10 flex items-center justify-center">
       <div
         className={`mx-auto max-w-xl rounded-2xl border ${style.border} ${style.bg} p-8 text-center`}
       >
@@ -73,7 +96,7 @@ export function PaymentResult({ kind }: { kind: keyof typeof STYLES }) {
 
 export function PaymentResultLoading() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="flex min-h-[80vh] items-center justify-center">
       <div className="flex items-center gap-2 text-gray-500">
         <Loader2 className="h-5 w-5 animate-spin" />
         Checking payment status...
