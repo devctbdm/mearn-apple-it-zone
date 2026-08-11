@@ -29,6 +29,11 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: [0, 'Discount price cannot be negative'],
     },
+    costPrice: {
+      type: Number,
+      default: 0,
+      min: [0, 'Cost price cannot be negative'],
+    },
     sku: {
       type: String,
       trim: true,

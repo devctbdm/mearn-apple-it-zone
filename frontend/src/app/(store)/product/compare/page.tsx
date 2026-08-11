@@ -647,7 +647,7 @@ export default function ComparePage() {
                         {row.values.map((v, vi) => (
                           <td
                             key={vi}
-                            className="border-l border-gray-200 px-4 py-3 text-gray-800"
+                            className="border-l border-gray-200 px-4 py-3 text-gray-800 whitespace-pre-line"
                           >
                             {v}
                           </td>

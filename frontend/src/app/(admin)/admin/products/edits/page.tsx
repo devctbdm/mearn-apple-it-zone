@@ -57,6 +57,7 @@ type ProductFormValue = {
   categories: string[];
   price: number;
   regularPrice: number;
+  costPrice: number;
   stock: number;
   status: Status;
   featured: boolean;
@@ -126,6 +127,7 @@ export default function EditsProductsPage() {
     categories: [],
     price: 0,
     regularPrice: 0,
+    costPrice: 0,
     stock: 0,
     status: "active",
     featured: false,
@@ -164,6 +166,7 @@ export default function EditsProductsPage() {
           categories: p.categories?.length ? p.categories : (p.category ? [p.category] : []),
           price: p.discountPrice > 0 ? p.discountPrice : p.price || 0,
           regularPrice: p.price || 0,
+          costPrice: p.costPrice || 0,
           stock: p.stock || 0,
           status: p.status || "active",
           featured: p.featured || false,
@@ -210,6 +213,7 @@ export default function EditsProductsPage() {
       }
       fd.append("category", form.categories[0]);
       fd.append("categories", JSON.stringify(form.categories));
+      fd.append("costPrice", String(Number(form.costPrice) || 0));
       fd.append("stock", String(form.stock));
       fd.append("status", form.status);
       fd.append("featured", String(form.featured));
@@ -358,6 +362,18 @@ function ProductForm({
           <p className="text-xs text-muted-foreground">Original price (shown crossed out)</p>
         </div>
         <div className="space-y-1.5">
+          <Label>Buy Price ($)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={value.costPrice}
+            placeholder="What you pay to buy it"
+            onChange={(e) => onChange({ costPrice: Number(e.target.value) })}
+          />
+          <p className="text-xs text-muted-foreground">Purchase cost (hidden from customers)</p>
+        </div>
+        <div className="space-y-1.5">
           <Label>Stock</Label>
           <Input
             type="number"
@@ -366,6 +382,11 @@ function ProductForm({
             onChange={(e) => onChange({ stock: Number(e.target.value) })}
           />
         </div>
+        <ProfitSummary
+          sellPrice={Number(value.price) || 0}
+          regularPrice={Number(value.regularPrice) || 0}
+          costPrice={Number(value.costPrice) || 0}
+        />
         <div className="col-span-2 space-y-1.5">
           <Label>Status</Label>
           <Select value={value.status} onValueChange={(v) => onChange({ status: v as Status })}>
@@ -426,6 +447,85 @@ function ProductForm({
         value={value.content}
         onChange={(content) => onChange({ content })}
       />
+    </div>
+  );
+}
+
+/* --------------------------- Profit calculator --------------------------- */
+
+function ProfitSummary({
+  sellPrice,
+  regularPrice,
+  costPrice,
+}: {
+  sellPrice: number;
+  regularPrice: number;
+  costPrice: number;
+}) {
+  const profit = sellPrice - costPrice;
+  const hasCost = costPrice > 0;
+  const margin = hasCost && sellPrice > 0 ? (profit / sellPrice) * 100 : null;
+  const isLoss = profit < 0;
+
+  return (
+    <div className="col-span-2 rounded-md border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Profit per unit
+          </div>
+          <div
+            className={`text-xl font-bold ${
+              isLoss
+                ? "text-destructive"
+                : profit > 0
+                  ? "text-emerald-600"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {profit > 0 ? "+" : ""}
+            ${profit.toFixed(2)}
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs">
+          <div>
+            <span className="text-muted-foreground">Buy: </span>
+            <span className="font-medium">${costPrice.toFixed(2)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Sell: </span>
+            <span className="font-medium">${sellPrice.toFixed(2)}</span>
+          </div>
+          {margin !== null && (
+            <div>
+              <span className="text-muted-foreground">Margin: </span>
+              <span
+                className={`font-medium ${
+                  isLoss ? "text-destructive" : "text-emerald-600"
+                }`}
+              >
+                {margin.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      {!hasCost ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Enter a buy price to see your profit on each sale.
+        </p>
+      ) : isLoss ? (
+        <p className="mt-1 text-xs text-destructive">
+          You're selling below your buy price — this item loses{" "}
+          ${Math.abs(profit).toFixed(2)} per unit.
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {regularPrice > sellPrice
+            ? "Customers see the crossed-out regular price as the original."
+            : "Profit = sell price − buy price."}
+        </p>
+      )}
     </div>
   );
 }
@@ -653,18 +753,19 @@ function SpecsEditor({
             </div>
             <div className="space-y-2 p-3">
               {g.fields.map((f) => (
-                <div key={f.id} className="grid grid-cols-12 gap-2">
+                <div key={f.id} className="grid grid-cols-12 gap-2 items-start">
                   <Input
                     className="col-span-4 h-8"
                     value={f.label}
                     onChange={(e) => updateField(g.id, f.id, { label: e.target.value })}
                     placeholder="Label (e.g. Size)"
                   />
-                  <Input
-                    className="col-span-7 h-8"
+                  <Textarea
+                    className="col-span-7 min-h-9 resize-none"
+                    rows={1}
                     value={f.value}
                     onChange={(e) => updateField(g.id, f.id, { value: e.target.value })}
-                    placeholder="Value (e.g. 6.7 inch)"
+                    placeholder="Value (e.g. 6.7 inch) — press Enter for a new line"
                   />
                   <Button
                     type="button"

@@ -836,3 +836,54 @@ export const promoApi = {
       subtotal,
     }),
 };
+
+export type SmsSettings = {
+  apiKey: string;
+  senderId: string;
+  signature: string;
+  enabled: boolean;
+};
+
+export type SmsBalance = {
+  status_code?: number;
+  message?: string;
+  data?: { balance?: string | number };
+};
+
+export type SmsLog = {
+  _id: string;
+  to: string[];
+  message: string;
+  segments: number;
+  status: 'sent' | 'failed';
+  providerStatus: string;
+  providerMessage: string;
+  errorCode: string;
+  createdAt: string;
+};
+
+export const smsApi = {
+  getSettings: () => api.get<{ success: boolean; settings: SmsSettings }>('/sms/settings'),
+
+  updateSettings: (data: Partial<SmsSettings>) =>
+    api.put<{ success: boolean; settings: SmsSettings }>('/sms/settings', data),
+
+  getBalance: () => api.get<{ success: boolean; balance: SmsBalance }>('/sms/balance'),
+
+  send: (data: { numbers: string; message: string; senderId?: string }) =>
+    api.post<{
+      success: boolean;
+      log: SmsLog;
+      provider: Record<string, any>;
+      numbers: string[];
+    }>('/sms/send', data),
+
+  getLogs: (params?: { page?: number; limit?: number }) =>
+    api.get<{
+      success: boolean;
+      logs: SmsLog[];
+      total: number;
+      page: number;
+      pages: number;
+    }>('/sms/logs', { params }),
+};

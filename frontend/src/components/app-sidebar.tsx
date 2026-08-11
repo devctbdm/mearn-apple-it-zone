@@ -30,6 +30,7 @@ import {
   Images,
   User,
   HandCoins,
+  MessageSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -107,8 +108,9 @@ const data = {
     {
       title: 'Payments',
       url: '/admin/payments',
-      icon: <HandCoins />
+      icon: <HandCoins />,
     },
+    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
 
     {
       title: 'Settings',

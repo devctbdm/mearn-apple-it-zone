@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/store';
 import { SearchBar } from '@/components/store/layout/SearchBar';
+import { useUI } from '@/store';
 
 import { useState, useEffect } from 'react';
 import Logo from '@/components/store/logo/Logo';
@@ -12,6 +13,7 @@ import Logo from '@/components/store/logo/Logo';
 const TopNav = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const { toggleCartDrawer } = useUI();
 
   const { totalItems } = useCart();
 
@@ -39,7 +41,7 @@ const TopNav = () => {
           <Button
             type="button"
             className="relative h-10 w-10 rounded-full p-0 hover:scale-105 transition-transform"
-            onClick={() => console.log('Open cart')}
+            onClick={toggleCartDrawer}
           >
             <ShoppingCart className="h-4 w-4" />
 

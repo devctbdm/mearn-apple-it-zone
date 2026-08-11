@@ -631,18 +631,6 @@ export default function ProductDetailPage({ params }: Props) {
                 </span>
                 <span className="text-green-700">Online / Cash Payment</span>
               </div>
-              <div className="rounded-lg border border-gray-100 px-3 py-2.5">
-                <p className="font-medium text-gray-800">
-                  ৳{monthlyEmi.toLocaleString()}
-                  <span className="text-gray-500 font-normal">/month</span>
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {hasDiscount && (
-                    <>Regular Price: ৳{product.price.toLocaleString()} · </>
-                  )}
-                  0% EMI for up to 12 Months***
-                </p>
-              </div>
             </div>
           </div>
 
@@ -721,7 +709,7 @@ export default function ProductDetailPage({ params }: Props) {
                             <dt className="w-1/2 font-medium text-gray-600 capitalize">
                               {item.label.replace(/-/g, ' ')}
                             </dt>
-                            <dd className="w-1/2 text-gray-800">
+                            <dd className="w-1/2 text-gray-800 whitespace-pre-line">
                               {item.value}
                             </dd>
                           </div>

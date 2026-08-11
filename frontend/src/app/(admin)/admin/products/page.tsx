@@ -81,6 +81,7 @@ type BackendProduct = {
   description: string;
   price: number;
   discountPrice?: number;
+  costPrice?: number;
   category: string;
   categories?: string[];
   stock: number;
@@ -100,6 +101,7 @@ type Product = {
   category: string;
   categories?: string[];
   price: number;
+  costPrice?: number;
   stock: number;
   status: Status;
   featured: boolean;
@@ -157,6 +159,7 @@ export default function AdminProductsPage() {
             category: p.category,
             categories: p.categories || (p.category ? [p.category] : []),
             price: p.price,
+            costPrice: p.costPrice || 0,
             stock: p.stock,
             status: p.status,
             featured: p.featured,
@@ -341,6 +344,7 @@ export default function AdminProductsPage() {
                   <TableHead>Product</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-center">Featured</TableHead>
@@ -350,7 +354,7 @@ export default function AdminProductsPage() {
               <TableBody>
                 {paged.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                       No products found.
                     </TableCell>
                   </TableRow>
@@ -393,6 +397,21 @@ export default function AdminProductsPage() {
                       </TableCell>
                       <TableCell>{(p.categories || [p.category]).join(", ")}</TableCell>
                       <TableCell className="text-right">${p.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={
+                            (p.costPrice || 0) > 0 && p.price - (p.costPrice || 0) < 0
+                              ? "font-medium text-destructive"
+                              : (p.costPrice || 0) > 0
+                                ? "font-medium text-emerald-600"
+                                : "text-muted-foreground"
+                          }
+                        >
+                          {(p.costPrice || 0) > 0
+                            ? `${p.price - (p.costPrice || 0) > 0 ? "+" : ""}$${(p.price - (p.costPrice || 0)).toFixed(2)}`
+                            : "—"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">{p.stock}</TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant(p.status)}>{statusLabels[p.status]}</Badge>
@@ -484,6 +503,11 @@ export default function AdminProductsPage() {
                 <Info label="Category" value={(viewProduct.categories || [viewProduct.category]).join(", ")} />
                 <Info label="Status" value={statusLabels[viewProduct.status]} />
                 <Info label="Price" value={`$${viewProduct.price.toFixed(2)}`} />
+                <Info label="Buy Price" value={`$${(viewProduct.costPrice || 0).toFixed(2)}`} />
+                <Info
+                  label="Profit"
+                  value={`${viewProduct.price - (viewProduct.costPrice || 0) >= 0 ? "+" : ""}$${(viewProduct.price - (viewProduct.costPrice || 0)).toFixed(2)}`}
+                />
                 <Info label="Stock" value={String(viewProduct.stock)} />
                 <Info label="Created" value={new Date(viewProduct.createdAt).toLocaleDateString()} />
                 <Info label="Featured" value={viewProduct.featured ? "Yes" : "No"} />
@@ -515,7 +539,7 @@ export default function AdminProductsPage() {
                           {section.items.map((item, j) => (
                             <div key={j} className="grid grid-cols-3 gap-2 text-xs">
                               <span className="text-muted-foreground">{item.label}</span>
-                              <span className="col-span-2">{item.value}</span>
+                              <span className="col-span-2 whitespace-pre-line">{item.value}</span>
                             </div>
                           ))}
                         </div>

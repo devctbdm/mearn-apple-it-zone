@@ -24,6 +24,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -117,6 +118,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/sms', smsRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

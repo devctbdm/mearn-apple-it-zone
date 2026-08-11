@@ -112,7 +112,7 @@ export const getProductsByCategory = async (req, res) => {
 // @access  Private/Admin
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, productCode, content, categories } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, specifications, sku, productCode, content, categories } = req.body;
 
     // Handle uploaded images
     const imageUrls = req.files ? req.files.map((file) => file.path) : [];
@@ -140,6 +140,7 @@ export const createProduct = async (req, res) => {
       description,
       price,
       discountPrice: discountPrice || 0,
+      costPrice: costPrice || 0,
       category: primaryCategory || category,
       categories: parsedCategories,
       stock,
@@ -176,7 +177,7 @@ export const updateProduct = async (req, res) => {
     }
 
     // Update fields
-    const { name, description, price, discountPrice, category, stock, status, featured, specifications, sku, productCode, content, categories } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, specifications, sku, productCode, content, categories } = req.body;
     if (name) {
       product.name = name;
       product.slug = name.toLowerCase().replace(/\s+/g, '-');
@@ -189,6 +190,9 @@ export const updateProduct = async (req, res) => {
     }
     if (discountPrice !== undefined) {
       product.discountPrice = discountPrice;
+    }
+    if (costPrice !== undefined) {
+      product.costPrice = costPrice;
     }
     if (category) {
       product.category = category;

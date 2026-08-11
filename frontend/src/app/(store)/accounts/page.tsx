@@ -35,6 +35,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import { motion } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -97,6 +108,27 @@ type WishItem = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const ORDERS_PER_PAGE = 5;
+
+function pageItems(
+  current: number,
+  total: number
+): (number | 'ellipsis-l' | 'ellipsis-r')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | 'ellipsis-l' | 'ellipsis-r')[] = [1];
+  if (current > 3) pages.push('ellipsis-l');
+  for (
+    let p = Math.max(2, current - 1);
+    p <= Math.min(total - 1, current + 1);
+    p++
+  ) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push('ellipsis-r');
+  pages.push(total);
+  return pages;
+}
 
 const mapBackendAddress = (a: SavedAddress): Address => ({
   id: a._id,
@@ -172,7 +204,10 @@ function AccountContent() {
     phone: user?.phone || '',
   });
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [orderPage, setOrderPage] = useState(1);
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
   const { wishlist: wishItems, removeFromWishlist } = useWishlist();
   const { addItem } = useCart();
   const wishlist: WishItem[] = wishItems.map((w) => ({
@@ -203,7 +238,8 @@ function AccountContent() {
       .then(({ data }) => {
         if (data.success) setAddresses(data.addresses.map(mapBackendAddress));
       })
-      .catch(() => toast.error('Failed to load addresses'));
+      .catch(() => toast.error('Failed to load addresses'))
+      .finally(() => setAddressesLoading(false));
   }, []);
 
   useEffect(() => {
@@ -228,8 +264,24 @@ function AccountContent() {
           );
         }
       })
-      .catch(() => toast.error('Failed to load orders'));
+      .catch(() => toast.error('Failed to load orders'))
+      .finally(() => setOrdersLoading(false));
   }, []);
+
+  const totalOrderPages = Math.max(
+    1,
+    Math.ceil(orders.length / ORDERS_PER_PAGE)
+  );
+  const paginatedOrders = orders.slice(
+    (orderPage - 1) * ORDERS_PER_PAGE,
+    orderPage * ORDERS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setOrderPage((p) =>
+      Math.min(p, Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE)))
+    );
+  }, [orders]);
 
   const stats = useMemo(() => {
     const totalSpent = orders
@@ -397,14 +449,24 @@ function AccountContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {orders.length === 0 && (
+                {ordersLoading ? (
+                  <OrdersSkeleton />
+                ) : orders.length === 0 ? (
                   <EmptyState
                     Icon={ShoppingBag}
                     title="No orders yet"
                     hint="Your orders will appear here."
                   />
-                )}
-                {orders.map((o) => {
+                ) : (
+                  <>
+                    <motion.div
+                      key={orderPage}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="space-y-3"
+                    >
+                      {paginatedOrders.map((o) => {
                   const meta = statusMeta[o.status];
                   const Icon = meta.Icon;
                   return (
@@ -475,9 +537,66 @@ function AccountContent() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  );
-                })}
+                      </div>
+                      );
+                    })}
+                    </motion.div>
+
+                    {totalOrderPages > 1 && (
+                      <Pagination className="pt-1">
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setOrderPage((p) => Math.max(1, p - 1));
+                              }}
+                              className={
+                                orderPage === 1
+                                  ? 'pointer-events-none opacity-50'
+                                  : ''
+                              }
+                            />
+                          </PaginationItem>
+                          {pageItems(orderPage, totalOrderPages).map((p, i) =>
+                            p === 'ellipsis-l' || p === 'ellipsis-r' ? (
+                              <PaginationItem key={`${p}-${i}`}>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            ) : (
+                              <PaginationItem key={p}>
+                                <PaginationLink
+                                  isActive={p === orderPage}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setOrderPage(p);
+                                  }}
+                                >
+                                  {p}
+                                </PaginationLink>
+                              </PaginationItem>
+                            )
+                          )}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setOrderPage((p) =>
+                                  Math.min(totalOrderPages, p + 1)
+                                );
+                              }}
+                              className={
+                                orderPage === totalOrderPages
+                                  ? 'pointer-events-none opacity-50'
+                                  : ''
+                              }
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -577,7 +696,9 @@ function AccountContent() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {addresses.length === 0 ? (
+                {addressesLoading ? (
+                  <AddressesSkeleton />
+                ) : addresses.length === 0 ? (
                   <EmptyState
                     Icon={MapPin}
                     title="No addresses saved"
@@ -789,6 +910,58 @@ function EmptyState({
       <Icon className="h-10 w-10 text-muted-foreground" />
       <p className="mt-3 font-medium">{title}</p>
       <p className="text-sm text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[0, 1].map((i) => (
+        <div key={i} className="rounded-lg border bg-card p-4">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-4 w-14" />
+          </div>
+          <Skeleton className="mt-2 h-3 w-28" />
+          <Skeleton className="mt-2 h-3 w-40" />
+          <div className="mt-3 space-y-2">
+            {[0, 1].map((j) => (
+              <div
+                key={j}
+                className="flex items-center gap-3 rounded-md border p-2"
+              >
+                <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+                <Skeleton className="h-3 w-12" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AddressesSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="rounded-lg border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <Skeleton className="mt-4 h-3 w-full" />
+          <Skeleton className="mt-2 h-3 w-4/5" />
+          <Skeleton className="mt-2 h-3 w-3/5" />
+          <Skeleton className="mt-2 h-3 w-2/3" />
+          <Skeleton className="mt-4 h-8 w-full" />
+        </div>
+      ))}
     </div>
   );
 }
