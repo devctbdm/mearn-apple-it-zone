@@ -837,6 +837,27 @@ export const promoApi = {
     }),
 };
 
+export type MaintenanceStatus = {
+  enabled: boolean;
+  message: string;
+  endAt: string | null;
+  contactEmail: string;
+  contactPhone: string;
+};
+
+export const maintenanceApi = {
+  getStatus: () =>
+    api.get<{ success: boolean; maintenance: MaintenanceStatus }>(
+      '/maintenance/status'
+    ),
+
+  update: (data: Partial<MaintenanceStatus>) =>
+    api.put<{ success: boolean; maintenance: MaintenanceStatus }>(
+      '/maintenance',
+      data
+    ),
+};
+
 export type SmsSettings = {
   apiKey: string;
   senderId: string;
@@ -845,9 +866,9 @@ export type SmsSettings = {
 };
 
 export type SmsBalance = {
-  status_code?: number;
-  message?: string;
-  data?: { balance?: string | number };
+  success: boolean;
+  balance: number | null;
+  raw?: Record<string, unknown>;
 };
 
 export type SmsLog = {
@@ -868,13 +889,14 @@ export const smsApi = {
   updateSettings: (data: Partial<SmsSettings>) =>
     api.put<{ success: boolean; settings: SmsSettings }>('/sms/settings', data),
 
-  getBalance: () => api.get<{ success: boolean; balance: SmsBalance }>('/sms/balance'),
+  getBalance: () => api.get<SmsBalance>('/sms/balance'),
 
   send: (data: { numbers: string; message: string; senderId?: string }) =>
     api.post<{
       success: boolean;
       log: SmsLog;
       provider: Record<string, any>;
+      providerMessage: string;
       numbers: string[];
     }>('/sms/send', data),
 

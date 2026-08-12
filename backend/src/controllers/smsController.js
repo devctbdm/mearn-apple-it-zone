@@ -1,23 +1,8 @@
 import { getSmsSetting } from '../models/SmsSetting.js';
 import SmsLog from '../models/SmsLog.js';
+import { sendSms as sendSmsService } from '../services/smsService.js';
 
 const BULKSMS_BASE = 'https://bulksmsbd.net/api';
-
-// Normalize a BD number: 01712345678 -> 8801712345678, keeps 8801xxxxxxxxx as-is
-function normalizeNumber(num) {
-  let n = String(num).replace(/[^\d]/g, '');
-  if (!n) return '';
-  if (n.startsWith('880')) return n;
-  if (n.startsWith('0') && n.length === 11) return `88${n}`;
-  return n;
-}
-
-function parseNumbers(input) {
-  if (Array.isArray(input)) {
-    return [...new Set(input.map(normalizeNumber).filter(Boolean))];
-  }
-  return [...new Set(String(input).split(/[\s,;]+/).map(normalizeNumber).filter(Boolean))];
-}
 
 // @desc    Get SMS settings (admin only)
 // @route   GET /api/sms/settings
@@ -77,7 +62,13 @@ export const getBalance = async (req, res) => {
     const url = `${BULKSMS_BASE}/getBalanceApi?api_key=${encodeURIComponent(setting.apiKey)}`;
     const resp = await fetch(url);
     const data = await resp.json();
-    res.json({ success: true, balance: data });
+    const balance =
+      data?.balance ?? data?.data?.balance ?? data?.currentBalance ?? null;
+    res.json({
+      success: true,
+      balance: balance != null && balance !== '' ? Number(balance) : null,
+      raw: data,
+    });
   } catch (error) {
     console.error('SMS Balance Error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -96,66 +87,24 @@ export const sendSms = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message cannot be empty' });
     }
 
-    const setting = await getSmsSetting();
-    if (!setting.apiKey) {
+    const result = await sendSmsService({ numbers, message, senderId });
+
+    if (result.skipped) {
+      return res.status(400).json({ success: false, message: result.reason });
+    }
+    if (result.numbers.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'API key not configured. Save it in SMS settings first.',
+        message: result.reason || 'No valid Bangladesh phone numbers provided',
       });
     }
-    if (!setting.enabled) {
-      return res.status(400).json({
-        success: false,
-        message: 'SMS sending is disabled. Enable it in SMS settings.',
-      });
-    }
-
-    const toList = parseNumbers(numbers);
-    if (toList.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid Bangladesh phone numbers provided (e.g. 017xxxxxxxx or 88017xxxxxxxx).',
-      });
-    }
-
-    const useSender = (senderId && String(senderId).trim()) || setting.senderId || '';
-    let fullMessage = String(message).trim();
-    if (setting.signature) {
-      fullMessage = `${fullMessage}\n${setting.signature}`;
-    }
-
-    const body = new URLSearchParams();
-    body.append('api_key', setting.apiKey);
-    if (useSender) body.append('senderid', useSender);
-    body.append('number', toList.join(','));
-    body.append('message', fullMessage);
-
-    const resp = await fetch(`${BULKSMS_BASE}/smsapi`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
-    const data = await resp.json();
-
-    const sent = data.status === 'SMS_SENT' || data.status === 'SUCCESS' || String(data.status_code) === '202';
-
-    const log = await SmsLog.create({
-      to: toList,
-      message: fullMessage,
-      segments: Math.max(1, Math.ceil(fullMessage.length / 160)),
-      status: sent ? 'sent' : 'failed',
-      providerStatus: data.status || '',
-      providerMessage: data.message || '',
-      errorCode: String(data.status_code || ''),
-      raw: data,
-      sentBy: req.user?._id,
-    });
 
     res.json({
-      success: sent,
-      log,
-      provider: data,
-      numbers: toList,
+      success: result.success,
+      log: result.log,
+      provider: result.log?.raw || {},
+      providerMessage: result.log?.providerMessage || '',
+      numbers: result.numbers,
     });
   } catch (error) {
     console.error('SMS Send Error:', error);

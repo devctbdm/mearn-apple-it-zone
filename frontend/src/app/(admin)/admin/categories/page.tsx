@@ -1,5 +1,5 @@
-"use client";
-import { useState, useMemo, useRef, useEffect } from "react";
+'use client';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -21,12 +21,12 @@ import {
   ArrowUp,
   ArrowDown,
   Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,21 +44,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { toast } from "sonner";
-import Image from "next/image";
-import { categoryApi, type Category, type CategoryForm } from "@/lib/api";
-
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import Image from 'next/image';
+import { categoryApi, type Category, type CategoryForm } from '@/lib/api';
 
 function normalize(c: Category): Category & { productCount: number } {
   return { ...c, productCount: (c as any).productCount ?? 0 };
@@ -78,31 +77,33 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
-  name: "",
-  slug: "",
-  description: "",
-  parentId: "root",
+  name: '',
+  slug: '',
+  description: '',
+  parentId: 'root',
   active: true,
-  imageUrl: "",
-  bannerUrl: "",
+  imageUrl: '',
+  bannerUrl: '',
   featured: false,
   sortOrder: 0,
-  color: "#0071e3",
+  color: '#0071e3',
 };
 
 function slugify(v: string) {
   return v
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<(Category & { productCount: number })[]>([]);
+  const [categories, setCategories] = useState<
+    (Category & { productCount: number })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -122,7 +123,11 @@ export default function CategoriesPage() {
       const rootIds = items.filter((c) => !c.parentId).map((c) => c._id);
       setExpanded(new Set(rootIds));
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to load categories");
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Failed to load categories'
+      );
     } finally {
       setLoading(false);
     }
@@ -151,7 +156,7 @@ export default function CategoriesPage() {
     }
     for (const [, list] of m) {
       list.sort(
-        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
       );
     }
     return m;
@@ -184,7 +189,7 @@ export default function CategoriesPage() {
       categories
         .filter((c) => c.featured && c.active)
         .sort((a, b) => a.sortOrder - b.sortOrder),
-    [categories],
+    [categories]
   );
 
   function toggle(id: string) {
@@ -204,7 +209,7 @@ export default function CategoriesPage() {
       : 1;
     setForm({
       ...emptyForm,
-      parentId: parentId ?? "root",
+      parentId: parentId ?? 'root',
       sortOrder: nextOrder,
     });
     setDialogOpen(true);
@@ -216,7 +221,7 @@ export default function CategoriesPage() {
       name: cat.name,
       slug: cat.slug,
       description: cat.description,
-      parentId: cat.parentId ?? "root",
+      parentId: cat.parentId ?? 'root',
       active: cat.active,
       imageUrl: cat.imageUrl,
       bannerUrl: cat.bannerUrl,
@@ -244,7 +249,7 @@ export default function CategoriesPage() {
       ? new Set([editing._id, ...getDescendantIds(editing._id)])
       : new Set<string>();
     const list: { id: string; label: string }[] = [
-      { id: "root", label: "— Root (no parent) —" },
+      { id: 'root', label: '— Root (no parent) —' },
     ];
     const byId = new Map(categories.map((c) => [c._id, c]));
     const pathOf = (c: Category): string => {
@@ -254,7 +259,7 @@ export default function CategoriesPage() {
         parts.unshift(cur.name);
         cur = cur.parentId ? byId.get(cur.parentId) : undefined;
       }
-      return parts.join(" / ");
+      return parts.join(' / ');
     };
     for (const c of categories) {
       if (blocked.has(c._id)) continue;
@@ -274,33 +279,33 @@ export default function CategoriesPage() {
   }
 
   async function handleImagePick(
-    kind: "imageUrl" | "bannerUrl",
-    file: File | null,
+    kind: 'imageUrl' | 'bannerUrl',
+    file: File | null
   ) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file");
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
       return;
     }
     if (file.size > 4 * 1024 * 1024) {
-      toast.error("Image must be under 4MB");
+      toast.error('Image must be under 4MB');
       return;
     }
     const dataUrl = await readFileToDataUrl(file);
     setForm((f) => ({ ...f, [kind]: dataUrl }));
-    if (kind === "imageUrl") imageFileRef.current = file;
+    if (kind === 'imageUrl') imageFileRef.current = file;
     else bannerFileRef.current = file;
-    toast.success("Image loaded");
+    toast.success('Image loaded');
   }
 
   async function handleSave() {
     const name = form.name.trim();
     if (!name) {
-      toast.error("Name is required");
+      toast.error('Name is required');
       return;
     }
     const slug = (form.slug.trim() || slugify(name)).toLowerCase();
-    const parentId = form.parentId === "root" ? null : form.parentId;
+    const parentId = form.parentId === 'root' ? null : form.parentId;
     const imageUrl = form.imageUrl;
 
     const payload: CategoryForm = {
@@ -324,20 +329,24 @@ export default function CategoriesPage() {
     try {
       if (editing) {
         await categoryApi.update(editing._id, payload, files);
-        toast.success("Category updated");
+        toast.success('Category updated');
       } else {
         const { data } = await categoryApi.create(payload, files);
         if (parentId) {
           setExpanded((prev) => new Set(prev).add(parentId));
         }
-        toast.success("Category created");
+        toast.success('Category created');
       }
       setDialogOpen(false);
       imageFileRef.current = null;
       bannerFileRef.current = null;
       await fetchCategories();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to create category");
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Failed to create category'
+      );
     }
   }
 
@@ -345,23 +354,21 @@ export default function CategoriesPage() {
     if (!deleteTarget) return;
     try {
       await categoryApi.delete(deleteTarget._id);
-      toast.success(
-        `Deleted "${deleteTarget.name}" and all sub-categories`,
-      );
+      toast.success(`Deleted "${deleteTarget.name}" and all sub-categories`);
       setDeleteTarget(null);
       await fetchCategories();
     } catch {
-      toast.error("Failed to delete category");
+      toast.error('Failed to delete category');
     }
   }
 
   async function toggleActive(cat: Category) {
     try {
       await categoryApi.update(cat._id, { active: !cat.active });
-      toast.success(`${cat.name} ${cat.active ? "hidden" : "activated"}`);
+      toast.success(`${cat.name} ${cat.active ? 'hidden' : 'activated'}`);
       await fetchCategories();
     } catch {
-      toast.error("Failed to update category");
+      toast.error('Failed to update category');
     }
   }
 
@@ -369,11 +376,11 @@ export default function CategoriesPage() {
     try {
       await categoryApi.update(cat._id, { featured: !cat.featured });
       toast.success(
-        `${cat.name} ${cat.featured ? "removed from" : "added to"} homepage featured`,
+        `${cat.name} ${cat.featured ? 'removed from' : 'added to'} homepage featured`
       );
       await fetchCategories();
     } catch {
-      toast.error("Failed to update category");
+      toast.error('Failed to update category');
     }
   }
 
@@ -392,7 +399,7 @@ export default function CategoriesPage() {
       await categoryApi.reorder(orders);
       await fetchCategories();
     } catch {
-      toast.error("Failed to reorder");
+      toast.error('Failed to reorder');
     }
   }
 
@@ -412,7 +419,7 @@ export default function CategoriesPage() {
             type="button"
             onClick={() => hasKids && toggle(cat._id)}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
-            aria-label={hasKids ? (isOpen ? "Collapse" : "Expand") : undefined}
+            aria-label={hasKids ? (isOpen ? 'Collapse' : 'Expand') : undefined}
           >
             {hasKids ? (
               isOpen ? (
@@ -501,7 +508,7 @@ export default function CategoriesPage() {
               size="icon"
               className="h-8 w-8"
               onClick={() => toggleFeatured(cat)}
-              title={cat.featured ? "Unfeature" : "Feature on homepage"}
+              title={cat.featured ? 'Unfeature' : 'Feature on homepage'}
             >
               {cat.featured ? (
                 <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
@@ -523,7 +530,7 @@ export default function CategoriesPage() {
               size="icon"
               className="h-8 w-8"
               onClick={() => toggleActive(cat)}
-              title={cat.active ? "Hide" : "Show"}
+              title={cat.active ? 'Hide' : 'Show'}
             >
               {cat.active ? (
                 <Eye className="h-4 w-4" />
@@ -597,10 +604,6 @@ export default function CategoriesPage() {
       <Tabs defaultValue="tree" className="space-y-4">
         <TabsList>
           <TabsTrigger value="tree">Tree</TabsTrigger>
-          <TabsTrigger value="featured" className="gap-1">
-            <Sparkles className="h-3.5 w-3.5" /> Homepage featured (
-            {featuredList.length})
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tree" className="space-y-4">
@@ -644,85 +647,27 @@ export default function CategoriesPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="featured" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                Homepage featured preview
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                These active categories render on the homepage "Shop by
-                category" section, ordered by sort order.
-              </p>
-            </CardHeader>
-            <CardContent>
-              {featuredList.length === 0 ? (
-                <div className="py-12 text-center text-sm text-muted-foreground">
-                  No featured categories yet. Click the star icon in the tree to
-                  feature one.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {featuredList.map((c) => (
-                    <div
-                      key={c._id}
-                      className="group relative overflow-hidden rounded-xl border bg-card transition hover:shadow-md"
-                    >
-                      <div className="aspect-square overflow-hidden bg-muted">
-                        <Image
-                          src={c.imageUrl}
-                          alt={c.name}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          width={144}
-                          height={144}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="truncate font-medium">{c.name}</div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {c.productCount} products
-                            </div>
-                          </div>
-                          <div
-                            className="h-3 w-3 shrink-0 rounded-full"
-                            style={{ backgroundColor: c.color }}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleFeatured(c)}
-                        className="absolute right-2 top-2 rounded-full bg-background/90 p-1.5 opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100"
-                        title="Remove from featured"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
-      <Dialog open={dialogOpen} onOpenChange={(o) => {
-        if (!o) { imageFileRef.current = null; bannerFileRef.current = null; }
-        setDialogOpen(o);
-      }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            imageFileRef.current = null;
+            bannerFileRef.current = null;
+          }
+          setDialogOpen(o);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editing ? "Edit category" : "New category"}
+              {editing ? 'Edit category' : 'New category'}
             </DialogTitle>
             <DialogDescription>
               {editing
-                ? "Update the category details, image, and homepage feature settings."
-                : "Create a new category or sub-category."}
+                ? 'Update the category details, image, and homepage feature settings.'
+                : 'Create a new category or sub-category.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -748,7 +693,7 @@ export default function CategoriesPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setForm((f) => ({ ...f, imageUrl: "" }));
+                        setForm((f) => ({ ...f, imageUrl: '' }));
                         imageFileRef.current = null;
                       }}
                       className="absolute right-1 top-1 rounded-full bg-background/90 p-1 shadow"
@@ -763,7 +708,7 @@ export default function CategoriesPage() {
                   accept="image/*"
                   hidden
                   onChange={(e) =>
-                    handleImagePick("imageUrl", e.target.files?.[0] ?? null)
+                    handleImagePick('imageUrl', e.target.files?.[0] ?? null)
                   }
                 />
                 <Button
@@ -809,7 +754,7 @@ export default function CategoriesPage() {
                     accept="image/*"
                     hidden
                     onChange={(e) =>
-                      handleImagePick("bannerUrl", e.target.files?.[0] ?? null)
+                      handleImagePick('bannerUrl', e.target.files?.[0] ?? null)
                     }
                   />
                   <Button
@@ -867,7 +812,9 @@ export default function CategoriesPage() {
               <Label>Parent category</Label>
               <Select
                 value={form.parentId}
-                onValueChange={(v) => setForm((f) => ({ ...f, parentId: v ?? "root" }))}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, parentId: v ?? 'root' }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -966,7 +913,7 @@ export default function CategoriesPage() {
               Cancel
             </Button>
             <Button onClick={handleSave}>
-              {editing ? "Save changes" : "Create category"}
+              {editing ? 'Save changes' : 'Create category'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -983,7 +930,7 @@ export default function CategoriesPage() {
               This will permanently delete this category
               {deleteTarget && getDescendantIds(deleteTarget._id).size > 0
                 ? ` and ${getDescendantIds(deleteTarget._id).size} nested sub-categories.`
-                : "."}{" "}
+                : '.'}{' '}
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

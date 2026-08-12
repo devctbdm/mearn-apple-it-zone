@@ -4,7 +4,7 @@ import * as React from 'react';
 import { NavMain } from '@/components/nav-main';
 import { SuperAdminNav } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/store';
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +31,7 @@ import {
   User,
   HandCoins,
   MessageSquare,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -92,6 +93,7 @@ const data = {
       url: '/admin/slider',
       icon: <Images />,
     },
+    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
   ],
 
   navSuperadmin: [
@@ -110,12 +112,16 @@ const data = {
       url: '/admin/payments',
       icon: <HandCoins />,
     },
-    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
 
     {
       title: 'Settings',
       url: '/admin/settings',
       icon: <Settings2Icon />,
+    },
+    {
+      title: 'Maintenance',
+      url: '/admin/maintenance',
+      icon: <Wrench />,
     },
   ],
 };

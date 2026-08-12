@@ -50,3 +50,11 @@ export const adminOnly = (req, res, next) => {
     res.status(403).json({ success: false, message: 'Admin access required' });
   }
 };
+
+export const superAdminOnly = (req, res, next) => {
+  if (req.user && req.user.role === 'super_admin') {
+    next();
+  } else {
+    res.status(403).json({ success: false, message: 'Super admin access required' });
+  }
+};

@@ -25,6 +25,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
+import maintenanceRoutes from './routes/maintenanceRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -82,6 +83,7 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
 
 // 4. Logging (dev format)
 if (process.env.NODE_ENV === 'development') {
@@ -119,6 +121,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

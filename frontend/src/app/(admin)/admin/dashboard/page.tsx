@@ -39,6 +39,7 @@ import {
   ShoppingCart,
   Users,
   Package,
+  MessageSquare,
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ import Link from 'next/link';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   dashboardApi,
+  smsApi,
   type DashboardStats,
   type Order,
   type OrderStatus,
@@ -279,6 +281,7 @@ function StatCard({
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [smsBalance, setSmsBalance] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const isMobile = useIsMobile();
@@ -293,6 +296,16 @@ export default function AdminDashboardPage() {
         // leave stats null; UI shows empty states
       } finally {
         if (mounted) setLoading(false);
+      }
+    })();
+    (async () => {
+      try {
+        const { data } = await smsApi.getBalance();
+        if (mounted && data.success) {
+          setSmsBalance(data.balance ?? null);
+        }
+      } catch {
+        // SMS not configured; balance card shows '—'
       }
     })();
     return () => {
@@ -351,6 +364,14 @@ export default function AdminDashboardPage() {
           icon: <Package className="h-4 w-4" />,
           color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
         },
+        {
+          title: 'SMS Balance',
+          value: smsBalance != null ? formatTaka(smsBalance) : '—',
+          change: 'bulksmsbd.net credit',
+          trend: 'flat' as const,
+          icon: <MessageSquare className="h-4 w-4" />,
+          color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/30',
+        },
       ]
     : [];
 
@@ -378,9 +399,9 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 5 }).map((_, i) => (
               <StatCardSkeleton key={i} />
             ))
           : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}

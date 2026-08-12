@@ -130,8 +130,8 @@ export default function SmsPage() {
     setBalanceLoading(true);
     try {
       const { data } = await smsApi.getBalance();
-      if (data.success && data.balance) {
-        setBalance(data.balance.data?.balance ?? null);
+      if (data.success && data.balance != null) {
+        setBalance(data.balance);
       } else {
         if (showError) toast.error('Could not fetch balance');
         setBalance(null);
@@ -172,7 +172,7 @@ export default function SmsPage() {
         fetchLogs(1);
         refreshBalance(false);
       } else {
-        toast.error(data.provider?.message || 'SMS provider rejected the message');
+        toast.error(data.providerMessage || 'SMS provider rejected the message');
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to send SMS');

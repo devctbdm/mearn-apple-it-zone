@@ -6,12 +6,14 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/store';
+import { useMaintenance } from '@/hooks/use-maintenance';
 
 const ADMIN_ROLES = ['admin', 'super_admin'];
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, fetchUser } = useAuth();
   const router = useRouter();
+  const { enabled } = useMaintenance();
 
   useEffect(() => {
     if (!user) fetchUser();
@@ -20,11 +22,13 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
-      router.replace('/login');
+      router.replace('/admin/login');
     } else if (!ADMIN_ROLES.includes(user.role)) {
       router.replace('/');
+    } else if (enabled && user.role !== 'super_admin') {
+      router.replace('/maintenance');
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, enabled]);
 
   if (isLoading || !user || !ADMIN_ROLES.includes(user.role)) {
     return (

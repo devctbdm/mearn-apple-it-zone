@@ -1,14 +1,23 @@
 // backend/src/controllers/authController.js
 
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import TeamMember from '../models/TeamMember.js';
 import Session from '../models/Session.js';
 import { parseUserAgent } from '../utils/parseUA.js';
+import { sendPasswordResetOtp } from '../services/smsService.js';
 
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
+
+const phoneRegex = (phone) => {
+  const digits = String(phone).replace(/[^\d]/g, '');
+  return new RegExp(`${digits.slice(-10)}$`);
 };
 
 // @desc    Register a new user
@@ -282,6 +291,93 @@ export const changePassword = async (req, res) => {
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Request a password reset OTP via SMS
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const user = await User.findOne({ phone: phoneRegex(phone) });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number',
+      });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.resetPasswordToken = hashOtp(otp);
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    const result = await sendPasswordResetOtp({ phone: user.phone, otp });
+    if (result.skipped || !result.success) {
+      console.error('Forgot password SMS failed:', result.reason || result.log?.providerMessage);
+      return res.status(500).json({
+        success: false,
+        message: 'Could not send the code. SMS service is not configured or is unavailable.',
+      });
+    }
+
+    res.json({ success: true, message: 'OTP sent to your phone' });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reset password with the SMS OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  try {
+    const { phone, otp, newPassword } = req.body;
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'phone, otp and newPassword are required',
+      });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+    }
+
+    const user = await User.findOne({ phone: phoneRegex(phone) }).select('+password');
+    if (!user || !user.resetPasswordToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'No password reset was requested for this phone',
+      });
+    }
+    if (!user.resetPasswordExpire || user.resetPasswordExpire < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Request a new code.',
+      });
+    }
+    if (user.resetPasswordToken !== hashOtp(otp)) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

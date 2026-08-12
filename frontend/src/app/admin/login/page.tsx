@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,31 +17,30 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAppStore, useAuth, useCart } from '@/store';
-import Link from 'next/link';
+import { useAppStore, useAuth } from '@/store';
 
-const loginSchema = z.object({
-  identifier: z.string().trim().min(1, 'Email or phone is required').max(255),
+const ADMIN_ROLES = ['super_admin', 'admin'];
+
+const adminLoginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email is required')
+    .max(255)
+    .email('Enter a valid email'),
   password: z
     .string()
     .min(6, 'Password must be at least 6 characters')
     .max(128),
 });
 
-type FormValues = {
-  identifier: string;
-  password: string;
-};
+type FormValues = { email: string; password: string };
 
-const initialValues: FormValues = {
-  identifier: '',
-  password: '',
-};
+const initialValues: FormValues = { email: '', password: '' };
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const router = useRouter();
-  const { fetchUser, isAuthenticated, isLoading, user } = useAuth();
-  const { syncCartWithBackend } = useCart();
+  const { user, isLoading, isAuthenticated, fetchUser } = useAuth();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormValues, string>>
@@ -54,13 +54,10 @@ export default function LoginPage() {
     }
   }, [user, isAuthenticated, fetchUser]);
 
+  // Already signed in as staff -> straight to the dashboard
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace(
-        user?.role === 'admin' || user?.role === 'super_admin'
-          ? '/admin/dashboard'
-          : '/'
-      );
+    if (!isLoading && isAuthenticated && ADMIN_ROLES.includes(user?.role || '')) {
+      router.replace('/admin/dashboard');
     }
   }, [isLoading, isAuthenticated, user, router]);
 
@@ -71,7 +68,7 @@ export default function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = loginSchema.safeParse(values);
+    const parsed = adminLoginSchema.safeParse(values);
     if (!parsed.success) {
       const fieldErrors: Partial<Record<keyof FormValues, string>> = {};
       for (const issue of parsed.error.issues) {
@@ -87,13 +84,26 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({
+          identifier: parsed.data.email,
+          password: parsed.data.password,
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
+      }
+
+      const role = data.user?.role;
+
+      if (!ADMIN_ROLES.includes(role || '')) {
+        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+        setErrors({
+          email: 'This is the admin login. Only admin accounts can sign in here.',
+        });
+        return;
       }
 
       if (data.token) {
@@ -112,15 +122,8 @@ export default function LoginPage() {
         });
       }
 
-      await syncCartWithBackend().catch(() => {});
-
-      const role = data.user?.role || useAppStore.getState().user?.role;
-      toast.success(`Welcome back, ${data.user?.name || 'User'}!`);
-      if (role === 'admin' || role === 'super_admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/');
-      }
+      toast.success(`Welcome back, ${data.user?.name || 'Admin'}!`);
+      router.push('/admin/dashboard');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -129,39 +132,40 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="bg-muted/30 px-4 py-10">
-      <div className="mx-auto max-w-md">
+    <div className="flex min-h-screen flex-col bg-muted/30 px-4 py-10">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
         <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <ShieldCheck size={28} />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">Apple IT Zone</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your account
+            Admin panel — staff access only
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle>Admin Login</CardTitle>
             <CardDescription>
-              Enter your email or phone and password.
+              Sign in with your staff email and password to manage the store.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div className="space-y-2">
-                <Label htmlFor="identifier">Phone / E-Mail</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="identifier"
-                  type="text"
+                  id="email"
+                  type="email"
                   autoComplete="username"
-                  placeholder="Enter your phone or email"
-                  value={values.identifier}
-                  onChange={(e) => update('identifier', e.target.value)}
-                  aria-invalid={!!errors.identifier}
+                  placeholder="admin@appleitzone.com"
+                  value={values.email}
+                  onChange={(e) => update('email', e.target.value)}
+                  aria-invalid={!!errors.email}
                 />
-                {errors.identifier && (
-                  <p className="text-xs text-destructive">
-                    {errors.identifier}
-                  </p>
+                {errors.email && (
+                  <p className="text-xs text-destructive">{errors.email}</p>
                 )}
               </div>
 
@@ -190,9 +194,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={
-                      showPassword ? 'Hide password' : 'Show password'
-                    }
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -203,29 +205,20 @@ export default function LoginPage() {
               </div>
 
               <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? 'Signing in...' : 'Sign in'}
+                {submitting ? 'Signing in...' : 'Sign in to admin panel'}
               </Button>
             </form>
 
             <div className="mt-6 rounded-md border bg-muted/40 p-4 text-sm">
-              <p className="font-medium">Don&apos;t have an account?</p>
-              <p className="mt-1 text-muted-foreground">
+              <p className="text-muted-foreground">
+                Customers should{' '}
                 <Link
-                  href="/register"
+                  href="/login"
                   className="text-primary underline underline-offset-4"
                 >
-                  Create Your Account
-                </Link>{' '}
-                to get started.
-              </p>
-              <p className="mt-3 border-t pt-3 text-muted-foreground">
-                Store staff?{' '}
-                <Link
-                  href="/admin/login"
-                  className="text-primary underline underline-offset-4"
-                >
-                  Admin Login
+                  sign in here
                 </Link>
+                .
               </p>
             </div>
           </CardContent>

@@ -3,6 +3,7 @@
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import PromoCode from '../models/PromoCode.js';
+import { notifyOrderPlaced, notifyOrderCancelled } from '../services/smsService.js';
 
 // @desc    Create a new order
 // @route   POST /api/orders
@@ -88,6 +89,15 @@ export const createOrder = async (req, res) => {
     if (appliedPromo) {
       appliedPromo.usageCount += 1;
       await appliedPromo.save();
+    }
+
+    // Fire-and-forget SMS confirmation (never blocks the order response)
+    if (req.user?.phone) {
+      notifyOrderPlaced({
+        order,
+        name: req.user.name || 'Customer',
+        phone: req.user.phone,
+      }).catch(() => {});
     }
 
     res.status(201).json({
@@ -228,6 +238,19 @@ export const updateOrderStatus = async (req, res) => {
 
     order.orderStatus = status;
     await order.save();
+
+    // Fire-and-forget SMS notification when an order is cancelled
+    if (status === 'cancelled') {
+      await order.populate('user', 'name phone');
+      const phone = order.user?.phone;
+      if (phone) {
+        notifyOrderCancelled({
+          order,
+          name: order.user?.name || 'Customer',
+          phone,
+        }).catch(() => {});
+      }
+    }
 
     res.json({ success: true, order });
   } catch (error) {
