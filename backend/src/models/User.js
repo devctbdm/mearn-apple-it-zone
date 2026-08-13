@@ -61,6 +61,9 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    twoFactorOtp: String,
+    twoFactorOtpExpire: Date,
+    twoFactorAttempts: { type: Number, default: 0 },
   },
   {
     timestamps: true, // Adds createdAt & updatedAt

@@ -365,6 +365,24 @@ export const authApi = {
 
   setDefaultAddress: (id: string) =>
     api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}/default`),
+
+  verifyOtp: (data: { pendingToken: string; otp: string }) =>
+    api.post<{
+      success: boolean;
+      token?: string;
+      user?: AuthMe;
+      message?: string;
+    }>('/auth/verify-otp', data),
+};
+
+export type LoginResponse = {
+  success: boolean;
+  token?: string;
+  user?: AuthMe;
+  twoFactorRequired?: boolean;
+  pendingToken?: string;
+  expiresIn?: number;
+  message?: string;
 };
 
 export type OrderStatus =
@@ -421,7 +439,12 @@ export type OrderStats = {
 export const orderApi = {
   getMyOrders: () =>
     api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
-  getAllOrders: (params?: { page?: number; limit?: number; status?: string }) =>
+  getAllOrders: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }) =>
     api.get<{
       success: boolean;
       total: number;
@@ -775,6 +798,7 @@ export type PromoCode = {
   startDate: string | null;
   endDate: string | null;
   status: 'active' | 'inactive';
+  categories?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -808,6 +832,7 @@ export type PromoFormData = {
   startDate: string | null;
   endDate: string | null;
   status: 'active' | 'inactive';
+  categories?: string[];
 };
 
 export const promoApi = {
@@ -830,10 +855,16 @@ export const promoApi = {
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/promo/${id}`),
 
-  validate: (code: string, subtotal: number) =>
-    api.post<{ success: boolean; promo: Partial<PromoCode>; discount: number }>('/promo/validate', {
+  validate: (code: string, subtotal: number, items?: { product: string; quantity: number }[]) =>
+    api.post<{
+      success: boolean;
+      promo: Partial<PromoCode>;
+      discount: number;
+      matchingSubtotal?: number;
+    }>('/promo/validate', {
       code,
       subtotal,
+      items,
     }),
 };
 
@@ -863,6 +894,8 @@ export type SmsSettings = {
   senderId: string;
   signature: string;
   enabled: boolean;
+  twoFactorEnabled?: boolean;
+  otpExpirySeconds?: number;
 };
 
 export type SmsBalance = {
@@ -908,4 +941,39 @@ export const smsApi = {
       page: number;
       pages: number;
     }>('/sms/logs', { params }),
+};
+
+// ---------------- Offers ----------------
+export type Offer = {
+  _id: string;
+  title: string;
+  slug: string;
+  shortDescription: string;
+  fullDescription: string;
+  image: string;
+  startDate?: string;
+  endDate?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const offerApi = {
+  getAll: (params?: Record<string, any>) =>
+    api.get<{ success: boolean; offers: Offer[] }>('/offers', { params }),
+
+  getById: (id: string) =>
+    api.get<{ success: boolean; offer: Offer }>(`/offers/${id}`),
+
+  getBySlug: (slug: string) =>
+    api.get<{ success: boolean; offer: Offer }>(`/offers/slug/${slug}`),
+
+  create: (data: FormData) =>
+    api.post<{ success: boolean; offer: Offer }>('/offers', data),
+
+  update: (id: string, data: FormData) =>
+    api.put<{ success: boolean; offer: Offer }>(`/offers/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/offers/${id}`),
 };

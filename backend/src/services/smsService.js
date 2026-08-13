@@ -134,3 +134,12 @@ export async function sendPasswordResetOtp({ phone, otp }) {
     `Valid for 10 minutes. Do not share this code with anyone.`;
   return sendSms({ numbers: phone, message });
 }
+
+// Admin login 2FA OTP
+export async function sendLoginOtp({ phone, otp, expirySeconds = 60 }) {
+  const store = await getStore();
+  const message =
+    `${store.name} login verification code: ${otp}. ` +
+    `Valid for ${expirySeconds} seconds. Do not share this code with anyone.`;
+  return sendSms({ numbers: phone, message });
+}

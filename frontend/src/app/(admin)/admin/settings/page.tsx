@@ -59,12 +59,14 @@ import {
   authApi,
   storeApi,
   paymentSettingsApi,
+  smsApi,
   type TeamMember,
   type Session,
   type PaymentGateway,
 } from '@/lib/api';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
+import Link from 'next/link';
 
 type ShippingZone = {
   id: string;
@@ -190,6 +192,40 @@ export default function SettingsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await smsApi.getSettings();
+        if (data.success) {
+          setTwoFactorEnabled(!!data.settings.twoFactorEnabled);
+          setOtpExpirySeconds(data.settings.otpExpirySeconds || 60);
+          setSmsConfigured(!!data.settings.apiKey);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  const handleSave2fa = async () => {
+    setLoading2fa(true);
+    try {
+      const { data } = await smsApi.updateSettings({
+        twoFactorEnabled,
+        otpExpirySeconds,
+      });
+      if (data.success) {
+        setTwoFactorEnabled(!!data.settings.twoFactorEnabled);
+        setOtpExpirySeconds(data.settings.otpExpirySeconds || 60);
+        toast.success('Two-factor authentication settings saved');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save 2FA settings');
+    } finally {
+      setLoading2fa(false);
+    }
+  };
+
   const handleRevokeSession = async (id: string) => {
     try {
       await authApi.revokeSession(id);
@@ -206,6 +242,12 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
+
+  // Two-factor authentication (SMS) state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [otpExpirySeconds, setOtpExpirySeconds] = useState(60);
+  const [loading2fa, setLoading2fa] = useState(false);
+  const [smsConfigured, setSmsConfigured] = useState(true);
 
   const getPasswordStrength = (pw: string) => {
     let score = 0;
@@ -674,12 +716,56 @@ export default function SettingsPage() {
                     </CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="gap-2">
-                    <KeyRound className="h-4 w-4" />
-                    Enable 2FA
-                  </Button>
-                </CardContent>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="font-medium">Require SMS code on admin login</div>
+                    <div className="text-sm text-muted-foreground">
+                      Staff (admin / manager / super admin) must enter a code
+                      sent to their phone before signing in.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={twoFactorEnabled}
+                    onCheckedChange={setTwoFactorEnabled}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="otpExpiry">Code valid for</Label>
+                  <Select
+                    value={String(otpExpirySeconds)}
+                    onValueChange={(v) => setOtpExpirySeconds(Number(v))}
+                  >
+                    <SelectTrigger id="otpExpiry" className="sm:w-56">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 seconds</SelectItem>
+                      <SelectItem value="60">1 minute</SelectItem>
+                      <SelectItem value="90">1 minute 30 seconds</SelectItem>
+                      <SelectItem value="120">2 minutes</SelectItem>
+                      <SelectItem value="180">3 minutes</SelectItem>
+                      <SelectItem value="300">5 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!smsConfigured && (
+                  <p className="text-xs text-amber-600">
+                    SMS is not configured yet. Add your bulksmsbd API key in the{' '}
+                    <Link href="/admin/sms" className="underline">
+                      SMS settings
+                    </Link>{' '}
+                    page before enabling this.
+                  </p>
+                )}
+
+                <Button onClick={handleSave2fa} disabled={loading2fa}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {loading2fa ? 'Saving...' : 'Save 2FA settings'}
+                </Button>
+              </CardContent>
               </Card>
 
               <Card>

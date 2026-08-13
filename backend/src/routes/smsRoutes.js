@@ -6,12 +6,12 @@ import {
   sendSms,
   getLogs,
 } from '../controllers/smsController.js';
-import { protect, adminOnly } from '../middleware/auth.js';
+import { protect, adminOnly, superAdminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.get('/settings', protect, adminOnly, getSettings);
-router.put('/settings', protect, adminOnly, updateSettings);
+router.put('/settings', protect, adminOnly, superAdminOnly, updateSettings);
 router.get('/balance', protect, adminOnly, getBalance);
 router.get('/logs', protect, adminOnly, getLogs);
 router.post('/send', protect, adminOnly, sendSms);

@@ -1,5 +1,6 @@
 import { getSmsSetting } from '../models/SmsSetting.js';
 import SmsLog from '../models/SmsLog.js';
+import AuditLog from '../models/AuditLog.js';
 import { sendSms as sendSmsService } from '../services/smsService.js';
 
 const BULKSMS_BASE = 'https://bulksmsbd.net/api';
@@ -16,6 +17,8 @@ export const getSettings = async (req, res) => {
         senderId: setting.senderId || '',
         signature: setting.signature || '',
         enabled: !!setting.enabled,
+        twoFactorEnabled: !!setting.twoFactorEnabled,
+        otpExpirySeconds: setting.otpExpirySeconds || 60,
       },
     });
   } catch (error) {
@@ -27,13 +30,54 @@ export const getSettings = async (req, res) => {
 // @route   PUT /api/sms/settings
 export const updateSettings = async (req, res) => {
   try {
-    const { apiKey, senderId, signature, enabled } = req.body;
+    const { apiKey, senderId, signature, enabled, twoFactorEnabled, otpExpirySeconds } = req.body;
+
+    // Defense in depth: only a super admin may change 2FA settings.
+    const wantsTwoFactorChange =
+      typeof twoFactorEnabled === 'boolean' ||
+      typeof otpExpirySeconds === 'number';
+    if (wantsTwoFactorChange && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Super admin access required to change two-factor settings',
+      });
+    }
+
     const setting = await getSmsSetting();
+    const before = {
+      twoFactorEnabled: !!setting.twoFactorEnabled,
+      otpExpirySeconds: setting.otpExpirySeconds || 60,
+    };
+
     if (typeof apiKey === 'string') setting.apiKey = apiKey.trim();
     if (typeof senderId === 'string') setting.senderId = senderId.trim();
     if (typeof signature === 'string') setting.signature = signature.trim();
     if (typeof enabled === 'boolean') setting.enabled = enabled;
+    if (typeof twoFactorEnabled === 'boolean') setting.twoFactorEnabled = twoFactorEnabled;
+    if (typeof otpExpirySeconds === 'number') {
+      setting.otpExpirySeconds = Math.min(
+        900,
+        Math.max(15, Math.floor(otpExpirySeconds))
+      );
+    }
     await setting.save();
+
+    // Audit 2FA setting changes (super-admin only by the route gate).
+    if (wantsTwoFactorChange) {
+      const after = {
+        twoFactorEnabled: !!setting.twoFactorEnabled,
+        otpExpirySeconds: setting.otpExpirySeconds || 60,
+      };
+      await AuditLog.create({
+        actor: { id: req.user?._id, name: req.user?.name, role: req.user?.role },
+        action: 'update_2fa_settings',
+        target: 'SmsSetting',
+        changes: { before, after },
+        ip: req.ip || req.connection?.remoteAddress || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    }
+
     res.json({
       success: true,
       settings: {
@@ -41,6 +85,8 @@ export const updateSettings = async (req, res) => {
         senderId: setting.senderId || '',
         signature: setting.signature || '',
         enabled: !!setting.enabled,
+        twoFactorEnabled: !!setting.twoFactorEnabled,
+        otpExpirySeconds: setting.otpExpirySeconds || 60,
       },
     });
   } catch (error) {

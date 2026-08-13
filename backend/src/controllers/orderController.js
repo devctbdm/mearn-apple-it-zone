@@ -1,8 +1,10 @@
 // backend/src/controllers/orderController.js
 
+import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import PromoCode from '../models/PromoCode.js';
+import { expandPromoCategories } from '../utils/categoryTree.js';
 import { notifyOrderPlaced, notifyOrderCancelled } from '../services/smsService.js';
 
 // @desc    Create a new order
@@ -19,9 +21,10 @@ export const createOrder = async (req, res) => {
     // Validate stock and calculate total
     let totalAmount = 0;
     const orderItems = [];
+    const promoItems = [];
 
     for (const item of items) {
-      const product = await Product.findById(item.product);
+      const product = await Product.findById(item.product).populate('category');
       if (!product) {
         return res.status(404).json({
           success: false,
@@ -50,15 +53,30 @@ export const createOrder = async (req, res) => {
         price: price,
         image: product.images[0] || '',
       });
+
+      promoItems.push({
+        categories:
+          Array.isArray(product.categories) && product.categories.length
+            ? product.categories
+            : product.category && typeof product.category === 'object' && product.category.name
+              ? [product.category.name]
+              : [],
+        price,
+        quantity: item.quantity,
+      });
     }
 
-    // Re-validate coupon server-side and apply discount
+    // Re-validate coupon server-side (category-aware) and apply discount
     let couponDiscount = 0;
     let appliedPromo = null;
     if (couponCode) {
       const promo = await PromoCode.findOne({ code: couponCode.toUpperCase() });
       if (promo) {
-        const result = promo.computeDiscount(totalAmount);
+        const result = promo.computeItemDiscount(
+          promoItems,
+          totalAmount,
+          await expandPromoCategories(promo.categories || [])
+        );
         if (result.valid) {
           couponDiscount = result.discount;
           appliedPromo = promo;
@@ -153,26 +171,73 @@ export const getOrderById = async (req, res) => {
 // @access  Private/Admin
 export const getAllOrders = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    const query = {};
+    const { status, search } = req.query;
+    const pageNum = Math.max(1, Number(req.query.page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    const s = String(search || '').trim();
+
+    const match = {};
     if (status) {
-      query.orderStatus = status;
+      match.orderStatus = status;
     }
 
-    const orders = await Order.find(query)
-      .populate('user', 'name email phone')
-      .populate('items.product', 'name')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    let orders;
+    let total;
 
-    const total = await Order.countDocuments(query);
+    if (s) {
+      // Search across order fields AND customer name/email (via $lookup)
+      const or = [
+        { 'shippingAddress.city': { $regex: s, $options: 'i' } },
+        { 'shippingAddress.street': { $regex: s, $options: 'i' } },
+        { 'payment.tran_id': { $regex: s, $options: 'i' } },
+        { 'items.name': { $regex: s, $options: 'i' } },
+        { 'userDoc.name': { $regex: s, $options: 'i' } },
+        { 'userDoc.email': { $regex: s, $options: 'i' } },
+        { 'userDoc.phone': { $regex: s, $options: 'i' } },
+      ];
+      if (/^[0-9a-fA-F]{24}$/.test(s)) {
+        or.push({ _id: new mongoose.Types.ObjectId(s) });
+      }
+
+      const [agg] = await Order.aggregate([
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDoc',
+          },
+        },
+        { $match: { ...match, $or: or } },
+        { $sort: { createdAt: -1 } },
+        {
+          $facet: {
+            meta: [{ $count: 'total' }],
+            data: [{ $skip: (pageNum - 1) * limitNum }, { $limit: limitNum }],
+          },
+        },
+      ]);
+
+      total = agg?.meta?.[0]?.total ?? 0;
+      orders = (agg?.data || []).map((o) => ({
+        ...o,
+        user: o.userDoc?.[0] || o.user,
+      }));
+    } else {
+      orders = await Order.find(match)
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name')
+        .sort({ createdAt: -1 })
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum);
+      total = await Order.countDocuments(match);
+    }
 
     res.json({
       success: true,
       total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
+      page: pageNum,
+      pages: Math.max(1, Math.ceil(total / limitNum)),
       orders,
     });
   } catch (error) {

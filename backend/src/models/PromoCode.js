@@ -71,6 +71,13 @@ const promoSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    // Empty array = applies to all categories. Otherwise the promo only
+    // discounts items belonging to the selected categories. Stored as
+    // category names to stay consistent with how products store categories.
+    categories: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -117,6 +124,66 @@ promoSchema.methods.computeDiscount = function (subtotal) {
 
   discount = Math.min(discount, subtotal);
   return { valid: true, reason: null, discount };
+};
+
+// ---- Compute discount scoped to specific categories ----
+// items: [{ categories: [id], price: number, quantity: number }]
+// orderSubtotal: full cart subtotal (used for the min-order check)
+promoSchema.methods.computeItemDiscount = function (
+  items = [],
+  orderSubtotal = 0,
+  expandedCategories
+) {
+  const now = new Date();
+  if (!this.isActive(now)) {
+    return { valid: false, reason: 'inactive', discount: 0 };
+  }
+  if (this.minOrder > 0 && (Number(orderSubtotal) || 0) < this.minOrder) {
+    return { valid: false, reason: 'min-order', discount: 0 };
+  }
+
+  const scopedSrc =
+    Array.isArray(expandedCategories) && expandedCategories.length
+      ? expandedCategories
+      : this.categories || [];
+  const scoped = (Array.isArray(scopedSrc) ? scopedSrc : [])
+    .map((c) => String(c).trim().toLowerCase())
+    .filter(Boolean);
+  let matchingSubtotal = Number(orderSubtotal) || 0;
+
+  if (scoped.length > 0) {
+    matchingSubtotal = (items || []).reduce((sum, it) => {
+      const cats = (
+        Array.isArray(it.categories)
+          ? it.categories
+          : it.category
+            ? [it.category]
+            : []
+      ).map((c) => String(c).trim().toLowerCase());
+      const matched = cats.some((c) => scoped.includes(c));
+      return matched
+        ? sum + (Number(it.price) || 0) * (Number(it.quantity) || 1)
+        : sum;
+    }, 0);
+
+    if (matchingSubtotal <= 0) {
+      return { valid: false, reason: 'no-category', discount: 0 };
+    }
+  }
+
+  let discount = 0;
+  if (this.type === 'percentage') {
+    discount = (matchingSubtotal * this.value) / 100;
+    if (this.maxDiscount > 0 && discount > this.maxDiscount) {
+      discount = this.maxDiscount;
+    }
+  } else if (this.type === 'fixed') {
+    discount = this.value;
+  }
+  // free_shipping handled at checkout; no amount discount here
+
+  discount = Math.min(discount, matchingSubtotal);
+  return { valid: true, reason: null, discount, matchingSubtotal };
 };
 
 // ---- Indexes ----

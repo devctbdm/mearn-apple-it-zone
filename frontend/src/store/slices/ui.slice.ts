@@ -1,5 +1,6 @@
 // src/store/slices/ui.slice.ts
 import { StateCreator } from 'zustand';
+import { toast } from 'sonner';
 
 export interface UISlice {
   isAdminSidebarOpen: boolean;
@@ -33,8 +34,12 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
 
   setGlobalLoading: (loading: boolean) => set({ globalLoading: loading }),
 
-  showToast: (message: string, type: 'success' | 'error' | 'info') =>
-    set({ toast: { message, type } }),
+  showToast: (message: string, type: 'success' | 'error' | 'info') => {
+    if (type === 'error') toast.error(message);
+    else if (type === 'success') toast.success(message);
+    else toast.info(message);
+    set({ toast: { message, type } });
+  },
 
   hideToast: () => set({ toast: null }),
 });

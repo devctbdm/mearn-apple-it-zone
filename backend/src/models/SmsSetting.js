@@ -6,6 +6,8 @@ const smsSettingSchema = new mongoose.Schema(
     senderId: { type: String, default: '' },
     signature: { type: String, default: '' },
     enabled: { type: Boolean, default: false },
+    twoFactorEnabled: { type: Boolean, default: false },
+    otpExpirySeconds: { type: Number, default: 60, min: 15, max: 900 },
   },
   { timestamps: true }
 );

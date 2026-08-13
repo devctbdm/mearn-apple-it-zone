@@ -18,6 +18,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAppStore, useAuth } from '@/store';
+import { TwoFactorStep } from '@/components/TwoFactorStep';
+import type { LoginResponse } from '@/lib/api';
 
 const ADMIN_ROLES = ['super_admin', 'admin'];
 
@@ -47,6 +49,11 @@ export default function AdminLoginPage() {
   >({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Two-factor (SMS OTP) step state
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [twoFactorExpiresIn, setTwoFactorExpiresIn] = useState<number>(0);
+  const [twoFactorEmail, setTwoFactorEmail] = useState<string>('');
 
   useEffect(() => {
     if (!user && !isAuthenticated) {
@@ -96,6 +103,18 @@ export default function AdminLoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
+      const loginData = data as LoginResponse;
+
+      // Two-factor challenge: the 2FA response has no `user`, so handle it
+      // before the admin role gate below.
+      if (loginData.twoFactorRequired && loginData.pendingToken) {
+        setPendingToken(loginData.pendingToken);
+        setTwoFactorExpiresIn(loginData.expiresIn || 0);
+        setTwoFactorEmail(parsed.data.email);
+        toast.success('A verification code was sent to your phone.');
+        return;
+      }
+
       const role = data.user?.role;
 
       if (!ADMIN_ROLES.includes(role || '')) {
@@ -131,6 +150,20 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleTwoFactorSuccess = (token: string, user: any) => {
+    if (token) {
+      localStorage.setItem('mobile_token', token);
+      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+    useAppStore.setState({
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    toast.success(`Welcome back, ${user?.name || 'Admin'}!`);
+    router.push('/admin/dashboard');
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-muted/30 px-4 py-10">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
@@ -146,12 +179,28 @@ export default function AdminLoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>
+              {pendingToken ? 'Verify it’s you' : 'Admin Login'}
+            </CardTitle>
             <CardDescription>
-              Sign in with your staff email and password to manage the store.
+              {pendingToken
+                ? 'Enter the code we sent to your phone to finish signing in.'
+                : 'Sign in with your staff email and password to manage the store.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {pendingToken ? (
+              <TwoFactorStep
+                pendingToken={pendingToken}
+                expiresIn={twoFactorExpiresIn}
+                onSuccess={handleTwoFactorSuccess}
+                onBack={() => {
+                  setPendingToken(null);
+                  setTwoFactorEmail('');
+                }}
+              />
+            ) : (
+            <>
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -221,6 +270,8 @@ export default function AdminLoginPage() {
                 .
               </p>
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       </div>

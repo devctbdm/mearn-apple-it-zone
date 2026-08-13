@@ -19,7 +19,7 @@ const Footer = () => {
                     9:00 AM - 8:00 PM
                   </span>
                   <span className="text-2xl font-bold text-gray-300">
-                    ab-net 😍
+                    01911059059
                   </span>
                 </div>
               </div>
@@ -29,7 +29,7 @@ const Footer = () => {
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-400">Store Locator</span>
                   <span className="text-lg font-extrabold text-gray-300">
-                    Find us
+                    Dhaka, Bangladesh
                   </span>
                 </div>
               </div>

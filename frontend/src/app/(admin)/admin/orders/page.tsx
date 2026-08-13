@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Eye,
   Pencil,
@@ -124,12 +124,18 @@ export default function OrdersPage() {
     cancelled: number;
   } | null>(null);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editStatus, setEditStatus] = useState<OrderStatus>('processing');
   const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -138,6 +144,7 @@ export default function OrdersPage() {
         page,
         limit: PAGE_SIZE,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: debouncedQuery || undefined,
       });
       if (data.success) {
         setOrders(data.orders);
@@ -149,7 +156,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, debouncedQuery]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -168,28 +175,7 @@ export default function OrdersPage() {
     fetchStats();
   }, [fetchStats]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter((o) => {
-      const cust = getCustomer(o);
-      const haystack = [
-        o._id,
-        cust?.name || '',
-        cust?.email || '',
-        o.shippingAddress.city,
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [orders, query]);
-
   const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
 
   const handleSaveStatus = async () => {
     if (!editOrder) return;
@@ -232,7 +218,7 @@ export default function OrdersPage() {
       'Items',
     ];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const rows = filtered.map((o) => {
+    const rows = orders.map((o) => {
       const cust = getCustomer(o);
       return [
         shortId(o._id),
@@ -262,7 +248,7 @@ export default function OrdersPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filtered.length} orders to CSV`);
+    toast.success(`Exported ${orders.length} orders to CSV`);
   };
 
   const handlePrintInvoice = (order: Order) => {
@@ -464,7 +450,7 @@ export default function OrdersPage() {
                     Loading...
                   </TableCell>
                 </TableRow>
-              ) : paged.length === 0 ? (
+              ) : orders.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -474,7 +460,7 @@ export default function OrdersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paged.map((order) => {
+                orders.map((order) => {
                   const cust = getCustomer(order);
                   return (
                     <TableRow key={order._id}>
@@ -548,8 +534,11 @@ export default function OrdersPage() {
         {/* Pagination */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {paged.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}
-            –{(currentPage - 1) * PAGE_SIZE + paged.length} of {filtered.length}
+            Showing{' '}
+            {orders.length === 0
+              ? 0
+              : (currentPage - 1) * PAGE_SIZE + 1}
+            –{(currentPage - 1) * PAGE_SIZE + orders.length} of {total}
           </p>
           {totalPages > 1 && (
             <Pagination className="mx-0 w-auto justify-end">

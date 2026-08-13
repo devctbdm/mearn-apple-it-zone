@@ -152,7 +152,11 @@ const CheckoutContent = () => {
     setCouponLoading(true);
     setOrderError('');
     try {
-      const { data } = await promoApi.validate(code, subtotal);
+      const { data } = await promoApi.validate(
+        code,
+        subtotal,
+        items.map((i) => ({ product: i.productId, quantity: i.quantity }))
+      );
       setAppliedCoupon({
         code: data.promo.code || code,
         discount: data.discount,
@@ -174,7 +178,15 @@ const CheckoutContent = () => {
         );
       }
     } catch (e: any) {
-      showToast(e?.response?.data?.message || 'Invalid coupon code', 'error');
+      const data = e?.response?.data;
+      if (data?.reason === 'no-category' && data?.categories?.length) {
+        showToast(
+          `This code is only valid for: ${data.categories.join(', ')}`,
+          'error'
+        );
+      } else {
+        showToast(data?.message || 'Invalid coupon code', 'error');
+      }
     } finally {
       setCouponLoading(false);
     }

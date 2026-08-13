@@ -5,6 +5,7 @@ import { NavMain } from '@/components/nav-main';
 import { SuperAdminNav } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import { useAuth } from '@/store';
+import { canAccessRoute } from '@/lib/adminPermissions';
 import {
   Sidebar,
   SidebarContent,
@@ -32,6 +33,7 @@ import {
   HandCoins,
   MessageSquare,
   Wrench,
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -83,17 +85,17 @@ const data = {
       url: '/admin/questions',
       icon: <CircleHelpIcon />,
     },
-    {
-      title: 'Coupons',
-      url: '/admin/promo',
-      icon: <Gem />,
-    },
+
     {
       title: 'Sliders',
       url: '/admin/slider',
       icon: <Images />,
     },
-    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
+    {
+      title: 'Offers',
+      url: '/admin/offers',
+      icon: <Tag />,
+    },
   ],
 
   navSuperadmin: [
@@ -112,16 +114,22 @@ const data = {
       url: '/admin/payments',
       icon: <HandCoins />,
     },
+    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
 
     {
-      title: 'Settings',
-      url: '/admin/settings',
-      icon: <Settings2Icon />,
+      title: 'Coupons',
+      url: '/admin/promo',
+      icon: <Gem />,
     },
     {
       title: 'Maintenance',
       url: '/admin/maintenance',
       icon: <Wrench />,
+    },
+    {
+      title: 'Settings',
+      url: '/admin/settings',
+      icon: <Settings2Icon />,
     },
   ],
 };
@@ -132,6 +140,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     email: user?.email || 'Not signed in',
     avatar: '',
   };
+  // Only show nav items the current role is allowed to access.
+  const navMainItems = data.navMain.filter((item) =>
+    canAccessRoute(item.url, user?.role)
+  );
+  const superAdminItems = data.navSuperadmin.filter((item) =>
+    canAccessRoute(item.url, user?.role)
+  );
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -148,8 +163,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <SuperAdminNav items={data.navSuperadmin} />
+        <NavMain items={navMainItems} />
+        {superAdminItems.length > 0 && (
+          <SuperAdminNav items={superAdminItems} />
+        )}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={sidebarUser} />
