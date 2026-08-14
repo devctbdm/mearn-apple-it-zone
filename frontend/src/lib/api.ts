@@ -648,6 +648,7 @@ export type ProductFormData = {
   stock: number;
   status: string;
   featured: boolean;
+  holiday: boolean;
   specifications?: Record<string, any>;
   images?: string[];
 };
@@ -976,4 +977,26 @@ export const offerApi = {
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/offers/${id}`),
+};
+
+export type HolidayConfig = {
+  _id?: string;
+  heroBadge?: string;
+  title?: string;
+  subtitle?: string;
+  discountPercent?: number;
+  endDate?: string | null;
+  couponCode?: string;
+  couponDescription?: string;
+  topDealsTitle?: string;
+  topDealsSubtitle?: string;
+  active?: boolean;
+};
+
+export const holidayApi = {
+  getConfig: () =>
+    api.get<{ success: boolean; config: HolidayConfig }>('/holiday'),
+
+  updateConfig: (data: Partial<HolidayConfig>) =>
+    api.put<{ success: boolean; config: HolidayConfig }>('/holiday', data),
 };

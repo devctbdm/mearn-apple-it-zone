@@ -1,4 +1,3 @@
-// src/app/(store)/checkout/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -7,7 +6,6 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AlertCircle,
-  Banknote,
   CheckCircle2,
   CreditCard,
   MapPin,
@@ -430,9 +428,7 @@ const CheckoutContent = () => {
       >
         <ShieldCheck size={20} className="mt-0.5 shrink-0 text-amber-600" />
         <p className="text-sm text-amber-800">
-          <span className="font-semibold">Apple IT Zone</span> — if anything
-          goes wrong with your order, we may cancel it at any time. You will be
-          notified immediately and any payment will be refunded.
+          <span className="font-semibold">Apple IT Zone</span> — কারিগরি ত্রুটির কারণে পণ্যের মূল্য অসঙ্গতিপূর্ণ হলে, কর্তৃপক্ষ অর্ডার বাতিলের অধিকার সংরক্ষণ করে। অনুগ্রহ করে কাস্টমার সাপোর্ট এজেন্টের কনফার্মেশন ব্যতীত কোনো ধরনের পেমেন্ট প্রোসিড না করার অনুরোধ করা হচ্ছে ।
         </p>
       </motion.div>
 
@@ -616,7 +612,9 @@ const CheckoutContent = () => {
                       onChange={(e) => setCouponInput(e.target.value)}
                       placeholder="Enter coupon code"
                       className="flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && handleApplyCoupon()
+                      }
                     />
                     <Button
                       variant="outline"

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Star,
+  Gift,
   ArrowLeft,
   Trash2,
   Type as TypeIcon,
@@ -61,6 +62,7 @@ type ProductFormValue = {
   stock: number;
   status: Status;
   featured: boolean;
+  holiday: boolean;
   description: string;
   images: string[];
   keySpecs: KeySpec[];
@@ -131,6 +133,7 @@ export default function EditsProductsPage() {
     stock: 0,
     status: "active",
     featured: false,
+    holiday: false,
     description: "",
     images: [],
     keySpecs: [],
@@ -170,6 +173,7 @@ export default function EditsProductsPage() {
           stock: p.stock || 0,
           status: p.status || "active",
           featured: p.featured || false,
+          holiday: p.holiday || false,
           description: p.description || "",
           images: p.images || [],
           keySpecs: parsed.keySpecs,
@@ -217,6 +221,7 @@ export default function EditsProductsPage() {
       fd.append("stock", String(form.stock));
       fd.append("status", form.status);
       fd.append("featured", String(form.featured));
+      fd.append("holiday", String(form.holiday));
       if (form.sku) fd.append("sku", form.sku);
       if (form.productCode) fd.append("productCode", form.productCode);
 
@@ -408,6 +413,20 @@ function ProductForm({
           <Switch
             checked={value.featured}
             onCheckedChange={(v) => onChange({ featured: v })}
+          />
+        </div>
+        <div className="col-span-2 flex items-center justify-between rounded-md border p-3">
+          <div className="space-y-0.5">
+            <Label className="flex items-center gap-2">
+              <Gift className="h-4 w-4 text-rose-500" /> Holiday deal
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Show this product under Top Holiday Deals on the storefront.
+            </p>
+          </div>
+          <Switch
+            checked={value.holiday}
+            onCheckedChange={(v) => onChange({ holiday: v })}
           />
         </div>
         <div className="col-span-2 space-y-1.5">

@@ -96,6 +96,7 @@ const data = {
       url: '/admin/offers',
       icon: <Tag />,
     },
+    { title: 'Holiday Offers', url: '/admin/holiday', icon: <Apple /> },
   ],
 
   navSuperadmin: [

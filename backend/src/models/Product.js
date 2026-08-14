@@ -79,6 +79,10 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    holiday: {
+      type: Boolean,
+      default: false,
+    },
     specifications: {
       type: mongoose.Schema.Types.Mixed, // Flexible for any spec (e.g., RAM, CPU, Brand)
       default: {},
