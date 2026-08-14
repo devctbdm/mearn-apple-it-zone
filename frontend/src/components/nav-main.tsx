@@ -1,41 +1,85 @@
-'use client';
+"use client"
 
-import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   SidebarGroup,
-  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar';
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar"
+import { ChevronRightIcon } from "lucide-react"
+import Link from "next/link"
 
-import { Separator } from '@/components/ui/separator';
-import Link from 'next/link';
+import { Badge } from "@/components/ui/badge"
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string;
-    url: string;
-    icon?: React.ReactNode;
-  }[];
+    title: string
+    url: string
+    icon?: React.ReactNode
+    isActive?: boolean
+    badge?: number
+    items?: {
+      title: string
+      url: string
+    }[]
+  }[]
 }) {
   return (
     <SidebarGroup>
-      <Separator />
-      <SidebarGroupContent className="flex flex-col gap-2">
-        <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
+      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarMenu>
+        {items.map((item) =>
+          item.items ? (
+            <Collapsible
+              key={item.title}
+              className="group/collapsible"
+              render={<SidebarMenuItem />}
+            >
+              <CollapsibleTrigger
+                render={<SidebarMenuButton tooltip={item.title} isActive={item.isActive} />}
+              >
                 {item.icon}
-                <Link href={item.url}>{item.title}</Link>
+                <SidebarMenuSubButton render={<Link href={item.url} />}>
+                  <span>{item.title}</span>
+                </SidebarMenuSubButton>
+                <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {item.items.map((subItem) => (
+                    <SidebarMenuSubItem key={subItem.title}>
+                      <SidebarMenuSubButton render={<Link href={subItem.url} />}>
+                        <span>{subItem.title}</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton tooltip={item.title} isActive={item.isActive} render={<Link href={item.url} />}>
+                {item.icon}
+                <span>{item.title}</span>
+                {item.badge !== undefined && (
+                  <Badge className="ml-auto">{item.badge >= 10 ? "10+" : item.badge}</Badge>
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
+          ),
+        )}
+      </SidebarMenu>
     </SidebarGroup>
-  );
+  )
 }

@@ -1,139 +1,186 @@
 'use client';
 
 import * as React from 'react';
+
 import { NavMain } from '@/components/nav-main';
-import { SuperAdminNav } from '@/components/nav-secondary';
+import { NavProjects } from '@/components/nav-projects';
 import { NavUser } from '@/components/nav-user';
-import { useAuth } from '@/store';
-import { canAccessRoute } from '@/lib/adminPermissions';
+import { TeamSwitcher } from '@/components/team-switcher';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import {
-  LayoutDashboardIcon,
-  ListIcon,
-  ChartBarIcon,
-  FolderIcon,
-  UsersIcon,
-  FileTextIcon,
+  GalleryVerticalEndIcon,
+  AudioLinesIcon,
+  TerminalIcon,
   Settings2Icon,
-  CircleHelpIcon,
-  FileChartColumnIcon,
-  Apple,
-  ShoppingBasket,
-  Gem,
-  Images,
-  User,
-  HandCoins,
-  MessageSquare,
-  Wrench,
-  Tag,
+  FrameIcon,
+  PieChartIcon,
+  MapIcon,
+  LayoutDashboard,
+  ShoppingCart,
+  ChartLine,
+  UsersRound,
+  UserStar,
+  ListSortAscending,
+  BellCheck,
 } from 'lucide-react';
-import Link from 'next/link';
 
+import { useAuth } from '@/hooks/useAuth';
+
+// This is sample data.
 const data = {
+  teams: [
+    {
+      name: 'Acme Inc',
+      logo: <GalleryVerticalEndIcon />,
+      plan: 'Enterprise',
+    },
+    {
+      name: 'Acme Corp.',
+      logo: <AudioLinesIcon />,
+      plan: 'Startup',
+    },
+    {
+      name: 'Evil Corp.',
+      logo: <TerminalIcon />,
+      plan: 'Free',
+    },
+  ],
   navMain: [
     {
       title: 'Dashboard',
       url: '/admin/dashboard',
-      icon: <LayoutDashboardIcon />,
+      icon: <LayoutDashboard />,
     },
     {
       title: 'Products',
-      url: '/admin/products',
-      icon: <ShoppingBasket />,
-    },
-    {
-      title: 'Categories',
-      url: '/admin/categories',
-      icon: <ListIcon />,
-    },
-    {
-      title: 'Analytics',
-      url: '/admin/analytics',
-      icon: <ChartBarIcon />,
+      url: '#',
+      icon: <ShoppingCart />,
+      items: [
+        {
+          title: 'All Products',
+          url: '/admin/products',
+        },
+        {
+          title: 'Add Product',
+          url: '/admin/products/new',
+        },
+
+        {
+          title: 'Categories',
+          url: '/admin/categories',
+        },
+      ],
     },
     {
       title: 'Orders',
-      url: '/admin/orders',
-      icon: <FolderIcon />,
+      url: '#',
+      icon: <ListSortAscending />,
+      items: [
+        {
+          title: 'All Orders',
+          url: '/admin/orders',
+        },
+        {
+          title: 'Delivery',
+          url: '/admin/delivery',
+        },
+      ],
     },
     {
-      title: 'Customers',
-      url: '/admin/customers',
-      icon: <UsersIcon />,
+      title: 'Analytics',
+      url: '#',
+      icon: <ChartLine />,
+      items: [
+        {
+          title: 'Overview',
+          url: '/admin/analytics',
+        },
+        {
+          title: 'Health Check',
+          url: '/admin/health',
+        },
+      ],
     },
-
     {
-      title: 'Invoices',
-      url: '/admin/invoice',
-      icon: <FileChartColumnIcon />,
+      title: 'Users',
+      url: '#',
+      icon: <UsersRound />,
+      items: [
+        {
+          title: 'Customers',
+          url: '/admin/customers',
+        },
+        {
+          title: 'Team',
+          url: '/admin/team',
+        },
+        {
+          title: 'Billing',
+          url: '/admin/invoice',
+        },
+      ],
     },
     {
       title: 'Reviews',
-      url: '/admin/reviews',
-      icon: <FileTextIcon />,
+      url: '#',
+      icon: <UserStar />,
+      items: [
+        {
+          title: 'All Reviews',
+          url: '/admin/reviews',
+        },
+        {
+          title: 'All Questions',
+          url: '/admin/questions',
+        },
+      ],
     },
     {
-      title: 'Questions',
-      url: '/admin/questions',
-      icon: <CircleHelpIcon />,
-    },
-
-    {
-      title: 'Sliders',
-      url: '/admin/slider',
-      icon: <Images />,
-    },
-    {
-      title: 'Offers',
-      url: '/admin/offers',
-      icon: <Tag />,
-    },
-    { title: 'Holiday Offers', url: '/admin/holiday', icon: <Apple /> },
-  ],
-
-  navSuperadmin: [
-    {
-      title: 'Users',
-      url: '/admin/users',
-      icon: <User />,
-    },
-    {
-      title: 'Team',
-      url: '/admin/team',
-      icon: <UsersIcon />,
-    },
-    {
-      title: 'Payments',
-      url: '/admin/payments',
-      icon: <HandCoins />,
-    },
-    { title: 'Sms', url: '/admin/sms', icon: <MessageSquare /> },
-
-    {
-      title: 'Coupons',
-      url: '/admin/promo',
-      icon: <Gem />,
-    },
-    {
-      title: 'Maintenance',
-      url: '/admin/maintenance',
-      icon: <Wrench />,
+      title: 'Notifications',
+      url: '/admin/notifications',
+      icon: <BellCheck />,
+      badge: 10,
     },
     {
       title: 'Settings',
-      url: '/admin/settings',
+      url: '#',
       icon: <Settings2Icon />,
+      items: [
+        {
+          title: 'General',
+          url: '/admin/settings',
+        },
+        {
+          title: 'Payments',
+          url: '/admin/payments',
+        },
+        {
+          title: 'Coupons',
+          url: '/admin/coupons',
+        },
+        {
+          title: 'Slider',
+          url: '/admin/slider',
+        },
+        {
+          title: 'SMS',
+          url: '/admin/sms',
+        },
+        {
+          title: 'Maintenance',
+          url: '/admin/maintenance',
+        },
+      ],
     },
   ],
 };
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth();
   const sidebarUser = {
@@ -141,37 +188,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     email: user?.email || 'Not signed in',
     avatar: '',
   };
-  // Only show nav items the current role is allowed to access.
-  const navMainItems = data.navMain.filter((item) =>
-    canAccessRoute(item.url, user?.role)
-  );
-  const superAdminItems = data.navSuperadmin.filter((item) =>
-    canAccessRoute(item.url, user?.role)
-  );
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-              render={<Link href="/admin/dashboard" />}
-            >
-              <Apple className="size-5!" />
-              <span className="text-base font-semibold">Apple it zone</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMainItems} />
-        {superAdminItems.length > 0 && (
-          <SuperAdminNav items={superAdminItems} />
-        )}
+        <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={sidebarUser} />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
