@@ -1,15 +1,255 @@
-'use client';
+"use client";
+import { motion } from 'motion/react';
+import { X, Copy, Check, RefreshCw, ShoppingCart, LifeBuoy } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import Link from 'next/link';
 
-import { Suspense } from 'react';
-import {
-  PaymentResult,
-  PaymentResultLoading,
-} from '@/components/store/payment/PaymentResult';
+const order = {
+  id: 'ORD-2459',
+  attempted: 125600,
+  method: 'SSLCommerz',
+  reason: 'Insufficient balance in card',
+  code: 'ERR_CARD_DECLINED',
+  date: '17 Aug 2026, 9:31 PM',
+};
 
-export default function PaymentFailPage() {
+const ringVariants = {
+  hidden: { scale: 0.8, opacity: 0 },
+  visible: {
+    scale: 1,
+    opacity: 1,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 120,
+      damping: 14,
+      delay: 0.1,
+    },
+  },
+};
+
+const crossVariants = {
+  hidden: { pathLength: 0, opacity: 0 },
+  visible: {
+    pathLength: 1,
+    opacity: 1,
+    transition: {
+      pathLength: {
+        type: 'spring' as const,
+        stiffness: 120,
+        damping: 16,
+        delay: 0.35,
+        duration: 0.6,
+      },
+      opacity: { duration: 0.1 },
+    },
+  },
+};
+
+const shakeTransition = {
+  duration: 0.5,
+  delay: 0.65,
+  ease: 'easeInOut' as const,
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.3 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring' as const, stiffness: 100, damping: 14 },
+  },
+};
+
+export default function PaymentFailedPage() {
+  const [copied, setCopied] = useState(false);
+
+  const copyOrderId = () => {
+    void navigator.clipboard.writeText(order.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
-    <Suspense fallback={<PaymentResultLoading />}>
-      <PaymentResult kind="fail" />
-    </Suspense>
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-12">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <motion.div
+          className="absolute top-1/2 left-1/2 aspect-square w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-destructive/5 blur-3xl"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
+        />
+      </div>
+
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+        className="w-full max-w-md"
+      >
+        <Card className="border border-border/60 shadow-2xl shadow-destructive/5">
+          <CardContent className="flex flex-col items-center px-8 py-12 text-center">
+            <div className="relative mb-8">
+              <motion.div
+                variants={ringVariants}
+                className="flex items-center justify-center rounded-full bg-destructive/10 p-5"
+              >
+                <motion.svg
+                  className="size-20 text-destructive"
+                  viewBox="0 0 52 52"
+                  fill="none"
+                  animate={{ x: [0, -6, 6, -4, 4, 0] }}
+                  transition={shakeTransition}
+                >
+                  <motion.circle
+                    cx="26"
+                    cy="26"
+                    r="24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
+                  />
+                  <motion.path
+                    d="M18 18 L34 34"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    variants={crossVariants}
+                  />
+                  <motion.path
+                    d="M34 18 L18 34"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    variants={crossVariants}
+                  />
+                </motion.svg>
+              </motion.div>
+
+              <motion.div
+                className="absolute -inset-3 rounded-full border border-destructive/20"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: [0, 1, 0], scale: [0.7, 1.15, 1.25] }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
+              />
+              <motion.div
+                className="absolute -inset-6 rounded-full border border-destructive/10"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: [0, 0.8, 0], scale: [0.7, 1.2, 1.35] }}
+                transition={{ duration: 1.4, ease: 'easeOut', delay: 0.15 }}
+              />
+            </div>
+
+            <motion.h1
+              variants={itemVariants}
+              className="text-3xl font-semibold tracking-tight"
+            >
+              Payment Failed
+            </motion.h1>
+
+            <motion.p
+              variants={itemVariants}
+              className="mt-3 max-w-xs text-sm text-muted-foreground"
+            >
+              We couldn&apos;t process your payment. No amount has been
+              deducted — you can try again or use a different method.
+            </motion.p>
+
+            <motion.div
+              variants={itemVariants}
+              className="mt-6 w-full rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-left text-sm"
+            >
+              <div className="font-medium text-destructive">{order.reason}</div>
+              <div className="mt-0.5 font-mono text-xs text-muted-foreground">
+                {order.code}
+              </div>
+            </motion.div>
+
+            <motion.div
+              variants={itemVariants}
+              className="mt-4 w-full space-y-3 rounded-xl bg-muted/40 p-4 text-left text-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Order number</span>
+                <button
+                  onClick={copyOrderId}
+                  className="group inline-flex items-center gap-1.5 font-medium hover:underline"
+                >
+                  {order.id}
+                  {copied ? (
+                    <Check className="size-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="size-3.5 text-muted-foreground transition-colors group-hover:text-foreground" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Amount attempted</span>
+                <span className="font-semibold">
+                  ৳{order.attempted.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Payment method</span>
+                <span className="font-medium">{order.method}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Date</span>
+                <span className="font-medium">{order.date}</span>
+              </div>
+            </motion.div>
+
+            <motion.div
+              variants={itemVariants}
+              className="mt-8 grid w-full gap-3 sm:grid-cols-2"
+            >
+              <Button className="w-full">
+                <Link href="/checkout" className="flex items-center gap-2">
+                  <RefreshCw className="size-4" />
+                  Try again
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full">
+                <Link href="/cart" className="flex items-center gap-2">
+                  <ShoppingCart className="size-4" />
+                  Back to cart
+                </Link>
+              </Button>
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="mt-3 w-full">
+              <Link
+                href="/support"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <LifeBuoy className="size-3.5" />
+                Need help? Contact support
+              </Link>
+            </motion.div>
+          </CardContent>
+        </Card>
+
+        <motion.p
+          variants={itemVariants}
+          className="mt-6 text-center text-xs text-muted-foreground"
+        >
+          If money was deducted from your account, it will be auto-refunded
+          within 5–7 business days.
+        </motion.p>
+      </motion.div>
+    </div>
   );
 }

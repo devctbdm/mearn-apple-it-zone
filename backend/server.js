@@ -7,6 +7,7 @@ import './src/models/User.js';
 import './src/models/Product.js';
 import './src/models/Cart.js';
 import './src/models/Order.js';
+import { backfillOrderNumbers } from './src/utils/orderNumber.js';
 
 dotenv.config();
 
@@ -14,6 +15,13 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
 await connectDB();
+
+// Assign sequential order numbers (AIZ-1, AIZ-2, ...) to any existing orders
+backfillOrderNumbers()
+  .then((n) => {
+    if (n) console.log(`🆔 Backfilled ${n} order number(s)`);
+  })
+  .catch((e) => console.error('Order number backfill failed:', e.message));
 
 // Start server after successful connection
 const server = app.listen(PORT, () => {

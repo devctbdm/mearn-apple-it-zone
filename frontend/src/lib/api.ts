@@ -402,6 +402,7 @@ export type OrderItem = {
 
 export type Order = {
   _id: string;
+  orderNumber?: string;
   user:
     | string
     | { _id: string; name: string; email: string; phone?: string };

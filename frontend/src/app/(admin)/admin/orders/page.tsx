@@ -104,6 +104,8 @@ const PAGE_SIZE = 8;
 
 const shortId = (id: string) => `#${id.slice(-8).toUpperCase()}`;
 
+const orderNo = (o: Order) => o.orderNumber || shortId(o._id);
+
 const formatAmount = (n: number) => `৳${n.toLocaleString()}`;
 
 const formatDate = (d: string) =>
@@ -207,7 +209,7 @@ export default function OrdersPage() {
     try {
       await orderApi.updateStatus(editOrder._id, editStatus);
       toast.success(
-        `Order ${shortId(editOrder._id)} status updated to ${editStatus}`
+        `Order ${orderNo(editOrder)} status updated to ${editStatus}`
       );
       setEditOrder(null);
       fetchOrders();
@@ -221,7 +223,7 @@ export default function OrdersPage() {
     if (!cancelOrder) return;
     try {
       await orderApi.updateStatus(cancelOrder._id, 'cancelled');
-      toast.success(`Order ${shortId(cancelOrder._id)} cancelled`);
+      toast.success(`Order ${orderNo(cancelOrder)} cancelled`);
       setCancelOrder(null);
       fetchOrders();
       fetchStats();
@@ -285,7 +287,7 @@ export default function OrdersPage() {
     const rows = orders.map((o) => {
       const cust = getCustomer(o);
       return [
-        shortId(o._id),
+        orderNo(o),
         cust?.name || '',
         cust?.email || '',
         formatDate(o.createdAt),
@@ -344,7 +346,7 @@ export default function OrdersPage() {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Invoice ${shortId(order._id)}</title>
+          <title>Invoice ${orderNo(order)}</title>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; color: #111; padding: 32px; }
             h1 { margin: 0 0 4px; font-size: 24px; }
@@ -359,7 +361,7 @@ export default function OrdersPage() {
         </head>
         <body>
           <h1>Invoice</h1>
-          <div class="muted">Order ${shortId(order._id)} · ${formatDate(order.createdAt)}</div>
+          <div class="muted">Order ${orderNo(order)} · ${formatDate(order.createdAt)}</div>
           <div class="row">
             <div class="box">
               <div class="muted">Billed to</div>
@@ -528,7 +530,7 @@ export default function OrdersPage() {
                   return (
                     <TableRow key={order._id}>
                       <TableCell className="font-medium">
-                        {shortId(order._id)}
+                        {orderNo(order)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -700,7 +702,7 @@ export default function OrdersPage() {
             <div className="w-full max-w-150 rounded-lg bg-white p-6 shadow-lg">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold">
-                  Order {shortId(viewOrder._id)}
+                  Order {orderNo(viewOrder)}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Placed on {formatDate(viewOrder.createdAt)}
@@ -889,7 +891,7 @@ export default function OrdersPage() {
             <DialogHeader>
               <DialogTitle>Edit Order Status</DialogTitle>
               <DialogDescription>
-                Update status for {editOrder ? shortId(editOrder._id) : ''}
+                Update status for {editOrder ? orderNo(editOrder) : ''}
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
@@ -926,7 +928,7 @@ export default function OrdersPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
               <AlertDialogDescription>
-                Order {cancelOrder ? shortId(cancelOrder._id) : ''} will be
+                Order {cancelOrder ? orderNo(cancelOrder) : ''} will be
                 marked as cancelled. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

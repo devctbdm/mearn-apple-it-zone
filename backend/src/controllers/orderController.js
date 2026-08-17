@@ -1,21 +1,26 @@
-// backend/src/controllers/orderController.js
-
-import mongoose from 'mongoose';
-import Order from '../models/Order.js';
-import Product from '../models/Product.js';
-import PromoCode from '../models/PromoCode.js';
-import { expandPromoCategories } from '../utils/categoryTree.js';
-import { notifyOrderPlaced, notifyOrderCancelled } from '../services/smsService.js';
+import mongoose from "mongoose";
+import Order from "../models/Order.js";
+import Product from "../models/Product.js";
+import PromoCode from "../models/PromoCode.js";
+import { expandPromoCategories } from "../utils/categoryTree.js";
+import { getNextOrderNumber } from "../utils/orderNumber.js";
+import {
+  notifyOrderPlaced,
+  notifyOrderCancelled,
+} from "../services/smsService.js";
 
 // @desc    Create a new order
 // @route   POST /api/orders
 // @access  Private
 export const createOrder = async (req, res) => {
   try {
-    const { items, shippingAddress, paymentMethod, note, couponCode } = req.body;
+    const { items, shippingAddress, paymentMethod, note, couponCode } =
+      req.body;
 
     if (!items || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'No items in order' });
+      return res
+        .status(400)
+        .json({ success: false, message: "No items in order" });
     }
 
     // Validate stock and calculate total
@@ -24,7 +29,7 @@ export const createOrder = async (req, res) => {
     const promoItems = [];
 
     for (const item of items) {
-      const product = await Product.findById(item.product).populate('category');
+      const product = await Product.findById(item.product).populate("category");
       if (!product) {
         return res.status(404).json({
           success: false,
@@ -43,7 +48,8 @@ export const createOrder = async (req, res) => {
       product.stock -= item.quantity;
       await product.save();
 
-      const price = product.discountPrice > 0 ? product.discountPrice : product.price;
+      const price =
+        product.discountPrice > 0 ? product.discountPrice : product.price;
       totalAmount += price * item.quantity;
 
       orderItems.push({
@@ -51,14 +57,16 @@ export const createOrder = async (req, res) => {
         name: product.name,
         quantity: item.quantity,
         price: price,
-        image: product.images[0] || '',
+        image: product.images[0] || "",
       });
 
       promoItems.push({
         categories:
           Array.isArray(product.categories) && product.categories.length
             ? product.categories
-            : product.category && typeof product.category === 'object' && product.category.name
+            : product.category &&
+                typeof product.category === "object" &&
+                product.category.name
               ? [product.category.name]
               : [],
         price,
@@ -75,7 +83,7 @@ export const createOrder = async (req, res) => {
         const result = promo.computeItemDiscount(
           promoItems,
           totalAmount,
-          await expandPromoCategories(promo.categories || [])
+          await expandPromoCategories(promo.categories || []),
         );
         if (result.valid) {
           couponDiscount = result.discount;
@@ -86,6 +94,7 @@ export const createOrder = async (req, res) => {
     totalAmount = Math.max(0, totalAmount - couponDiscount);
 
     // Create order
+    const orderNumber = await getNextOrderNumber();
     const order = new Order({
       user: req.user._id,
       items: orderItems,
@@ -95,11 +104,12 @@ export const createOrder = async (req, res) => {
         ? { code: appliedPromo.code, discount: couponDiscount }
         : undefined,
       payment: {
-        method: paymentMethod || 'sslcommerz',
-        status: 'pending',
+        method: paymentMethod || "sslcommerz",
+        status: "pending",
       },
-      orderStatus: 'processing',
-      note: note || '',
+      orderStatus: "processing",
+      note: note || "",
+      orderNumber,
     });
 
     await order.save();
@@ -113,7 +123,7 @@ export const createOrder = async (req, res) => {
     if (req.user?.phone) {
       notifyOrderPlaced({
         order,
-        name: req.user.name || 'Customer',
+        name: req.user.name || "Customer",
         phone: req.user.phone,
       }).catch(() => {});
     }
@@ -123,7 +133,7 @@ export const createOrder = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.error('Create Order Error:', error);
+    console.error("Create Order Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -134,7 +144,7 @@ export const createOrder = async (req, res) => {
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
-      .populate('items.product', 'name images')
+      .populate("items.product", "name images")
       .sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (error) {
@@ -148,16 +158,24 @@ export const getMyOrders = async (req, res) => {
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('user', 'name email phone')
-      .populate('items.product', 'name images');
+      .populate("user", "name email phone")
+      .populate("items.product", "name images");
 
     if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
 
     // Check if user is authorized (owner or admin)
-    if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
+    if (
+      order.user._id.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin" &&
+      req.user.role !== "super_admin"
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
     res.json({ success: true, order });
@@ -174,7 +192,7 @@ export const getAllOrders = async (req, res) => {
     const { status, search } = req.query;
     const pageNum = Math.max(1, Number(req.query.page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
-    const s = String(search || '').trim();
+    const s = String(search || "").trim();
 
     const match = {};
     if (status) {
@@ -187,13 +205,13 @@ export const getAllOrders = async (req, res) => {
     if (s) {
       // Search across order fields AND customer name/email (via $lookup)
       const or = [
-        { 'shippingAddress.city': { $regex: s, $options: 'i' } },
-        { 'shippingAddress.street': { $regex: s, $options: 'i' } },
-        { 'payment.tran_id': { $regex: s, $options: 'i' } },
-        { 'items.name': { $regex: s, $options: 'i' } },
-        { 'userDoc.name': { $regex: s, $options: 'i' } },
-        { 'userDoc.email': { $regex: s, $options: 'i' } },
-        { 'userDoc.phone': { $regex: s, $options: 'i' } },
+        { "shippingAddress.city": { $regex: s, $options: "i" } },
+        { "shippingAddress.street": { $regex: s, $options: "i" } },
+        { "payment.tran_id": { $regex: s, $options: "i" } },
+        { "items.name": { $regex: s, $options: "i" } },
+        { "userDoc.name": { $regex: s, $options: "i" } },
+        { "userDoc.email": { $regex: s, $options: "i" } },
+        { "userDoc.phone": { $regex: s, $options: "i" } },
       ];
       if (/^[0-9a-fA-F]{24}$/.test(s)) {
         or.push({ _id: new mongoose.Types.ObjectId(s) });
@@ -202,17 +220,17 @@ export const getAllOrders = async (req, res) => {
       const [agg] = await Order.aggregate([
         {
           $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDoc',
+            from: "users",
+            localField: "user",
+            foreignField: "_id",
+            as: "userDoc",
           },
         },
         { $match: { ...match, $or: or } },
         { $sort: { createdAt: -1 } },
         {
           $facet: {
-            meta: [{ $count: 'total' }],
+            meta: [{ $count: "total" }],
             data: [{ $skip: (pageNum - 1) * limitNum }, { $limit: limitNum }],
           },
         },
@@ -225,8 +243,8 @@ export const getAllOrders = async (req, res) => {
       }));
     } else {
       orders = await Order.find(match)
-        .populate('user', 'name email phone')
-        .populate('items.product', 'name')
+        .populate("user", "name email phone")
+        .populate("items.product", "name")
         .sort({ createdAt: -1 })
         .limit(limitNum)
         .skip((pageNum - 1) * limitNum);
@@ -251,7 +269,7 @@ export const getAllOrders = async (req, res) => {
 export const getOrderStats = async (req, res) => {
   try {
     const grouped = await Order.aggregate([
-      { $group: { _id: '$orderStatus', count: { $sum: 1 } } },
+      { $group: { _id: "$orderStatus", count: { $sum: 1 } } },
     ]);
     const stats = {
       total: 0,
@@ -277,21 +295,23 @@ export const getOrderStats = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['processing', 'shipped', 'delivered', 'cancelled'];
+    const validStatuses = ["Pending","Processing", "Shipped", "Delivered", "Cancelled"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
       });
     }
 
     const order = await Order.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
 
     // If cancelling, restore stock
-    if (status === 'cancelled' && order.orderStatus !== 'cancelled') {
+    if (status === "Cancelled" && order.orderStatus !== "Cancelled") {
       for (const item of order.items) {
         const product = await Product.findById(item.product);
         if (product) {
@@ -305,13 +325,13 @@ export const updateOrderStatus = async (req, res) => {
     await order.save();
 
     // Fire-and-forget SMS notification when an order is cancelled
-    if (status === 'cancelled') {
-      await order.populate('user', 'name phone');
+    if (status === "Cancelled") {
+      await order.populate("user", "name phone");
       const phone = order.user?.phone;
       if (phone) {
         notifyOrderCancelled({
           order,
-          name: order.user?.name || 'Customer',
+          name: order.user?.name || "Customer",
           phone,
         }).catch(() => {});
       }
@@ -329,21 +349,23 @@ export const updateOrderStatus = async (req, res) => {
 export const updatePaymentStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['pending', 'paid', 'failed', 'cancelled'];
+    const validStatuses = ["Pending", "Paid", "Failed", "Cancelled"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
       });
     }
 
     const order = await Order.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
 
     order.payment.status = status;
-    if (status === 'paid') {
+    if (status === "Paid") {
       order.payment.paidAt = order.payment.paidAt || new Date();
     } else {
       order.payment.paidAt = undefined;
@@ -365,7 +387,9 @@ export const updateAdvance = async (req, res) => {
     const { advanceAmount, advancePaid, advanceReference } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
 
     if (advanceAmount !== undefined) {
@@ -373,7 +397,7 @@ export const updateAdvance = async (req, res) => {
       if (isNaN(amt) || amt < 0) {
         return res
           .status(400)
-          .json({ success: false, message: 'Invalid advance amount' });
+          .json({ success: false, message: "Invalid advance amount" });
       }
       order.advanceAmount = amt;
     }
@@ -382,12 +406,12 @@ export const updateAdvance = async (req, res) => {
       if (isNaN(paid) || paid < 0) {
         return res
           .status(400)
-          .json({ success: false, message: 'Invalid advance paid amount' });
+          .json({ success: false, message: "Invalid advance paid amount" });
       }
       order.advancePaid = paid;
     }
     if (advanceReference !== undefined) {
-      order.advanceReference = String(advanceReference || '').trim();
+      order.advanceReference = String(advanceReference || "").trim();
     }
 
     // Keep advancePaid within sensible bounds.

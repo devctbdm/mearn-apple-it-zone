@@ -1,11 +1,6 @@
-// backend/src/controllers/paymentController.js
-
 import SSLCommerzPayment from "sslcommerz-lts";
 import Order from "../models/Order.js";
 import PaymentGateway from "../models/PaymentGateway.js";
-
-import dotenv from 'dotenv';
-dotenv.config();  
 
 // @desc    Load SSLCommerz credentials from DB config, falling back to env
 const getSSLCommerzConfig = async () => {
@@ -13,10 +8,14 @@ const getSSLCommerzConfig = async () => {
   const cfg = gateway?.config || {};
   return {
     storeId: cfg.storeId || process.env.SSL_STORE_ID || "test6a71d90a75724",
-    storePassword: cfg.storePassword || process.env.SSL_STORE_PASSWORD || "558814a223682feb540e06ed16a99e3a",
-    isLive: cfg.sandbox === undefined
-      ? process.env.SSL_IS_LIVE === "true"
-      : !cfg.sandbox,
+    storePassword:
+      cfg.storePassword ||
+      process.env.SSL_STORE_PASSWORD ||
+      "test6a71d90a75724@ssl",
+    isLive:
+      cfg.sandbox === undefined
+        ? process.env.SSL_IS_LIVE === "true"
+        : !cfg.sandbox,
   };
 };
 
@@ -29,12 +28,10 @@ export const initiatePayment = async (req, res) => {
     const isAdvance = advance === true || advance === "true";
 
     if (!orderId || !amount || !customer) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "orderId, amount and customer are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "orderId, amount and customer are required",
+      });
     }
 
     const order = await Order.findById(orderId);

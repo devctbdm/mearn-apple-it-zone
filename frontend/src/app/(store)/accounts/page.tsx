@@ -83,6 +83,7 @@ type Order = {
   total: number;
   status: OrderStatus;
   items: OrderItem[];
+  orderNumber?: string;
   coupon?: { code: string; discount: number };
   payment?: { method: string; status: string };
   advanceAmount?: number;
@@ -262,6 +263,7 @@ function AccountContent() {
               id: o._id,
               date: o.createdAt,
               total: o.totalAmount,
+              orderNumber: o.orderNumber,
               status: o.orderStatus,
               coupon: o.coupon,
               payment: o.payment,
@@ -524,7 +526,7 @@ function AccountContent() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <p className="font-medium">
-                            Order {o.id.slice(-6).toUpperCase()}
+                            Order {o.orderNumber || o.id.slice(-6).toUpperCase()}
                           </p>
                           <Badge
                             variant="secondary"

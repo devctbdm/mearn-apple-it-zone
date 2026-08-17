@@ -78,6 +78,13 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       maxlength: [500, 'Note cannot exceed 500 characters'],
     },
+    // Human-friendly sequential order number, e.g. AIZ-1, AIZ-2 (auto-generated).
+    orderNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     // Advance confirmation payment collected to verify genuine COD orders.
     // Operator sets `advanceAmount`; customer pays it online; `advancePaid`
     // is recorded (via gateway IPN) and deducted from the amount due on delivery.
