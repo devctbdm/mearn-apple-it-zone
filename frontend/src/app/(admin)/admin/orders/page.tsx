@@ -73,9 +73,31 @@ type StatusFilter = OrderStatus | 'all';
 
 const statusVariant: Record<OrderStatus, string> = {
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  shipped: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
+  shipped: 'bg-purple-100 text-purple-800 hover:bg-blue-100',
   delivered: 'bg-green-100 text-green-800 hover:bg-green-100',
   cancelled: 'bg-red-100 text-red-800 hover:bg-red-100',
+};
+
+const paymentStatusVariant: Record<string, string> = {
+  paid: 'bg-green-100 text-green-800 hover:bg-green-100',
+  pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+  failed: 'bg-red-100 text-red-800 hover:bg-red-100',
+  cancelled: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+};
+
+const paymentStatusLabel = (s?: string) => {
+  switch (s) {
+    case 'paid':
+      return 'Paid';
+    case 'pending':
+      return 'Pending';
+    case 'failed':
+      return 'Failed';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
+  }
 };
 
 const PAGE_SIZE = 8;
@@ -131,6 +153,9 @@ export default function OrdersPage() {
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editStatus, setEditStatus] = useState<OrderStatus>('processing');
   const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
+  const [advanceAmountDraft, setAdvanceAmountDraft] = useState('');
+  const [advancePaidDraft, setAdvancePaidDraft] = useState('');
+  const [advanceRefDraft, setAdvanceRefDraft] = useState('');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -205,6 +230,45 @@ export default function OrdersPage() {
     }
   };
 
+  const handleSaveAdvanceAmount = async () => {
+    if (!viewOrder) return;
+    try {
+      const amt = Number(advanceAmountDraft) || 0;
+      const { data } = await orderApi.updateAdvance(viewOrder._id, {
+        advanceAmount: amt,
+      });
+      if (data.success) {
+        setViewOrder({ ...viewOrder, advanceAmount: amt });
+        toast.success('Advance amount updated');
+        fetchOrders();
+      }
+    } catch {
+      toast.error('Failed to update advance amount');
+    }
+  };
+
+  const handleRecordAdvance = async () => {
+    if (!viewOrder) return;
+    try {
+      const paid = Number(advancePaidDraft) || 0;
+      const { data } = await orderApi.updateAdvance(viewOrder._id, {
+        advancePaid: paid,
+        advanceReference: advanceRefDraft,
+      });
+      if (data.success) {
+        setViewOrder({
+          ...viewOrder,
+          advancePaid: paid,
+          advanceReference: advanceRefDraft,
+        });
+        toast.success('Advance payment recorded');
+        fetchOrders();
+      }
+    } catch {
+      toast.error('Failed to record advance payment');
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = [
       'Order ID',
@@ -227,7 +291,7 @@ export default function OrdersPage() {
         formatDate(o.createdAt),
         o.totalAmount,
         o.orderStatus,
-        paymentLabel(o.payment.method),
+        `${paymentLabel(o.payment.method)} (${paymentStatusLabel(o.payment.status)})`,
         formatAddress(o.shippingAddress),
         o.items
           .map(
@@ -367,10 +431,7 @@ export default function OrdersPage() {
 
   return (
     <div>
-      <SiteHeader
-        title="Orders Management"
-        description="Manage and track all customer orders."
-      />
+      <SiteHeader />
       <div className="px-4 py-8">
         {/* Stats */}
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -436,29 +497,31 @@ export default function OrdersPage() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Payment Status</TableHead>
+                <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    Loading...
-                  </TableCell>
-                </TableRow>
-              ) : orders.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No orders found.
-                  </TableCell>
-                </TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : orders.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      No orders found.
+                    </TableCell>
+                  </TableRow>
               ) : (
                 orders.map((order) => {
                   const cust = getCustomer(order);
@@ -478,6 +541,31 @@ export default function OrdersPage() {
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell>{formatAmount(order.totalAmount)}</TableCell>
                       <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge
+                            className={
+                              paymentStatusVariant[order.payment.status] || ''
+                            }
+                            variant="secondary"
+                          >
+                            {paymentStatusLabel(order.payment.status)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {paymentLabel(order.payment.method)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {formatAmount(
+                          order.totalAmount - (order.advancePaid || 0)
+                        )}
+                        {order.advancePaid ? (
+                          <span className="block text-xs text-muted-foreground">
+                            adv. {formatAmount(order.advancePaid || 0)}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           className={statusVariant[order.orderStatus]}
                           variant="secondary"
@@ -495,7 +583,14 @@ export default function OrdersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => setViewOrder(order)}
+                              onClick={() => {
+                                setViewOrder(order);
+                                setAdvanceAmountDraft(
+                                  String(order.advanceAmount || 0)
+                                );
+                                setAdvancePaidDraft('');
+                                setAdvanceRefDraft('');
+                              }}
                             >
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </DropdownMenuItem>
@@ -642,6 +737,69 @@ export default function OrdersPage() {
                   <div className="font-medium">Payment</div>
                   <div className="text-muted-foreground">
                     {paymentLabel(viewOrder.payment.method)}
+                  </div>
+                  <Badge
+                    className={
+                      paymentStatusVariant[viewOrder.payment.status] || ''
+                    }
+                    variant="secondary"
+                  >
+                    {paymentStatusLabel(viewOrder.payment.status)}
+                  </Badge>
+                </div>
+                <div>
+                  <div className="font-medium">
+                    Advance confirmation (COD verify)
+                  </div>
+                  <div className="text-muted-foreground">
+                    Required:{' '}
+                    {formatAmount(viewOrder.advanceAmount || 0)} · Received:{' '}
+                    {formatAmount(viewOrder.advancePaid || 0)} · Due on
+                    delivery:{' '}
+                    {formatAmount(
+                      viewOrder.totalAmount - (viewOrder.advancePaid || 0)
+                    )}
+                  </div>
+                  {viewOrder.advanceReference ? (
+                    <div className="text-xs text-muted-foreground">
+                      Ref: {viewOrder.advanceReference}
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={advanceAmountDraft}
+                      onChange={(e) => setAdvanceAmountDraft(e.target.value)}
+                      placeholder="Set required amount"
+                      className="w-44"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveAdvanceAmount}
+                    >
+                      Save amount
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={advancePaidDraft}
+                      onChange={(e) => setAdvancePaidDraft(e.target.value)}
+                      placeholder="Mark received"
+                      className="w-36"
+                    />
+                    <Input
+                      value={advanceRefDraft}
+                      onChange={(e) => setAdvanceRefDraft(e.target.value)}
+                      placeholder="bKash ref (trxid)"
+                      className="w-44"
+                    />
+                    <Button size="sm" onClick={handleRecordAdvance}>
+                      Record received
+                    </Button>
                   </div>
                 </div>
                 {viewOrder.note ? (

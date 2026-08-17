@@ -4,13 +4,16 @@ import SSLCommerzPayment from "sslcommerz-lts";
 import Order from "../models/Order.js";
 import PaymentGateway from "../models/PaymentGateway.js";
 
+import dotenv from 'dotenv';
+dotenv.config();  
+
 // @desc    Load SSLCommerz credentials from DB config, falling back to env
 const getSSLCommerzConfig = async () => {
   const gateway = await PaymentGateway.findOne({ name: "sslcommerz" });
   const cfg = gateway?.config || {};
   return {
-    storeId: cfg.storeId || process.env.SSL_STORE_ID || "testbox",
-    storePassword: cfg.storePassword || process.env.SSL_STORE_PASSWORD || "qwerty",
+    storeId: cfg.storeId || process.env.SSL_STORE_ID || "test6a71d90a75724",
+    storePassword: cfg.storePassword || process.env.SSL_STORE_PASSWORD || "558814a223682feb540e06ed16a99e3a",
     isLive: cfg.sandbox === undefined
       ? process.env.SSL_IS_LIVE === "true"
       : !cfg.sandbox,
@@ -22,7 +25,8 @@ const getSSLCommerzConfig = async () => {
 // @access  Private
 export const initiatePayment = async (req, res) => {
   try {
-    const { orderId, amount, customer } = req.body;
+    const { orderId, amount, customer, advance } = req.body;
+    const isAdvance = advance === true || advance === "true";
 
     if (!orderId || !amount || !customer) {
       return res
@@ -44,13 +48,26 @@ export const initiatePayment = async (req, res) => {
         .status(403)
         .json({ success: false, message: "Not authorized" });
     }
-    if (order.payment.status === "paid") {
+    if (isAdvance) {
+      if (order.payment.status === "paid") {
+        return res
+          .status(400)
+          .json({ success: false, message: "Order is already paid" });
+      }
+      if (order.advancePaid >= order.advanceAmount && order.advanceAmount > 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Advance already paid" });
+      }
+    } else if (order.payment.status === "paid") {
       return res
         .status(400)
         .json({ success: false, message: "Order is already paid" });
     }
 
-    const tran_id = `${order._id}_${Date.now()}`;
+    const tran_id = isAdvance
+      ? `${order._id}_adv_${Date.now()}`
+      : `${order._id}_${Date.now()}`;
 
     const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
     const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
@@ -64,7 +81,9 @@ export const initiatePayment = async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?tran_id=${tran_id}`,
       ipn_url: `${process.env.BACKEND_URL || "http://localhost:5000"}/api/payment/ipn?tran_id=${tran_id}`,
       productcategory: "General",
-      product_name: "Apple IT Zone Order",
+      product_name: isAdvance
+        ? "Apple IT Zone Order (Advance)"
+        : "Apple IT Zone Order",
       product_category: "Electronics",
       product_profile: "general",
       shipping_method: "COURIER",
@@ -84,6 +103,7 @@ export const initiatePayment = async (req, res) => {
       cus_postcode: customer.postcode || "1207",
       cus_country: customer.country || "Bangladesh",
       value_a: order._id.toString(),
+      value_b: isAdvance ? "advance" : "full",
     };
 
     const apiResponse = await sslcz.init(data);
@@ -105,6 +125,7 @@ export const initiatePayment = async (req, res) => {
       success: true,
       gatewayUrl: apiResponse.GatewayPageURL,
       tran_id,
+      advance: isAdvance,
     });
   } catch (error) {
     console.error("SSLCommerz Initiate Error:", error);
@@ -150,19 +171,33 @@ export const validatePayment = async (req, res) => {
       validation?.status === "VALID" ||
       validation?.status === "VALIDATED";
 
+    const isAdvance = tran_id.includes("_adv_");
+
     if (success) {
-      order.payment.status = "paid";
-      order.payment.val_id = val_id || validation?.val_id || "";
-      order.payment.card_type = validation?.card_type || "";
-      order.payment.paidAt = order.payment.paidAt || new Date();
+      if (isAdvance) {
+        // Partial advance confirmation payment — do not mark the whole
+        // COD order as paid; just record the amount against the order.
+        order.advancePaid = Number(amount) || order.advanceAmount;
+        order.advanceReference = tran_id;
+      } else {
+        order.payment.status = "paid";
+        order.payment.val_id = val_id || validation?.val_id || "";
+        order.payment.card_type = validation?.card_type || "";
+        order.payment.paidAt = order.payment.paidAt || new Date();
+      }
     } else if (status === "CANCELLED") {
-      order.payment.status = "cancelled";
+      if (!isAdvance) order.payment.status = "cancelled";
     } else {
-      order.payment.status = "failed";
+      if (!isAdvance) order.payment.status = "failed";
     }
     await order.save();
 
-    res.json({ success: true, valid: success, order: order._id });
+    res.json({
+      success: true,
+      valid: success,
+      advance: isAdvance,
+      order: order._id,
+    });
   } catch (error) {
     console.error("SSLCommerz Validate Error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -200,15 +235,20 @@ export const ipnListener = async (req, res) => {
     }
 
     if (success) {
-      order.payment.status = "paid";
-      order.payment.val_id = val_id || "";
-      order.payment.card_type = card_type || "";
-      order.payment.amount = amount ? Number(amount) : order.payment.amount;
-      order.payment.paidAt = order.payment.paidAt || new Date();
+      if (tran_id.includes("_adv_")) {
+        order.advancePaid = amount ? Number(amount) : order.advanceAmount;
+        order.advanceReference = tran_id;
+      } else {
+        order.payment.status = "paid";
+        order.payment.val_id = val_id || "";
+        order.payment.card_type = card_type || "";
+        order.payment.amount = amount ? Number(amount) : order.payment.amount;
+        order.payment.paidAt = order.payment.paidAt || new Date();
+      }
     } else if (status === "FAILED") {
-      order.payment.status = "failed";
+      if (!tran_id.includes("_adv_")) order.payment.status = "failed";
     } else if (status === "CANCELLED") {
-      order.payment.status = "cancelled";
+      if (!tran_id.includes("_adv_")) order.payment.status = "cancelled";
     }
     await order.save();
 

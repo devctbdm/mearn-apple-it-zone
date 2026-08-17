@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { productApi, categoryApi } from "@/lib/api";
+import { SiteHeader } from "@/components/site-header";
 
 type Status = "active" | "draft" | "out_of_stock";
 
@@ -260,6 +261,8 @@ export default function AdminProductsPage() {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -580,6 +583,7 @@ export default function AdminProductsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </>
   );
 }
 

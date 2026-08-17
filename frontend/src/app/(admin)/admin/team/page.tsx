@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { teamApi, type TeamMember } from "@/lib/api";
+import { SiteHeader } from "@/components/site-header";
 
 type Role = "admin" | "manager" | "super_admin";
 
@@ -281,6 +282,8 @@ export default function TeamPage() {
   }
 
   return (
+    <> 
+    <SiteHeader />
     <div className="min-h-screen bg-background px-4 py-8 md:px-8">
       <div className="space-y-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -508,6 +511,7 @@ export default function TeamPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </>
   );
 }
 

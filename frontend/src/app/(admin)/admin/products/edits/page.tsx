@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { categoryApi, productApi } from "@/lib/api";
+import { SiteHeader } from "@/components/site-header";
 
 type Status = "active" | "draft" | "out_of_stock";
 
@@ -262,6 +263,8 @@ export default function EditsProductsPage() {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -293,6 +296,7 @@ export default function EditsProductsPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }
 

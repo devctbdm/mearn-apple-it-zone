@@ -97,6 +97,7 @@ import {
   type InvoiceStatus,
   type InvoiceStats,
 } from '@/lib/api';
+import { SiteHeader } from '@/components/site-header';
 
 // --- Company constants (print header) ---
 const COMPANY = {
@@ -1415,6 +1416,8 @@ export default function InvoiceManagementPage() {
   ];
 
   return (
+    <> 
+    <SiteHeader />
     <div className="flex-1 space-y-6 p-8 pt-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1870,5 +1873,6 @@ export default function InvoiceManagementPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

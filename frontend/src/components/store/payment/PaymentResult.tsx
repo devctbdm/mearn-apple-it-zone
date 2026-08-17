@@ -39,6 +39,7 @@ export function PaymentResult({ kind }: { kind: keyof typeof STYLES }) {
   const params = useSearchParams();
   const tranId = params.get('tran_id') || '';
   const [validating, setValidating] = useState(false);
+  const [advance, setAdvance] = useState(false);
   const style = STYLES[kind];
   const Icon = style.icon;
 
@@ -53,10 +54,22 @@ export function PaymentResult({ kind }: { kind: keyof typeof STYLES }) {
         amount: params.get('amount') ? Number(params.get('amount')) : undefined,
         card_type: params.get('card_type') || undefined,
       })
+      .then((res) => {
+        if (res.data?.advance) setAdvance(true);
+      })
       .catch(() => {})
       .finally(() => setValidating(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tranId]);
+
+  const title =
+    kind === 'success' && advance
+      ? 'Advance Payment Received'
+      : style.title;
+  const message =
+    kind === 'success' && advance
+      ? 'Your confirmation advance has been received. The remaining balance will be collected on delivery (cash on delivery).'
+      : style.message;
 
   if (validating) {
     return <PaymentResultLoading />;
@@ -68,8 +81,8 @@ export function PaymentResult({ kind }: { kind: keyof typeof STYLES }) {
         className={`mx-auto max-w-xl rounded-2xl border ${style.border} ${style.bg} p-8 text-center`}
       >
         <Icon size={56} className={`mx-auto ${style.iconColor}`} />
-        <h1 className="mt-4 text-2xl font-bold text-gray-900">{style.title}</h1>
-        <p className="mt-2 text-sm text-gray-600">{style.message}</p>
+        <h1 className="mt-4 text-2xl font-bold text-gray-900">{title}</h1>
+        <p className="mt-2 text-sm text-gray-600">{message}</p>
 
         {tranId && (
           <div className="mt-4 rounded-lg bg-white px-4 py-2 text-sm text-gray-500">

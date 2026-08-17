@@ -78,6 +78,23 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       maxlength: [500, 'Note cannot exceed 500 characters'],
     },
+    // Advance confirmation payment collected to verify genuine COD orders.
+    // Operator sets `advanceAmount`; customer pays it online; `advancePaid`
+    // is recorded (via gateway IPN) and deducted from the amount due on delivery.
+    advanceAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Advance amount cannot be negative'],
+    },
+    advancePaid: {
+      type: Number,
+      default: 0,
+      min: [0, 'Advance paid cannot be negative'],
+    },
+    advanceReference: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,

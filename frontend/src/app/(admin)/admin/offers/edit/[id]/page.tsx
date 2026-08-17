@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OfferForm } from '@/components/admin/offers/OfferForm';
 import { offerApi, type Offer } from '@/lib/api';
 import { toast } from 'sonner';
+import { SiteHeader } from '@/components/site-header';
 
 export default function EditOfferPage() {
   const router = useRouter();
@@ -48,6 +49,8 @@ export default function EditOfferPage() {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -64,5 +67,6 @@ export default function EditOfferPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

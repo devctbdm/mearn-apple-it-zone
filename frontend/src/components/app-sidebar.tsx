@@ -3,7 +3,6 @@
 import * as React from 'react';
 
 import { NavMain } from '@/components/nav-main';
-import { NavProjects } from '@/components/nav-projects';
 import { NavUser } from '@/components/nav-user';
 import { TeamSwitcher } from '@/components/team-switcher';
 import {
@@ -14,13 +13,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import {
-  GalleryVerticalEndIcon,
-  AudioLinesIcon,
-  TerminalIcon,
   Settings2Icon,
-  FrameIcon,
-  PieChartIcon,
-  MapIcon,
   LayoutDashboard,
   ShoppingCart,
   ChartLine,
@@ -28,7 +21,9 @@ import {
   UserStar,
   ListSortAscending,
   BellCheck,
+  HandCoins,
 } from 'lucide-react';
+import AppleLogo from "@/Apple.png"
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -36,19 +31,9 @@ import { useAuth } from '@/hooks/useAuth';
 const data = {
   teams: [
     {
-      name: 'Acme Inc',
-      logo: <GalleryVerticalEndIcon />,
-      plan: 'Enterprise',
-    },
-    {
-      name: 'Acme Corp.',
-      logo: <AudioLinesIcon />,
-      plan: 'Startup',
-    },
-    {
-      name: 'Evil Corp.',
-      logo: <TerminalIcon />,
-      plan: 'Free',
+      name: 'Apple IT Zone',
+      logo: AppleLogo,
+      plan: 'IT Zone',
     },
   ],
   navMain: [
@@ -67,7 +52,7 @@ const data = {
           url: '/admin/products',
         },
         {
-          title: 'Add Product',
+          title: 'New Product',
           url: '/admin/products/new',
         },
 
@@ -127,16 +112,31 @@ const data = {
       ],
     },
     {
+      title: 'Offers',
+      url: '#',
+      icon: <HandCoins />,
+      items: [
+        {
+          title: 'All Offers',
+          url: '/admin/offers',
+        },
+        {
+          title: 'New Offer',
+          url: '/admin/offers/new',
+        },
+      ],
+    },
+    {
       title: 'Reviews',
       url: '#',
       icon: <UserStar />,
       items: [
         {
-          title: 'All Reviews',
+          title: 'Reviews',
           url: '/admin/reviews',
         },
         {
-          title: 'All Questions',
+          title: 'Questions',
           url: '/admin/questions',
         },
       ],
@@ -160,9 +160,10 @@ const data = {
           title: 'Payments',
           url: '/admin/payments',
         },
+        
         {
           title: 'Coupons',
-          url: '/admin/coupons',
+          url: '/admin/promo',
         },
         {
           title: 'Slider',

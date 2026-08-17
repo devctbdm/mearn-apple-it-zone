@@ -58,6 +58,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { categoryApi, type Category, type CategoryForm } from '@/lib/api';
+import { SiteHeader } from '@/components/site-header';
 
 function normalize(c: Category): Category & { productCount: number } {
   return { ...c, productCount: (c as any).productCount ?? 0 };
@@ -577,6 +578,7 @@ export default function CategoriesPage() {
   }
 
   return (
+    <> <SiteHeader />
     <div className="space-y-6 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -946,6 +948,7 @@ export default function CategoriesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </>
   );
 }
 

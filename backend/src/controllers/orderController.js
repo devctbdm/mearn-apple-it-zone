@@ -355,3 +355,49 @@ export const updatePaymentStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Set/update the advance confirmation amount for a COD order, and/or
+//          manually record an advance payment received (operator verification).
+// @route   PUT /api/orders/:id/advance
+// @access  Private/Admin
+export const updateAdvance = async (req, res) => {
+  try {
+    const { advanceAmount, advancePaid, advanceReference } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (advanceAmount !== undefined) {
+      const amt = Number(advanceAmount);
+      if (isNaN(amt) || amt < 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid advance amount' });
+      }
+      order.advanceAmount = amt;
+    }
+    if (advancePaid !== undefined) {
+      const paid = Number(advancePaid);
+      if (isNaN(paid) || paid < 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid advance paid amount' });
+      }
+      order.advancePaid = paid;
+    }
+    if (advanceReference !== undefined) {
+      order.advanceReference = String(advanceReference || '').trim();
+    }
+
+    // Keep advancePaid within sensible bounds.
+    if (order.advancePaid > order.advanceAmount && order.advanceAmount > 0) {
+      order.advancePaid = order.advanceAmount;
+    }
+
+    await order.save();
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

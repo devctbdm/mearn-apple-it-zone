@@ -287,14 +287,15 @@ export const paymentApi = {
       state?: string;
       postcode?: string;
     };
-  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string }>('/payment/initiate', data),
+    advance?: boolean;
+  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string; advance?: boolean }>('/payment/initiate', data),
   validate: (data: {
     tran_id: string;
     val_id?: string;
     status?: string;
     amount?: number;
     card_type?: string;
-  }) => api.post<{ success: boolean; valid: boolean; order?: string }>('/payment/validate', data),
+  }) => api.post<{ success: boolean; valid: boolean; advance?: boolean; order?: string }>('/payment/validate', data),
 };
 
 export type ActiveTeamMember = {
@@ -424,6 +425,9 @@ export type Order = {
   };
   orderStatus: OrderStatus;
   note?: string;
+  advanceAmount?: number;
+  advancePaid?: number;
+  advanceReference?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -469,6 +473,16 @@ export const orderApi = {
       `/orders/${id}/payment-status`,
       { status }
     ),
+
+  updateAdvance: (
+    id: string,
+    data: {
+      advanceAmount?: number;
+      advancePaid?: number;
+      advanceReference?: string;
+    }
+  ) =>
+    api.put<{ success: boolean; order: Order }>(`/orders/${id}/advance`, data),
 
   create: (data: {
     items: { product: string; quantity: number }[];

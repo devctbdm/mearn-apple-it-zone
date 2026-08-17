@@ -67,7 +67,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { useWishlist, useCart, useAuth } from '@/store';
-import { authApi, orderApi, SavedAddress } from '@/lib/api';
+import { authApi, orderApi, paymentApi, SavedAddress } from '@/lib/api';
 import RequireAuth from '@/components/store/layout/RequireAuth';
 
 type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -84,6 +84,16 @@ type Order = {
   status: OrderStatus;
   items: OrderItem[];
   coupon?: { code: string; discount: number };
+  payment?: { method: string; status: string };
+  advanceAmount?: number;
+  advancePaid?: number;
+  shippingAddress?: {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+  };
 };
 
 type Address = {
@@ -254,6 +264,10 @@ function AccountContent() {
               total: o.totalAmount,
               status: o.orderStatus,
               coupon: o.coupon,
+              payment: o.payment,
+              advanceAmount: o.advanceAmount,
+              advancePaid: o.advancePaid,
+              shippingAddress: o.shippingAddress,
               items: o.items.map((i) => ({
                 name: i.name,
                 price: i.price,
@@ -352,6 +366,39 @@ function AccountContent() {
   const removeWish = (id: string) => {
     removeFromWishlist(id);
     toast.success('Removed from wishlist');
+  };
+
+  const payAdvance = async (o: Order) => {
+    if (!o.advanceAmount) return;
+    try {
+      const customer = {
+        name: user?.name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+        address: [o.shippingAddress?.street, o.shippingAddress?.city]
+          .filter(Boolean)
+          .join(', '),
+        city: o.shippingAddress?.city,
+        state: o.shippingAddress?.state,
+        postcode: o.shippingAddress?.postcode,
+        country: o.shippingAddress?.country,
+      };
+      const { data } = await paymentApi.initiate({
+        orderId: o.id,
+        amount: o.advanceAmount,
+        customer,
+        advance: true,
+      });
+      if (data.success && data.gatewayUrl) {
+        window.location.href = data.gatewayUrl;
+      } else {
+        toast.error('Could not start the advance payment');
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || 'Could not start the advance payment'
+      );
+    }
   };
 
   const saveProfile = async (v: z.infer<typeof profileSchema>) => {
@@ -537,6 +584,36 @@ function AccountContent() {
                           </div>
                         ))}
                       </div>
+                      {o.advanceAmount ? (
+                        <div className="mt-3 rounded-md border border-dashed bg-muted/40 p-3">
+                          {o.advancePaid &&
+                          o.advancePaid >= o.advanceAmount ? (
+                            <p className="text-xs text-green-600">
+                              Advance paid: ৳
+                              {o.advancePaid.toLocaleString()} · Due on
+                              delivery: ৳
+                              {(
+                                o.total - (o.advancePaid || 0)
+                              ).toLocaleString()}
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                Confirm this order with a ৳
+                                {o.advanceAmount.toLocaleString()} advance
+                                (deducted from delivery total).
+                              </p>
+                              <Button
+                                size="sm"
+                                onClick={() => payAdvance(o)}
+                              >
+                                Pay ৳{o.advanceAmount.toLocaleString()}{' '}
+                                advance
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                       </div>
                       );
                     })}

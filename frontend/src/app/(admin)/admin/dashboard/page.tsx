@@ -54,22 +54,30 @@ import {
 } from '@/lib/api';
 
 import { TrendingUp } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
+} from '@/components/ui/chart';
+import { SiteHeader } from '@/components/site-header';
 
-export const description = "A bar chart with a custom label"
+export const description = 'A bar chart with a custom label';
 
 const chartConfig = {
   value: {
-    label: "Sales",
-    color: "var(--chart-2)",
+    label: 'Sales',
+    color: 'var(--chart-2)',
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 // --- Helpers ---
 const formatTaka = (n: number) =>
@@ -108,8 +116,6 @@ function StatCardSkeleton() {
     </Card>
   );
 }
-
-
 
 function TableSkeleton() {
   return (
@@ -169,10 +175,7 @@ export function ChartBarLabelCustom({
         <CardDescription>Total sales for {year} (Jan - Dec)</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-100"
-        >
+        <ChartContainer config={chartConfig} className="aspect-auto h-100">
           <BarChart
             accessibilityLayer
             data={data}
@@ -387,7 +390,10 @@ export default function AdminDashboardPage() {
   const recentOrders = stats?.recentOrders || [];
 
   return (
+    <>
+    <SiteHeader />
     <div className="flex-1 space-y-6 p-8 pt-6">
+      
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -764,5 +770,6 @@ export default function AdminDashboardPage() {
         </DrawerContent>
       </Drawer>
     </div>
+    </>
   );
 }
