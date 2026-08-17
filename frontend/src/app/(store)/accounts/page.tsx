@@ -70,7 +70,7 @@ import { useWishlist, useCart, useAuth } from '@/store';
 import { authApi, orderApi, paymentApi, SavedAddress } from '@/lib/api';
 import RequireAuth from '@/components/store/layout/RequireAuth';
 
-type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
+type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 type OrderItem = {
   name: string;
   price: number;
@@ -158,6 +158,11 @@ const statusMeta: Record<
   OrderStatus,
   { label: string; className: string; Icon: typeof Clock }
 > = {
+  pending: {
+    label: 'Pending',
+    className: 'bg-amber-100 text-amber-800',
+    Icon: Clock,
+  },
   processing: {
     label: 'Processing',
     className: 'bg-blue-100 text-blue-800',

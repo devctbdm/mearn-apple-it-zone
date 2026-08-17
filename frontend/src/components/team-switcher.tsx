@@ -34,6 +34,7 @@ export function TeamSwitcher({
               alt="Logo"
               fill
               className="object-contain"
+              sizes="32px"
             />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">

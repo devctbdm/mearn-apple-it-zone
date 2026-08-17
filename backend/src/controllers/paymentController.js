@@ -19,6 +19,16 @@ const getSSLCommerzConfig = async () => {
   };
 };
 
+// When the confirmed advance fully covers the order total, the COD order is
+// effectively paid in full — mark the payment as paid and record the amount.
+const settleAdvanceIfFullyPaid = (order) => {
+  if (Number(order.advancePaid) >= Number(order.totalAmount)) {
+    order.payment.status = "paid";
+    order.payment.amount = Number(order.advancePaid) || order.payment.amount;
+    order.payment.paidAt = order.payment.paidAt || new Date();
+  }
+};
+
 // @desc    Initiate SSLCommerz payment for an order
 // @route   POST /api/payment/initiate
 // @access  Private
@@ -138,9 +148,8 @@ export const initiatePayment = async (req, res) => {
 // @access  Public (called by SSLCommerz redirect)
 export const validatePayment = async (req, res) => {
   try {
-    const { val_id, tran_id, status } = req.body?.tran_id
-      ? req.body
-      : req.query;
+    const body = req.body?.tran_id ? req.body : req.query;
+    const { val_id, tran_id, status, amount } = body;
 
     if (!tran_id) {
       return res
@@ -155,44 +164,68 @@ export const validatePayment = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
+    const norm = (s) => (typeof s === "string" ? s.trim().toUpperCase() : "");
+    const SUCCESS = ["VALID", "VALIDATED"];
+
+    // The redirect outcome (the `status` SSLCommerz sends in its redirect,
+    // or which result page the user landed on) is authoritative. In sandbox
+    // the server-to-server validation call is flaky/timing-sensitive, so we
+    // never let it downgrade a clearly successful redirect to "failed".
+    const redirectStatus = norm(status);
+    let outcome = null; // 'paid' | 'failed' | 'cancelled'
+    if (SUCCESS.includes(redirectStatus)) outcome = "paid";
+    else if (redirectStatus === "FAILED") outcome = "failed";
+    else if (redirectStatus === "CANCELLED") outcome = "cancelled";
+
+    // Supplement with the gateway validation only when present (non-throwing).
     let validation = null;
     if (val_id) {
-      const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
-      const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
-      validation = await sslcz.validate({ val_id });
+      try {
+        const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+        const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
+        validation = await sslcz.validate({ val_id });
+      } catch {
+        validation = null;
+      }
     }
-
-    const success =
-      status === "VALID" ||
-      status === "VALIDATED" ||
-      validation?.status === "VALID" ||
-      validation?.status === "VALIDATED";
+    const gwStatus = norm(validation?.status);
+    if (gwStatus && !outcome) {
+      if (SUCCESS.includes(gwStatus)) outcome = "paid";
+      else if (gwStatus === "FAILED") outcome = "failed";
+      else if (gwStatus === "CANCELLED") outcome = "cancelled";
+    }
 
     const isAdvance = tran_id.includes("_adv_");
 
-    if (success) {
+    if (outcome === "paid") {
       if (isAdvance) {
-        // Partial advance confirmation payment — do not mark the whole
-        // COD order as paid; just record the amount against the order.
-        order.advancePaid = Number(amount) || order.advanceAmount;
+        // Partial advance confirmation payment — do not mark the whole COD
+        // order as paid; just record the amount against the order.
+        order.advancePaid =
+          Number(validation?.amount) || Number(amount) || order.advanceAmount;
         order.advanceReference = tran_id;
+        settleAdvanceIfFullyPaid(order);
       } else {
         order.payment.status = "paid";
         order.payment.val_id = val_id || validation?.val_id || "";
         order.payment.card_type = validation?.card_type || "";
+        order.payment.amount =
+          Number(validation?.amount) || Number(amount) || order.payment.amount;
         order.payment.paidAt = order.payment.paidAt || new Date();
       }
-    } else if (status === "CANCELLED") {
+    } else if (outcome === "cancelled") {
       if (!isAdvance) order.payment.status = "cancelled";
     } else {
+      // failed (or unknown → failed, so it isn't stuck as pending)
       if (!isAdvance) order.payment.status = "failed";
     }
     await order.save();
 
     res.json({
       success: true,
-      valid: success,
+      valid: outcome === "paid",
       advance: isAdvance,
+      outcome,
       order: order._id,
     });
   } catch (error) {
@@ -221,20 +254,28 @@ export const ipnListener = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
-    let success = status === "VALID" || status === "VALIDATED";
+    const norm = (s) => (typeof s === "string" ? s.trim().toUpperCase() : "");
+    const SUCCESS = ["VALID", "VALIDATED"];
+    const redirectStatus = norm(status);
 
+    let success = SUCCESS.includes(redirectStatus);
+    let validation = null;
     if (!success && val_id) {
-      const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
-      const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
-      const validation = await sslcz.validate({ val_id });
-      success =
-        validation?.status === "VALID" || validation?.status === "VALIDATED";
+      try {
+        const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+        const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
+        validation = await sslcz.validate({ val_id });
+        success = SUCCESS.includes(norm(validation?.status));
+      } catch {
+        validation = null;
+      }
     }
 
     if (success) {
       if (tran_id.includes("_adv_")) {
         order.advancePaid = amount ? Number(amount) : order.advanceAmount;
         order.advanceReference = tran_id;
+        settleAdvanceIfFullyPaid(order);
       } else {
         order.payment.status = "paid";
         order.payment.val_id = val_id || "";
@@ -242,9 +283,9 @@ export const ipnListener = async (req, res) => {
         order.payment.amount = amount ? Number(amount) : order.payment.amount;
         order.payment.paidAt = order.payment.paidAt || new Date();
       }
-    } else if (status === "FAILED") {
+    } else if (redirectStatus === "FAILED") {
       if (!tran_id.includes("_adv_")) order.payment.status = "failed";
-    } else if (status === "CANCELLED") {
+    } else if (redirectStatus === "CANCELLED") {
       if (!tran_id.includes("_adv_")) order.payment.status = "cancelled";
     }
     await order.save();
@@ -288,6 +329,7 @@ export const queryTransaction = async (req, res) => {
       if (isAdvance) {
         order.advancePaid = Number(result.amount) || order.advanceAmount;
         order.advanceReference = tran_id;
+        settleAdvanceIfFullyPaid(order);
       } else {
         order.payment.status = "paid";
         order.payment.val_id = result.val_id || order.payment.val_id || "";

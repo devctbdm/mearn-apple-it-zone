@@ -288,7 +288,7 @@ export const paymentApi = {
       postcode?: string;
     };
     advance?: boolean;
-  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string; advance?: boolean }>('/payment/initiate', data),
+  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string; advance?: boolean; message?: string }>('/payment/initiate', data),
   validate: (data: {
     tran_id: string;
     val_id?: string;
@@ -398,6 +398,7 @@ export type LoginResponse = {
 };
 
 export type OrderStatus =
+  | 'pending'
   | 'processing'
   | 'shipped'
   | 'delivered'
@@ -450,6 +451,7 @@ export type Order = {
 
 export type OrderStats = {
   total: number;
+  pending: number;
   processing: number;
   shipped: number;
   delivered: number;

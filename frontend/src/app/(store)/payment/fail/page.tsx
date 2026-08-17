@@ -44,8 +44,50 @@ function FailContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   const orderId = useMemo(() => orderIdFromTran(tran_id), [tran_id]);
+
+  // Re-pay the SAME order instead of creating a duplicate. The order was
+  // already created at checkout; a failed payment must not spawn a second one.
+  const handleRetry = async () => {
+    if (!orderId) {
+      setRetryError('Could not find the original order. Please return to checkout.');
+      return;
+    }
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const res = await orderApi.getById(orderId);
+      const o = res.data.order;
+      const isAdvance = !!tran_id?.includes('_adv_');
+      const amount = o.payment?.amount ?? o.totalAmount;
+      const u = typeof o.user === 'object' && o.user ? o.user : null;
+      const customer = {
+        name: u?.name || '',
+        email: u?.email || '',
+        phone: u?.phone || '',
+        address: o.shippingAddress?.street || '',
+        city: o.shippingAddress?.city || '',
+        state: o.shippingAddress?.state || '',
+        postcode: o.shippingAddress?.postcode || '',
+      };
+      const payRes = await paymentApi.initiate({ orderId, amount, customer, advance: isAdvance });
+      if (payRes.data.success && payRes.data.gatewayUrl) {
+        window.location.href = payRes.data.gatewayUrl;
+        return;
+      }
+      throw new Error(payRes.data.message || 'Could not start the payment.');
+    } catch (e: any) {
+      setRetryError(
+        e?.response?.data?.message ||
+          e?.message ||
+          'Payment could not be started. Please return to checkout.'
+      );
+      setRetrying(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -138,11 +180,9 @@ function FailContent() {
             </motion.div>
 
             <motion.div variants={itemVariants} className="mt-8 grid w-full gap-3 sm:grid-cols-2">
-              <Button className="w-full">
-                <Link href="/checkout" className="flex items-center gap-2">
-                  <RefreshCw className="size-4" />
-                  Try again
-                </Link>
+              <Button className="w-full" onClick={handleRetry} disabled={retrying}>
+                <RefreshCw className={`size-4 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Redirecting…' : 'Try again'}
               </Button>
               <Button variant="outline" className="w-full">
                 <Link href="/cart" className="flex items-center gap-2">
@@ -151,6 +191,12 @@ function FailContent() {
                 </Link>
               </Button>
             </motion.div>
+
+            {retryError ? (
+              <motion.p variants={itemVariants} className="mt-3 text-center text-xs text-destructive">
+                {retryError}
+              </motion.p>
+            ) : null}
 
             <motion.div variants={itemVariants} className="mt-3 w-full">
               <Link href="/support" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline">

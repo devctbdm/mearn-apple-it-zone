@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { paymentApi, orderApi, type Order } from '@/lib/api';
+import { useCart } from '@/store';
 
 const ringVariants = {
   hidden: { scale: 0.8, opacity: 0 },
@@ -77,6 +78,7 @@ function SuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const { clearCart } = useCart();
 
   const orderId = useMemo(() => orderIdFromTran(tran_id), [tran_id]);
 
@@ -85,7 +87,14 @@ function SuccessContent() {
     (async () => {
       try {
         if (tran_id) {
-          await paymentApi.validate({ tran_id, val_id, status }).catch(() => {});
+          await paymentApi.validate({ tran_id, val_id, status: status || 'VALID' }).catch(() => {});
+          // Payment succeeded (SSLCommerz only lands here on success) — now
+          // it's safe to empty the cart. We deliberately do NOT clear it on a
+          // failed payment so the customer can retry with items intact.
+          clearCart();
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('aiz_pending_order');
+          }
         }
         if (orderId) {
           const res = await orderApi.getById(orderId);
@@ -100,7 +109,7 @@ function SuccessContent() {
     return () => {
       active = false;
     };
-  }, [tran_id, val_id, status, orderId]);
+  }, [tran_id, val_id, status, orderId, clearCart]);
 
   const paid = order?.payment?.amount ?? order?.totalAmount ?? 0;
   const method = order?.payment?.method ? order.payment.method.toUpperCase() : 'SSLCommerz';

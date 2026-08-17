@@ -81,13 +81,16 @@ export const removeFromCart = async (req, res) => {
 
 export const clearCart = async (req, res) => {
   try {
-    const cart = await Cart.findOne({ user: req.user._id });
-    if (cart) {
-      cart.items = [];
-      await cart.save();
-    }
+    // updateOne avoids loading the document, the pre('save') hook and any
+    // subdocument validation/casting — robust even if a cart somehow holds a
+    // malformed item.
+    await Cart.updateOne(
+      { user: req.user._id },
+      { $set: { items: [], totalItems: 0, totalPrice: 0 } }
+    );
     res.json({ success: true, message: 'Cart cleared' });
   } catch (error) {
+    console.error('❌ clearCart error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

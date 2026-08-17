@@ -159,7 +159,7 @@ export function ProductFilters({ products, filters, onChange }: ProductFiltersPr
   const priceRange = useMemo(() => getPriceRange(products), [products]);
 
   const min = priceRange[0];
-  const max = priceRange[1];
+  const max = Math.max(priceRange[1], min + 1);
 
   const priceValue: [number, number] = filters.price ?? [min, max];
 

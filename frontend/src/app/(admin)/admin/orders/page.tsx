@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Download,
   Printer,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,7 @@ import { orderApi, paymentApi, type Order, type OrderStatus } from '@/lib/api';
 type StatusFilter = OrderStatus | 'all';
 
 const statusVariant: Record<OrderStatus, string> = {
+  pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
   shipped: 'bg-purple-100 text-purple-800 hover:bg-blue-100',
   delivered: 'bg-green-100 text-green-800 hover:bg-green-100',
@@ -142,6 +144,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     total: number;
+    pending: number;
     processing: number;
     shipped: number;
     delivered: number;
@@ -458,6 +461,12 @@ export default function OrdersPage() {
       color: 'text-foreground',
     },
     {
+      label: 'Pending',
+      value: stats?.pending ?? 0,
+      icon: Clock,
+      color: 'text-amber-600',
+    },
+    {
       label: 'Processing',
       value: stats?.processing ?? 0,
       icon: Loader2,
@@ -522,6 +531,7 @@ export default function OrdersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
@@ -966,6 +976,7 @@ export default function OrdersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
                   <SelectItem value="shipped">Shipped</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>

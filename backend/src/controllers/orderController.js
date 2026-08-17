@@ -107,7 +107,7 @@ export const createOrder = async (req, res) => {
         method: paymentMethod || "sslcommerz",
         status: "pending",
       },
-      orderStatus: "processing",
+      orderStatus: "pending",
       note: note || "",
       orderNumber,
     });
@@ -273,6 +273,7 @@ export const getOrderStats = async (req, res) => {
     ]);
     const stats = {
       total: 0,
+      pending: 0,
       processing: 0,
       shipped: 0,
       delivered: 0,
@@ -282,7 +283,11 @@ export const getOrderStats = async (req, res) => {
       if (stats[g._id] !== undefined) stats[g._id] = g.count;
     });
     stats.total =
-      stats.processing + stats.shipped + stats.delivered + stats.cancelled;
+      stats.pending +
+      stats.processing +
+      stats.shipped +
+      stats.delivered +
+      stats.cancelled;
     res.json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -295,7 +300,7 @@ export const getOrderStats = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ["Pending","Processing", "Shipped", "Delivered", "Cancelled"];
+    const validStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -311,7 +316,7 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     // If cancelling, restore stock
-    if (status === "Cancelled" && order.orderStatus !== "Cancelled") {
+    if (status === "cancelled" && order.orderStatus !== "cancelled") {
       for (const item of order.items) {
         const product = await Product.findById(item.product);
         if (product) {
@@ -417,6 +422,19 @@ export const updateAdvance = async (req, res) => {
     // Keep advancePaid within sensible bounds.
     if (order.advancePaid > order.advanceAmount && order.advanceAmount > 0) {
       order.advancePaid = order.advanceAmount;
+    }
+
+    // If the confirmed advance fully covers the order, it is paid in full.
+    if (
+      Number(order.advancePaid) >= Number(order.totalAmount) &&
+      order.advancePaid > 0
+    ) {
+      order.payment.status = "paid";
+      order.payment.amount = Number(order.advancePaid) || order.payment.amount;
+      order.payment.paidAt = order.payment.paidAt || new Date();
+    } else if (order.payment.status === "paid") {
+      // Advance no longer covers the order — revert to pending.
+      order.payment.status = "pending";
     }
 
     await order.save();
