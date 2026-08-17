@@ -296,6 +296,17 @@ export const paymentApi = {
     amount?: number;
     card_type?: string;
   }) => api.post<{ success: boolean; valid: boolean; advance?: boolean; order?: string }>('/payment/validate', data),
+  queryTransaction: (tran_id: string) =>
+    api.get<{
+      success: boolean;
+      gatewayStatus?: string;
+      paymentStatus?: string;
+      advancePaid?: number;
+      updated?: boolean;
+      order?: string;
+    }>(`/payment/transaction/${tran_id}`),
+  cancel: (data: { tran_id: string }) =>
+    api.post<{ success: boolean; message: string }>('/payment/cancel', data),
 };
 
 export type ActiveTeamMember = {
@@ -422,6 +433,10 @@ export type Order = {
   payment: {
     method: string;
     status: string;
+    tran_id?: string;
+    amount?: number;
+    val_id?: string;
+    card_type?: string;
     paidAt?: string;
   };
   orderStatus: OrderStatus;
@@ -444,6 +459,9 @@ export type OrderStats = {
 export const orderApi = {
   getMyOrders: () =>
     api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
+
+  getById: (id: string) =>
+    api.get<{ success: boolean; order: Order }>(`/orders/${id}`),
   getAllOrders: (params?: {
     page?: number;
     limit?: number;

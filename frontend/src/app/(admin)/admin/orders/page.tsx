@@ -67,7 +67,7 @@ import {
 } from '@/components/ui/pagination';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
-import { orderApi, type Order, type OrderStatus } from '@/lib/api';
+import { orderApi, paymentApi, type Order, type OrderStatus } from '@/lib/api';
 
 type StatusFilter = OrderStatus | 'all';
 
@@ -158,6 +158,7 @@ export default function OrdersPage() {
   const [advanceAmountDraft, setAdvanceAmountDraft] = useState('');
   const [advancePaidDraft, setAdvancePaidDraft] = useState('');
   const [advanceRefDraft, setAdvanceRefDraft] = useState('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -185,8 +186,53 @@ export default function OrdersPage() {
     }
   }, [page, statusFilter, debouncedQuery]);
 
-  const fetchStats = useCallback(async () => {
+  // Re-query the real transaction status from SSLCommerz and sync it onto the order.
+  const syncPayment = async (order: Order) => {
+    const tranId = order.payment?.tran_id;
+    if (!tranId) {
+      toast.error('No gateway transaction for this order');
+      return;
+    }
     try {
+      setSyncingId(order._id);
+      const res = await paymentApi.queryTransaction(tranId);
+      if (res.data.paymentStatus) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === order._id
+              ? {
+                  ...o,
+                  payment: { ...o.payment, status: res.data.paymentStatus as Order['payment']['status'] },
+                  advancePaid: res.data.advancePaid ?? o.advancePaid,
+                }
+              : o
+          )
+        );
+        if (viewOrder?._id === order._id) {
+          setViewOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  payment: { ...prev.payment, status: res.data.paymentStatus as Order['payment']['status'] },
+                  advancePaid: res.data.advancePaid ?? prev.advancePaid,
+                }
+              : prev
+          );
+        }
+      }
+      toast.success(
+        res.data.updated
+          ? `Synced: payment is ${res.data.paymentStatus}`
+          : `Gateway status: ${res.data.gatewayStatus || res.data.paymentStatus} (no change)`
+      );
+    } catch {
+      toast.error('Failed to query SSLCommerz');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const fetchStats = useCallback(async () => {    try {
       const { data } = await orderApi.getStats();
       if (data.success) setStats(data.stats);
     } catch {
@@ -748,6 +794,23 @@ export default function OrdersPage() {
                   >
                     {paymentStatusLabel(viewOrder.payment.status)}
                   </Badge>
+                  {viewOrder.payment.tran_id ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      disabled={syncingId === viewOrder._id}
+                      onClick={() => syncPayment(viewOrder)}
+                    >
+                      {syncingId === viewOrder._id
+                        ? 'Syncing…'
+                        : 'Sync from SSLCommerz'}
+                    </Button>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      No gateway transaction (e.g. COD)
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="font-medium">

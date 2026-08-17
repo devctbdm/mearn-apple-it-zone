@@ -256,6 +256,73 @@ export const ipnListener = async (req, res) => {
   }
 };
 
+// @desc    Query the real transaction status from SSLCommerz by tran_id and
+//          sync it onto the order. Used by the admin "refresh from gateway".
+// @route   GET /api/payment/transaction/:tran_id
+// @access  Admin
+export const queryTransaction = async (req, res) => {
+  try {
+    const { tran_id } = req.params;
+    if (!tran_id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "tran_id is required" });
+    }
+
+    const order = await Order.findByTranId(tran_id);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
+    const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
+
+    const result = await sslcz.transactionQueryByTransactionId({ tran_id });
+    const gatewayStatus = result?.status; // VALID / VALIDATED / FAILED / CANCELLED / UNATTEMPTED
+    const isAdvance = tran_id.includes("_adv_");
+    let updated = false;
+
+    if (gatewayStatus === "VALID" || gatewayStatus === "VALIDATED") {
+      if (isAdvance) {
+        order.advancePaid = Number(result.amount) || order.advanceAmount;
+        order.advanceReference = tran_id;
+      } else {
+        order.payment.status = "paid";
+        order.payment.val_id = result.val_id || order.payment.val_id || "";
+        order.payment.amount = Number(result.amount) || order.payment.amount;
+        order.payment.paidAt = order.payment.paidAt || new Date();
+      }
+      updated = true;
+    } else if (gatewayStatus === "FAILED") {
+      if (!isAdvance && order.payment.status === "pending") {
+        order.payment.status = "failed";
+        updated = true;
+      }
+    } else if (gatewayStatus === "CANCELLED") {
+      if (!isAdvance && order.payment.status === "pending") {
+        order.payment.status = "cancelled";
+        updated = true;
+      }
+    }
+
+    if (updated) await order.save();
+
+    res.json({
+      success: true,
+      gatewayStatus,
+      paymentStatus: order.payment.status,
+      advancePaid: order.advancePaid,
+      updated,
+      order: order._id,
+    });
+  } catch (error) {
+    console.error("SSLCommerz Query Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Mark an order's payment as cancelled
 // @route   GET/POST /api/payment/cancel
 // @access  Public (called by SSLCommerz redirect)
