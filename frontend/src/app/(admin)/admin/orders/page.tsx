@@ -12,6 +12,7 @@ import {
   Download,
   Printer,
   Clock,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,16 +69,22 @@ import {
 } from '@/components/ui/pagination';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
-import { orderApi, paymentApi, type Order, type OrderStatus } from '@/lib/api';
+import {
+  orderApi,
+  paymentApi,
+  courierApi,
+  type Order,
+  type OrderStatus,
+  type Courier,
+} from '@/lib/api';
 
 type StatusFilter = OrderStatus | 'all';
 
 const statusVariant: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  shipped: 'bg-purple-100 text-purple-800 hover:bg-blue-100',
-  delivered: 'bg-green-100 text-green-800 hover:bg-green-100',
   cancelled: 'bg-red-100 text-red-800 hover:bg-red-100',
+  send_courier: 'bg-violet-100 text-violet-800 hover:bg-violet-100',
 };
 
 const paymentStatusVariant: Record<string, string> = {
@@ -146,9 +153,8 @@ export default function OrdersPage() {
     total: number;
     pending: number;
     processing: number;
-    shipped: number;
-    delivered: number;
     cancelled: number;
+    send_courier: number;
   } | null>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -162,11 +168,73 @@ export default function OrdersPage() {
   const [advancePaidDraft, setAdvancePaidDraft] = useState('');
   const [advanceRefDraft, setAdvanceRefDraft] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [couriers, setCouriers] = useState<Courier[]>([]);
+  const [selectedCourier, setSelectedCourier] = useState<string>('');
+  const [assigningCourier, setAssigningCourier] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
     return () => clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    courierApi
+      .list()
+      .then((r) => {
+        if (r.data.success) setCouriers(r.data.couriers);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (editOrder) {
+      const c = editOrder.courier;
+      const id =
+        typeof c === 'object' && c ? c._id : typeof c === 'string' ? c : '';
+      setSelectedCourier(id);
+    }
+  }, [editOrder]);
+
+  const handleAssignCourier = async () => {
+    if (!editOrder || !selectedCourier) {
+      toast.error('Select a courier to assign');
+      return;
+    }
+    try {
+      setAssigningCourier(true);
+      const res = await courierApi.assign(editOrder._id, selectedCourier);
+      if (res.data.success) {
+        const courierName =
+          typeof res.data.order.courier === 'object' &&
+          res.data.order.courier?.name;
+        if (res.data.delivery) {
+          toast.success(
+            `Sent to ${courierName || 'courier'}${
+              res.data.delivery.consignmentId
+                ? ` · consignment ${res.data.delivery.consignmentId}`
+                : ' (draft — complete in Delivery)'
+            }`
+          );
+        } else {
+          toast.success(`Assigned to ${courierName || 'courier'}`);
+        }
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === editOrder._id
+              ? { ...o, courier: res.data.order.courier }
+              : o
+          )
+        );
+        setEditOrder((prev) =>
+          prev ? { ...prev, courier: res.data.order.courier } : prev
+        );
+      }
+    } catch {
+      toast.error('Failed to assign courier');
+    } finally {
+      setAssigningCourier(false);
+    }
+  };
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -473,10 +541,10 @@ export default function OrdersPage() {
       color: 'text-blue-600',
     },
     {
-      label: 'Delivered',
-      value: stats?.delivered ?? 0,
-      icon: CheckCircle2,
-      color: 'text-green-600',
+      label: 'Sent to courier',
+      value: stats?.send_courier ?? 0,
+      icon: Truck,
+      color: 'text-violet-600',
     },
     {
       label: 'Cancelled',
@@ -533,8 +601,7 @@ export default function OrdersPage() {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="send_courier">Sent to courier</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -978,17 +1045,45 @@ export default function OrdersPage() {
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="shipped">Shipped</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="send_courier">Sent to courier</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Courier
+              </p>
+              <Select
+                value={selectedCourier}
+                onValueChange={(v) => setSelectedCourier(v ?? '')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select courier system" />
+                </SelectTrigger>
+                <SelectContent>
+                  {couriers.length === 0 ? (
+                    <SelectItem value="__none" disabled>
+                      No couriers available
+                    </SelectItem>
+                  ) : (
+                    couriers.map((c) => (
+                      <SelectItem key={c._id} value={c._id}>
+                        {c.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="mt-3 flex-col gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setEditOrder(null)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveStatus}>Save</Button>
+              <Button onClick={handleAssignCourier} disabled={assigningCourier}>
+                {assigningCourier ? 'Sending…' : 'Assign & send to courier'}
+              </Button>
+              <Button onClick={handleSaveStatus}>Save status</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

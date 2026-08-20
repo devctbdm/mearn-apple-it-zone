@@ -555,7 +555,18 @@ export const getAddresses = async (req, res) => {
 // @access  Private
 export const addAddress = async (req, res) => {
   try {
-    const { label, fullName, phone, street, city, state, postcode, country } = req.body;
+    const {
+      label,
+      fullName,
+      phone,
+      street,
+      city,
+      state,
+      postcode,
+      country,
+      deliveryArea,
+      zoneId,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -572,6 +583,8 @@ export const addAddress = async (req, res) => {
       state: state || '',
       postcode: postcode || '',
       country: country || 'Bangladesh',
+      deliveryArea: deliveryArea || '',
+      zoneId: zoneId || '',
       isDefault: isFirst,
     });
 
@@ -588,7 +601,18 @@ export const addAddress = async (req, res) => {
 export const updateAddress = async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, fullName, phone, street, city, state, postcode, country } = req.body;
+    const {
+      label,
+      fullName,
+      phone,
+      street,
+      city,
+      state,
+      postcode,
+      country,
+      deliveryArea,
+      zoneId,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -608,6 +632,8 @@ export const updateAddress = async (req, res) => {
     if (state !== undefined) address.state = state;
     if (postcode !== undefined) address.postcode = postcode;
     if (country !== undefined) address.country = country;
+    if (deliveryArea !== undefined) address.deliveryArea = deliveryArea;
+    if (zoneId !== undefined) address.zoneId = zoneId;
 
     await user.save();
     res.json({ success: true, addresses: user.addresses });

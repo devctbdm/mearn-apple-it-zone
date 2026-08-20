@@ -35,9 +35,8 @@ export const getDashboardStats = async (req, res) => {
       { $group: { _id: '$orderStatus', count: { $sum: 1 } } },
     ]);
     const ordersByStatus = {
+      pending: 0,
       processing: 0,
-      shipped: 0,
-      delivered: 0,
       cancelled: 0,
     };
     grouped.forEach((g) => {

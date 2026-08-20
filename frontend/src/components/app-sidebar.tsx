@@ -174,6 +174,10 @@ const data = {
           url: '/admin/sms',
         },
         {
+          title: 'Pathao',
+          url: '/admin/pathao',
+        },
+        {
           title: 'Maintenance',
           url: '/admin/maintenance',
         },

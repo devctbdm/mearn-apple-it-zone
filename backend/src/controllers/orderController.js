@@ -275,19 +275,14 @@ export const getOrderStats = async (req, res) => {
       total: 0,
       pending: 0,
       processing: 0,
-      shipped: 0,
-      delivered: 0,
       cancelled: 0,
+      send_courier: 0,
     };
     grouped.forEach((g) => {
       if (stats[g._id] !== undefined) stats[g._id] = g.count;
     });
     stats.total =
-      stats.pending +
-      stats.processing +
-      stats.shipped +
-      stats.delivered +
-      stats.cancelled;
+      stats.pending + stats.processing + stats.cancelled + stats.send_courier;
     res.json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -300,7 +295,7 @@ export const getOrderStats = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
+    const validStatuses = ["pending", "processing", "cancelled", "send_courier"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,

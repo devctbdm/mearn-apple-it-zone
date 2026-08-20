@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 import './src/models/User.js';
 import './src/models/Product.js';
 import './src/models/Cart.js';
-import './src/models/Order.js';
+import Order from './src/models/Order.js';
+import Courier from './src/models/Courier.js';
 import { backfillOrderNumbers } from './src/utils/orderNumber.js';
 
 dotenv.config();
@@ -16,12 +17,55 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB
 await connectDB();
 
-// Assign sequential order numbers (AIZ-1, AIZ-2, ...) to any existing orders
+// Assign sequential order numbers (#1, #2, ...) to any existing orders
 backfillOrderNumbers()
   .then((n) => {
     if (n) console.log(`🆔 Backfilled ${n} order number(s)`);
   })
   .catch((e) => console.error('Order number backfill failed:', e.message));
+
+// Seed default couriers (Pathao today; more can be added from admin later).
+Courier.countDocuments()
+  .then(async (count) => {
+    if (count === 0) {
+      await Courier.create({
+        name: 'Pathao',
+        slug: 'pathao',
+        active: true,
+        description: 'Pathao Courier (sandbox)',
+      });
+      console.log('🚚 Seeded default courier: Pathao');
+    }
+  })
+  .catch((e) => console.error('Courier seed failed:', e.message));
+
+// Migrate legacy order statuses that were removed from the enum.
+Order.updateMany(
+  { orderStatus: { $in: ['shipped', 'delivered'] } },
+  { $set: { orderStatus: 'processing' } }
+)
+  .then((res) => {
+    if (res.modifiedCount) {
+      console.log(`🔄 Migrated ${res.modifiedCount} legacy order(s) to processing`);
+    }
+  })
+  .catch((e) => console.error('Order status migration failed:', e.message));
+
+// Migrate legacy "AIZ-N" order numbers to the "#N" format.
+Order.find({ orderNumber: { $regex: /^AIZ-/i } })
+  .then(async (legacy) => {
+    for (const o of legacy) {
+      const m = /^AIZ-(\d+)$/i.exec(o.orderNumber || '');
+      if (m) {
+        o.orderNumber = `#${m[1]}`;
+        await o.save();
+      }
+    }
+    if (legacy.length) {
+      console.log(`🔄 Migrated ${legacy.length} legacy order number(s) to # format`);
+    }
+  })
+  .catch((e) => console.error('Order number migration failed:', e.message));
 
 // Start server after successful connection
 const server = app.listen(PORT, () => {

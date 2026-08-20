@@ -70,15 +70,18 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      enum: ['pending', 'processing', 'cancelled', 'send_courier'],
       default: 'pending',
     },
+    // Courier assigned to fulfil this order (slug from the Courier table),
+    // e.g. "pathao". Empty until an admin assigns one.
+    courier: { type: String, default: '', index: true },
     note: {
       type: String,
       trim: true,
       maxlength: [500, 'Note cannot exceed 500 characters'],
     },
-    // Human-friendly sequential order number, e.g. AIZ-1, AIZ-2 (auto-generated).
+    // Human-friendly sequential order number, e.g. #1, #2 (auto-generated).
     orderNumber: {
       type: String,
       unique: true,

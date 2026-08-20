@@ -1,16 +1,16 @@
 import Counter from '../models/Counter.js';
 import Order from '../models/Order.js';
 
-const ORDER_PREFIX = 'AIZ';
+const ORDER_PREFIX = '#';
 
-// Atomically fetch the next sequential order number (AIZ-1, AIZ-2, ...).
+// Atomically fetch the next sequential order number (#1, #2, ...).
 export const getNextOrderNumber = async () => {
   const counter = await Counter.findByIdAndUpdate(
     'order',
     { $inc: { seq: 1 } },
     { new: true, upsert: true }
   );
-  return `${ORDER_PREFIX}-${counter.seq}`;
+  return `${ORDER_PREFIX}${counter.seq}`;
 };
 
 // One-time backfill: assign sequential numbers to any existing orders that

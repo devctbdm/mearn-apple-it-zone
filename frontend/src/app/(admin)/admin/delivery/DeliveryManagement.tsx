@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Package,
   Truck,
@@ -17,14 +17,22 @@ import {
   PhoneCall,
   MessageSquare,
   RefreshCw,
+  Plus,
+  AlertTriangle,
 } from 'lucide-react';
 import { SiteHeader } from '@/components/site-header';
+import { toast } from 'sonner';
+import {
+  deliveryApi,
+  type Delivery,
+  type DeliveryStatus,
+  type PathaoLocation,
+} from '@/lib/api';
 
-/* ---------------------------------------------------------
-   MOCK DATA — replace with calls to your Pathow API
-   e.g. GET /api/deliveries, GET /api/deliveries/:id
---------------------------------------------------------- */
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<
+  DeliveryStatus,
+  { label: string; color: string; bg: string; icon: any }
+> = {
   pending: { label: 'Pending', color: '#B45309', bg: '#FEF3E2', icon: Clock },
   picked_up: {
     label: 'Picked Up',
@@ -53,178 +61,7 @@ const STATUS_CONFIG = {
   },
 };
 
-const MOCK_DELIVERIES: Delivery[] = [
-  {
-    id: '1',
-    trackingId: 'PTW-88213',
-    customer: 'Nusrat Jahan',
-    phone: '01711-223344',
-    pickup: 'Gulshan Circle 2, Dhaka',
-    dropoff: 'Bashundhara R/A, Block C',
-    rider: 'Rakib Hasan',
-    status: 'in_transit',
-    payment: 'COD',
-    amount: 1450,
-    distance: '6.2 km',
-    eta: '18 min',
-    createdAt: '10:24 AM',
-  },
-  {
-    id: '2',
-    trackingId: 'PTW-88214',
-    customer: 'Tanvir Ahmed',
-    phone: '01822-556677',
-    pickup: 'Dhanmondi 27',
-    dropoff: 'Mohammadpur Town Hall',
-    rider: 'Sohel Rana',
-    status: 'pending',
-    payment: 'Prepaid',
-    amount: 890,
-    distance: '4.1 km',
-    eta: '—',
-    createdAt: '10:41 AM',
-  },
-  {
-    id: '3',
-    trackingId: 'PTW-88215',
-    customer: 'Farhana Islam',
-    phone: '01933-887766',
-    pickup: 'Uttara Sector 7',
-    dropoff: 'Airport Rd, Khilkhet',
-    rider: 'Imran Kabir',
-    status: 'delivered',
-    payment: 'COD',
-    amount: 2100,
-    distance: '8.7 km',
-    eta: 'Delivered',
-    createdAt: '09:12 AM',
-  },
-  {
-    id: '4',
-    trackingId: 'PTW-88216',
-    customer: 'Shakil Mahmud',
-    phone: '01611-998877',
-    pickup: 'Banani DOHS',
-    dropoff: 'Gulshan 1',
-    rider: '—',
-    status: 'pending',
-    payment: 'Prepaid',
-    amount: 650,
-    distance: '3.4 km',
-    eta: '—',
-    createdAt: '11:02 AM',
-  },
-  {
-    id: '5',
-    trackingId: 'PTW-88217',
-    customer: 'Ayesha Siddika',
-    phone: '01755-334455',
-    pickup: 'Mirpur 10',
-    dropoff: 'Agargaon',
-    rider: 'Rakib Hasan',
-    status: 'picked_up',
-    payment: 'COD',
-    amount: 1200,
-    distance: '5.5 km',
-    eta: '26 min',
-    createdAt: '11:15 AM',
-  },
-  {
-    id: '6',
-    trackingId: 'PTW-88218',
-    customer: 'Kamal Hossain',
-    phone: '01944-112233',
-    pickup: 'Khulna Sonadanga',
-    dropoff: 'Khulna Boyra',
-    rider: 'Jasim Uddin',
-    status: 'failed',
-    payment: 'COD',
-    amount: 780,
-    distance: '3.9 km',
-    eta: '—',
-    createdAt: '08:47 AM',
-  },
-  {
-    id: '7',
-    trackingId: 'PTW-88219',
-    customer: 'Rumana Akter',
-    phone: '01677-445566',
-    pickup: 'Chattogram GEC',
-    dropoff: 'Chattogram Agrabad',
-    rider: 'Delwar Hossain',
-    status: 'delivered',
-    payment: 'Prepaid',
-    amount: 1990,
-    distance: '7.3 km',
-    eta: 'Delivered',
-    createdAt: '07:58 AM',
-  },
-  {
-    id: '8',
-    trackingId: 'PTW-88220',
-    customer: 'Mahdi Hasan',
-    phone: '01511-667788',
-    pickup: 'Sylhet Zindabazar',
-    dropoff: 'Sylhet Amberkhana',
-    rider: '—',
-    status: 'cancelled',
-    payment: 'COD',
-    amount: 540,
-    distance: '2.8 km',
-    eta: '—',
-    createdAt: '09:30 AM',
-  },
-  {
-    id: '9',
-    trackingId: 'PTW-88221',
-    customer: 'Sabrina Chowdhury',
-    phone: '01822-990011',
-    pickup: 'Dhanmondi 15',
-    dropoff: 'Elephant Rd',
-    rider: 'Sohel Rana',
-    status: 'in_transit',
-    payment: 'COD',
-    amount: 1330,
-    distance: '3.1 km',
-    eta: '9 min',
-    createdAt: '11:28 AM',
-  },
-  {
-    id: '10',
-    trackingId: 'PTW-88222',
-    customer: 'Habibur Rahman',
-    phone: '01933-223311',
-    pickup: 'Wari, Old Dhaka',
-    dropoff: 'Jatrabari',
-    rider: 'Imran Kabir',
-    status: 'picked_up',
-    payment: 'Prepaid',
-    amount: 970,
-    distance: '4.6 km',
-    eta: '31 min',
-    createdAt: '11:33 AM',
-  },
-];
-
-type DeliveryStatus = keyof typeof STATUS_CONFIG;
-
-interface Delivery {
-  id: string;
-  trackingId: string;
-  customer: string;
-  phone: string;
-  pickup: string;
-  dropoff: string;
-  rider: string;
-  status: DeliveryStatus;
-  payment: string;
-  amount: number;
-  distance: string;
-  eta: string;
-  createdAt: string;
-}
-
-const STATUS_TABS = [
+const STATUS_TABS: ('all' | DeliveryStatus)[] = [
   'all',
   'pending',
   'picked_up',
@@ -232,10 +69,17 @@ const STATUS_TABS = [
   'delivered',
   'failed',
   'cancelled',
-] as const;
+];
 
-function StatusPill({ status }: { status: keyof typeof STATUS_CONFIG }) {
-  const cfg = STATUS_CONFIG[status];
+function etaFor(status: DeliveryStatus) {
+  if (status === 'delivered') return 'Delivered';
+  if (status === 'in_transit') return 'On way';
+  if (status === 'picked_up') return 'Picked up';
+  return '—';
+}
+
+function StatusPill({ status }: { status: DeliveryStatus }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
   const Icon = cfg.icon;
   return (
     <span
@@ -248,7 +92,21 @@ function StatusPill({ status }: { status: keyof typeof STATUS_CONFIG }) {
   );
 }
 
-function StatCard({ label, value, delta, icon: Icon, accent, index }: { label: string; value: number; delta?: string; icon: any; accent: string; index: number }) {
+function StatCard({
+  label,
+  value,
+  delta,
+  icon: Icon,
+  accent,
+  index,
+}: {
+  label: string;
+  value: number;
+  delta?: string;
+  icon: any;
+  accent: string;
+  index: number;
+}) {
   return (
     <div
       className="animate-fadeUp relative flex-1 min-w-37.5 rounded-2xl p-4 border bg-white"
@@ -276,36 +134,144 @@ function StatCard({ label, value, delta, icon: Icon, accent, index }: { label: s
   );
 }
 
-function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onClose: () => void }) {
+function Timeline({ delivery }: { delivery: Delivery }) {
+  const entries = delivery.history?.length
+    ? delivery.history
+    : [
+        {
+          status: delivery.status,
+          note: 'Created',
+          timestamp: delivery.createdAt,
+        },
+      ];
+  return (
+    <div className="space-y-3">
+      {entries.map((t, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <CircleDot
+            size={14}
+            className={
+              i === entries.length - 1 ? 'text-orange-500' : 'text-slate-300'
+            }
+          />
+          <div
+            className="flex-1 text-sm"
+            style={{ color: t.status ? '#1E293B' : '#A3AAB8' }}
+          >
+            {STATUS_CONFIG[t.status as DeliveryStatus]?.label ||
+              t.status ||
+              'Update'}
+            {t.note ? (
+              <span className="text-slate-400"> — {t.note}</span>
+            ) : null}
+          </div>
+          <div className="font-mono text-[11px] text-slate-400">
+            {t.timestamp ? new Date(t.timestamp).toLocaleString() : ''}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[11px] text-slate-500 mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function DeliveryDrawer({
+  delivery,
+  onClose,
+  onTrack,
+  onStatusChange,
+  onPushDraft,
+}: {
+  delivery: Delivery | null;
+  onClose: () => void;
+  onTrack: (d: Delivery) => void;
+  onStatusChange: (id: string, status: DeliveryStatus) => void;
+  onPushDraft: (
+    id: string,
+    payload: {
+      storeId: number;
+      cityId: number;
+      zoneId: number;
+      areaId: number;
+      cityName?: string;
+      zoneName?: string;
+      areaName?: string;
+    }
+  ) => Promise<void>;
+}) {
+  const [localStatus, setLocalStatus] = useState<DeliveryStatus>('pending');
+  const [showPush, setShowPush] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [stores, setStores] = useState<PathaoLocation[]>([]);
+  const [cities, setCities] = useState<PathaoLocation[]>([]);
+  const [zones, setZones] = useState<PathaoLocation[]>([]);
+  const [areas, setAreas] = useState<PathaoLocation[]>([]);
+  const [sel, setSel] = useState<{
+    storeId?: number;
+    cityId?: number;
+    zoneId?: number;
+    areaId?: number;
+  }>({});
+
+  useEffect(() => {
+    if (delivery) setLocalStatus(delivery.status);
+  }, [delivery]);
+
+  useEffect(() => {
+    if (showPush) {
+      deliveryApi
+        .stores()
+        .then((r) => setStores(r.data.stores || []))
+        .catch(() => {});
+      deliveryApi
+        .cities()
+        .then((r) => setCities(r.data.cities || []))
+        .catch(() => {});
+    }
+  }, [showPush]);
+
+  useEffect(() => {
+    if (sel.cityId != null) {
+      deliveryApi
+        .zones(sel.cityId)
+        .then((r) => setZones(r.data.cities || []))
+        .catch(() => setZones([]));
+    } else {
+      setZones([]);
+      setAreas([]);
+    }
+    setSel((s) => ({ ...s, zoneId: undefined, areaId: undefined }));
+  }, [sel.cityId]);
+
+  useEffect(() => {
+    if (sel.zoneId != null) {
+      deliveryApi
+        .areas(sel.zoneId)
+        .then((r) => setAreas(r.data.areas || []))
+        .catch(() => setAreas([]));
+    } else {
+      setAreas([]);
+    }
+    setSel((s) => ({ ...s, areaId: undefined }));
+  }, [sel.zoneId]);
+
   if (!delivery) return null;
-  const cfg = STATUS_CONFIG[delivery.status];
-  const timeline = [
-    { label: 'Order placed', time: delivery.createdAt, done: true },
-    {
-      label: 'Rider assigned',
-      time: delivery.rider !== '—' ? '10:29 AM' : '—',
-      done: delivery.rider !== '—',
-    },
-    {
-      label: 'Picked up',
-      time: ['picked_up', 'in_transit', 'delivered'].includes(delivery.status)
-        ? '10:38 AM'
-        : '—',
-      done: ['picked_up', 'in_transit', 'delivered'].includes(delivery.status),
-    },
-    {
-      label: 'In transit',
-      time: ['in_transit', 'delivered'].includes(delivery.status)
-        ? '10:44 AM'
-        : '—',
-      done: ['in_transit', 'delivered'].includes(delivery.status),
-    },
-    {
-      label: 'Delivered',
-      time: delivery.status === 'delivered' ? '11:02 AM' : '—',
-      done: delivery.status === 'delivered',
-    },
-  ];
+  const cfg = STATUS_CONFIG[delivery.status] || STATUS_CONFIG.pending;
+  const isDraft = !delivery.consignmentId;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -323,10 +289,10 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
         >
           <div>
             <div className="font-mono text-xs text-slate-400 tracking-wide">
-              {delivery.trackingId}
+              {delivery.consignmentId || delivery.merchantOrderId || '—'}
             </div>
             <div className="font-display text-lg font-bold text-slate-900">
-              {delivery.customer}
+              {delivery.recipient.name}
             </div>
           </div>
           <button
@@ -347,7 +313,9 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
             >
               <div className="text-[11px] text-slate-500 mb-1">Payment</div>
               <div className="font-display font-semibold text-slate-900 text-sm">
-                {delivery.payment}
+                {delivery.amountToCollect > 0
+                  ? `COD ৳${delivery.amountToCollect}`
+                  : 'Prepaid'}
               </div>
             </div>
             <div
@@ -356,16 +324,18 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
             >
               <div className="text-[11px] text-slate-500 mb-1">Amount</div>
               <div className="font-mono font-semibold text-slate-900 text-sm">
-                ৳{delivery.amount}
+                ৳{delivery.amountToCollect}
               </div>
             </div>
             <div
               className="rounded-xl p-3 border"
               style={{ borderColor: '#E7E9EE' }}
             >
-              <div className="text-[11px] text-slate-500 mb-1">Distance</div>
-              <div className="font-display font-semibold text-slate-900 text-sm">
-                {delivery.distance}
+              <div className="text-[11px] text-slate-500 mb-1">
+                Delivery fee
+              </div>
+              <div className="font-mono font-semibold text-slate-900 text-sm">
+                ৳{delivery.deliveryFee || 0}
               </div>
             </div>
             <div
@@ -377,7 +347,7 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
                 className="font-display font-semibold text-sm"
                 style={{ color: cfg.color }}
               >
-                {delivery.eta}
+                {etaFor(delivery.status)}
               </div>
             </div>
           </div>
@@ -396,8 +366,15 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
                   className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full"
                   style={{ background: '#C2410C' }}
                 />
-                <div className="text-[11px] text-slate-500">Pickup</div>
-                <div className="text-sm text-slate-800">{delivery.pickup}</div>
+                <div className="text-[11px] text-slate-500">
+                  Pickup (Store #{delivery.storeId})
+                </div>
+                <div className="text-sm text-slate-800">
+                  {delivery.recipient.areaName
+                    ? `${delivery.recipient.areaName}, `
+                    : ''}
+                  {delivery.recipient.cityName || 'Pathao hub'}
+                </div>
               </div>
               <div className="relative">
                 <div
@@ -405,104 +382,202 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
                   style={{ background: cfg.color }}
                 />
                 <div className="text-[11px] text-slate-500">Dropoff</div>
-                <div className="text-sm text-slate-800">{delivery.dropoff}</div>
+                <div className="text-sm text-slate-800">
+                  {delivery.recipient.address}
+                </div>
               </div>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              <Bike size={13} /> Rider
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Recipient
             </div>
-            {delivery.rider !== '—' ? (
-              <div
-                className="flex items-center justify-between rounded-xl p-3 border"
-                style={{ borderColor: '#E7E9EE' }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center font-display font-bold text-sm text-white"
-                    style={{ background: '#C2410C' }}
-                  >
-                    {delivery.rider
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">
-                      {delivery.rider}
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      {delivery.phone}
-                    </div>
-                  </div>
+            <div
+              className="rounded-xl p-3 border flex items-center justify-between"
+              style={{ borderColor: '#E7E9EE' }}
+            >
+              <div>
+                <div className="text-sm font-semibold text-slate-900">
+                  {delivery.recipient.name}
                 </div>
-                <div className="flex gap-2">
-                  <button className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500">
-                    <PhoneCall size={14} />
-                  </button>
-                  <button className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500">
-                    <MessageSquare size={14} />
-                  </button>
+                <div className="text-[11px] text-slate-500">
+                  {delivery.recipient.phone}
                 </div>
               </div>
-            ) : (
-              <div
-                className="rounded-xl p-3 border border-dashed flex items-center justify-between"
-                style={{ borderColor: '#D8DCE3' }}
-              >
-                <span className="text-sm text-slate-500">
-                  No rider assigned
-                </span>
-                <button
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
-                  style={{ background: '#C2410C' }}
+              <div className="flex gap-2">
+                <a
+                  href={`tel:${delivery.recipient.phone}`}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500"
                 >
-                  Assign rider
-                </button>
+                  <PhoneCall size={14} />
+                </a>
+                <a
+                  href={`https://wa.me/${delivery.recipient.phone.replace(/[^0-9]/g, '')}`}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500"
+                >
+                  <MessageSquare size={14} />
+                </a>
               </div>
-            )}
+            </div>
           </div>
 
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               <Clock size={13} /> Timeline
             </div>
-            <div className="space-y-3">
-              {timeline.map((t, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <CircleDot
-                    size={14}
-                    className={t.done ? 'text-orange-500' : 'text-slate-300'}
-                  />
-                  <div
-                    className="flex-1 text-sm"
-                    style={{ color: t.done ? '#1E293B' : '#A3AAB8' }}
-                  >
-                    {t.label}
-                  </div>
-                  <div className="font-mono text-[11px] text-slate-400">
-                    {t.time}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Timeline delivery={delivery} />
           </div>
 
           <div className="flex gap-2 pt-2">
             <button
+              onClick={() => onTrack(delivery)}
               className="flex-1 py-2.5 rounded-xl font-display font-semibold text-sm text-white flex items-center justify-center gap-2"
               style={{ background: '#C2410C' }}
             >
-              <RefreshCw size={14} /> Update status
+              <RefreshCw size={14} /> Track from Pathao
             </button>
-            <button
-              className="px-4 py-2.5 rounded-xl border text-slate-500 text-sm"
+          </div>
+
+          {isDraft && (
+            <div
+              className="rounded-xl border p-3 space-y-3"
               style={{ borderColor: '#E7E9EE' }}
             >
-              <MoreVertical size={16} />
-            </button>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600">
+                  Draft — complete &amp; send to Pathao
+                </span>
+                {!showPush && (
+                  <button
+                    onClick={() => setShowPush(true)}
+                    className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg"
+                    style={{ background: '#1D4ED8' }}
+                  >
+                    Send to Pathao
+                  </button>
+                )}
+              </div>
+              {showPush && (
+                <div className="space-y-2">
+                  <select
+                    className="w-full px-3 py-2 rounded-xl text-sm border bg-white"
+                    style={{ borderColor: '#E7E9EE' }}
+                    value={sel.storeId ?? ''}
+                    onChange={(e) =>
+                      setSel((s) => ({ ...s, storeId: Number(e.target.value) }))
+                    }
+                  >
+                    <option value="">Store *</option>
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} (#{s.id})
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="w-full px-3 py-2 rounded-xl text-sm border bg-white"
+                    style={{ borderColor: '#E7E9EE' }}
+                    value={sel.cityId ?? ''}
+                    onChange={(e) =>
+                      setSel((s) => ({ ...s, cityId: Number(e.target.value) }))
+                    }
+                  >
+                    <option value="">City *</option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="w-full px-3 py-2 rounded-xl text-sm border bg-white disabled:opacity-50"
+                    style={{ borderColor: '#E7E9EE' }}
+                    disabled={sel.cityId == null}
+                    value={sel.zoneId ?? ''}
+                    onChange={(e) =>
+                      setSel((s) => ({ ...s, zoneId: Number(e.target.value) }))
+                    }
+                  >
+                    <option value="">Zone *</option>
+                    {zones.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="w-full px-3 py-2 rounded-xl text-sm border bg-white disabled:opacity-50"
+                    style={{ borderColor: '#E7E9EE' }}
+                    disabled={sel.zoneId == null}
+                    value={sel.areaId ?? ''}
+                    onChange={(e) =>
+                      setSel((s) => ({ ...s, areaId: Number(e.target.value) }))
+                    }
+                  >
+                    <option value="">Area *</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={
+                      pushBusy ||
+                      !sel.storeId ||
+                      !sel.cityId ||
+                      !sel.zoneId ||
+                      !sel.areaId
+                    }
+                    onClick={async () => {
+                      try {
+                        setPushBusy(true);
+                        await onPushDraft(delivery._id, {
+                          storeId: sel.storeId!,
+                          cityId: sel.cityId!,
+                          zoneId: sel.zoneId!,
+                          areaId: sel.areaId!,
+                          cityName: cities.find((c) => c.id === sel.cityId)
+                            ?.name,
+                          zoneName: zones.find((z) => z.id === sel.zoneId)
+                            ?.name,
+                          areaName: areas.find((a) => a.id === sel.areaId)
+                            ?.name,
+                        });
+                        setShowPush(false);
+                      } finally {
+                        setPushBusy(false);
+                      }
+                    }}
+                    className="w-full py-2.5 rounded-xl font-display font-semibold text-sm text-white disabled:opacity-50"
+                    style={{ background: '#15803D' }}
+                  >
+                    {pushBusy ? 'Sending…' : 'Create Pathao consignment'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Set status:</span>
+            <select
+              className="flex-1 px-3 py-2 rounded-xl text-sm border bg-white"
+              style={{ borderColor: '#E7E9EE' }}
+              value={localStatus}
+              onChange={(e) => {
+                const v = e.target.value as DeliveryStatus;
+                setLocalStatus(v);
+                onStatusChange(delivery._id, v);
+              }}
+            >
+              {STATUS_TABS.filter((s) => s !== 'all').map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_CONFIG[s].label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -512,34 +587,97 @@ function DeliveryDrawer({ delivery, onClose }: { delivery: Delivery | null; onCl
 
 export default function DeliveryManagement() {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | DeliveryStatus>(
+    'all'
+  );
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Delivery | null>(null);
-  const filtered = useMemo(() => {
-    return MOCK_DELIVERIES.filter((d) => {
-      const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        d.trackingId.toLowerCase().includes(q) ||
-        d.customer.toLowerCase().includes(q) ||
-        d.rider.toLowerCase().includes(q);
-      return matchesStatus && matchesSearch;
-    });
-  }, [search, statusFilter]);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await deliveryApi.list({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: search || undefined,
+      });
+      setDeliveries(data.deliveries || []);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to load deliveries');
+    }
+  };
+
+  useEffect(() => {
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, search]);
+
+  const handleTrack = async (d: Delivery) => {
+    try {
+      const { data } = await deliveryApi.track(d._id);
+      setDeliveries((prev) =>
+        prev.map((x) => (x._id === d._id ? data.delivery : x))
+      );
+      setSelected(data.delivery);
+      toast.success('Status synced from Pathao');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to track');
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: DeliveryStatus) => {
+    try {
+      const { data } = await deliveryApi.updateStatus(id, status);
+      setDeliveries((prev) =>
+        prev.map((x) => (x._id === id ? data.delivery : x))
+      );
+      setSelected(data.delivery);
+      toast.success('Status updated');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handlePushDraft = async (
+    id: string,
+    payload: {
+      storeId: number;
+      cityId: number;
+      zoneId: number;
+      areaId: number;
+      cityName?: string;
+      zoneName?: string;
+      areaName?: string;
+    }
+  ) => {
+    try {
+      const { data } = await deliveryApi.pushDraft(id, payload);
+      setDeliveries((prev) =>
+        prev.map((x) => (x._id === id ? data.delivery : x))
+      );
+      setSelected(data.delivery);
+      toast.success(
+        data.delivery.consignmentId
+          ? `Pathao consignment ${data.delivery.consignmentId} created`
+          : 'Sent to Pathao'
+      );
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to push to Pathao');
+    }
+  };
+
+  const filtered = useMemo(() => deliveries, [deliveries]);
 
   const stats = useMemo(() => {
-    const total = MOCK_DELIVERIES.length;
-    const pending = MOCK_DELIVERIES.filter(
-      (d) => d.status === 'pending'
-    ).length;
-    const inTransit = MOCK_DELIVERIES.filter((d) =>
+    const total = deliveries.length;
+    const pending = deliveries.filter((d) => d.status === 'pending').length;
+    const inTransit = deliveries.filter((d) =>
       ['picked_up', 'in_transit'].includes(d.status)
     ).length;
-    const delivered = MOCK_DELIVERIES.filter(
-      (d) => d.status === 'delivered'
-    ).length;
+    const delivered = deliveries.filter((d) => d.status === 'delivered').length;
     return { total, pending, inTransit, delivered };
-  }, []);
+  }, [deliveries]);
 
   return (
     <>
@@ -547,22 +685,19 @@ export default function DeliveryManagement() {
 
       <div className="min-h-screen w-full" style={{ background: '#F8F8F6' }}>
         <div className="flex">
-          {/* Main */}
           <div className="flex-1 min-w-0">
             <main className="p-4 lg:p-8 space-y-6">
-              {/* Page title */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <h1 className="font-display text-xl font-bold text-slate-900 leading-tight">
                     Delivery Management
                   </h1>
                   <p className="text-[13px] text-slate-500">
-                    Track and manage all active deliveries in real time
+                    Track and manage shipments via Pathao Courier
                   </p>
                 </div>
               </div>
 
-              {/* Stats */}
               <div className="flex gap-3 overflow-x-auto pb-1">
                 <StatCard
                   index={0}
@@ -588,7 +723,7 @@ export default function DeliveryManagement() {
                 />
                 <StatCard
                   index={3}
-                  label="Delivered today"
+                  label="Delivered"
                   value={stats.delivered}
                   delta="8%"
                   icon={CheckCircle2}
@@ -596,7 +731,6 @@ export default function DeliveryManagement() {
                 />
               </div>
 
-              {/* Filters */}
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="relative flex-1 max-w-sm">
                   <Search
@@ -606,7 +740,7 @@ export default function DeliveryManagement() {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search tracking ID, customer, rider..."
+                    placeholder="Search tracking ID, customer, phone..."
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none border bg-white focus:border-orange-400 transition-colors"
                     style={{ borderColor: '#E7E9EE' }}
                   />
@@ -637,133 +771,142 @@ export default function DeliveryManagement() {
                 </div>
               </div>
 
-              {/* Table (md+) */}
-              <div
-                className="hidden md:block rounded-2xl border overflow-hidden bg-white"
-                style={{ borderColor: '#E7E9EE' }}
-              >
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr
-                      className="text-left text-[11px] uppercase tracking-wider text-slate-400"
-                      style={{ background: '#FBFBFA' }}
-                    >
-                      <th className="px-5 py-3 font-semibold">Tracking</th>
-                      <th className="px-5 py-3 font-semibold">Customer</th>
-                      <th className="px-5 py-3 font-semibold">Route</th>
-                      <th className="px-5 py-3 font-semibold">Rider</th>
-                      <th className="px-5 py-3 font-semibold">Status</th>
-                      <th className="px-5 py-3 font-semibold text-right">
-                        Amount
-                      </th>
-                      <th className="px-5 py-3 font-semibold text-right">
-                        ETA
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              {loading ? (
+                <div className="py-14 text-center text-slate-400 text-sm">
+                  Loading deliveries…
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="py-14 text-center text-slate-400 text-sm">
+                  No deliveries yet. Create one with “Create shipment”.
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="hidden md:block rounded-2xl border overflow-hidden bg-white"
+                    style={{ borderColor: '#E7E9EE' }}
+                  >
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr
+                          className="text-left text-[11px] uppercase tracking-wider text-slate-400"
+                          style={{ background: '#FBFBFA' }}
+                        >
+                          <th className="px-5 py-3 font-semibold">Tracking</th>
+                          <th className="px-5 py-3 font-semibold">Customer</th>
+                          <th className="px-5 py-3 font-semibold">Route</th>
+                          <th className="px-5 py-3 font-semibold">Status</th>
+                          <th className="px-5 py-3 font-semibold text-right">
+                            Amount
+                          </th>
+                          <th className="px-5 py-3 font-semibold text-right">
+                            ETA
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((d, i) => (
+                          <tr
+                            key={d._id}
+                            onClick={() => setSelected(d)}
+                            className="cursor-pointer border-t hover:bg-slate-50 transition-colors animate-fadeUp"
+                            style={{
+                              borderColor: '#EEF0F3',
+                              animationDelay: `${i * 30}ms`,
+                            }}
+                          >
+                            <td className="px-5 py-3.5 font-mono text-xs text-slate-500">
+                              {d.consignmentId || d.merchantOrderId || '—'}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <div className="text-slate-900 font-medium">
+                                {d.recipient.name}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                {d.recipient.phone}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 max-w-55">
+                              <div className="text-[12px] text-slate-500 truncate">
+                                Store #{d.storeId}
+                              </div>
+                              <div className="text-[12px] text-slate-400 truncate">
+                                ↳ {d.recipient.address}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <StatusPill status={d.status} />
+                            </td>
+                            <td className="px-5 py-3.5 text-right font-mono text-slate-700">
+                              ৳{d.amountToCollect}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <span className="inline-flex items-center gap-1 text-slate-500 text-xs">
+                                {etaFor(d.status)}
+                                <ChevronRight
+                                  size={14}
+                                  className="text-slate-300"
+                                />
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="md:hidden space-y-3">
                     {filtered.map((d, i) => (
-                      <tr
-                        key={d.id}
+                      <div
+                        key={d._id}
                         onClick={() => setSelected(d)}
-                        className="cursor-pointer border-t hover:bg-slate-50 transition-colors animate-fadeUp"
+                        className="rounded-2xl border p-4 animate-fadeUp bg-white"
                         style={{
-                          borderColor: '#EEF0F3',
+                          borderColor: '#E7E9EE',
                           animationDelay: `${i * 30}ms`,
                         }}
                       >
-                        <td className="px-5 py-3.5 font-mono text-xs text-slate-500">
-                          {d.trackingId}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="text-slate-900 font-medium">
-                            {d.customer}
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="font-mono text-[11px] text-slate-400">
+                              {d.consignmentId || d.merchantOrderId || '—'}
+                            </div>
+                            <div className="text-slate-900 font-semibold text-sm">
+                              {d.recipient.name}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-400">
-                            {d.phone}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 max-w-[220px]">
-                          <div className="text-[12px] text-slate-500 truncate">
-                            {d.pickup}
-                          </div>
-                          <div className="text-[12px] text-slate-400 truncate">
-                            ↳ {d.dropoff}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-slate-600">
-                          {d.rider}
-                        </td>
-                        <td className="px-5 py-3.5">
                           <StatusPill status={d.status} />
-                        </td>
-                        <td className="px-5 py-3.5 text-right font-mono text-slate-700">
-                          ৳{d.amount}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <span className="inline-flex items-center gap-1 text-slate-500 text-xs">
-                            {d.eta}
-                            <ChevronRight
-                              size={14}
-                              className="text-slate-300"
-                            />
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filtered.length === 0 && (
-                  <div className="py-14 text-center text-slate-400 text-sm">
-                    No deliveries match your filters.
-                  </div>
-                )}
-              </div>
-
-              {/* Cards (mobile) */}
-              <div className="md:hidden space-y-3">
-                {filtered.map((d, i) => (
-                  <div
-                    key={d.id}
-                    onClick={() => setSelected(d)}
-                    className="rounded-2xl border p-4 animate-fadeUp bg-white"
-                    style={{
-                      borderColor: '#E7E9EE',
-                      animationDelay: `${i * 30}ms`,
-                    }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <div className="font-mono text-[11px] text-slate-400">
-                          {d.trackingId}
                         </div>
-                        <div className="text-slate-900 font-semibold text-sm">
-                          {d.customer}
+                        <div className="text-[12px] text-slate-500 mb-1">
+                          Store #{d.storeId}
+                        </div>
+                        <div className="text-[12px] text-slate-400 mb-3">
+                          ↳ {d.recipient.address}
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">
+                            ৳{d.amountToCollect}
+                          </span>
+                          <span className="font-mono text-slate-700">
+                            {etaFor(d.status)}
+                          </span>
                         </div>
                       </div>
-                      <StatusPill status={d.status} />
-                    </div>
-                    <div className="text-[12px] text-slate-500 mb-1">
-                      {d.pickup}
-                    </div>
-                    <div className="text-[12px] text-slate-400 mb-3">
-                      ↳ {d.dropoff}
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">{d.rider}</span>
-                      <span className="font-mono text-slate-700">
-                        ৳{d.amount}
-                      </span>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
             </main>
           </div>
         </div>
-
-        <DeliveryDrawer delivery={selected} onClose={() => setSelected(null)} />
       </div>
+
+      <DeliveryDrawer
+        delivery={selected}
+        onClose={() => setSelected(null)}
+        onTrack={handleTrack}
+        onStatusChange={handleStatusChange}
+        onPushDraft={handlePushDraft}
+      />
     </>
   );
 }

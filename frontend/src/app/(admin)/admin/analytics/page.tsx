@@ -207,19 +207,19 @@ export default function AnalyticsPage() {
   const orderStatusData = stats
     ? [
         {
+          name: 'Pending',
+          value: stats.ordersByStatus.pending,
+          color: '#f59e0b',
+        },
+        {
           name: 'Processing',
           value: stats.ordersByStatus.processing,
           color: '#3b82f6',
         },
         {
-          name: 'Shipped',
-          value: stats.ordersByStatus.shipped,
+          name: 'Sent to courier',
+          value: stats.ordersByStatus.send_courier,
           color: '#8b5cf6',
-        },
-        {
-          name: 'Delivered',
-          value: stats.ordersByStatus.delivered,
-          color: '#22c55e',
         },
         {
           name: 'Cancelled',

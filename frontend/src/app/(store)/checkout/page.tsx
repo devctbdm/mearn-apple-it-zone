@@ -232,7 +232,7 @@ const CheckoutContent = () => {
             const retryable =
               o &&
               o.payment?.status !== 'paid' &&
-              !['cancelled', 'delivered'].includes(o.orderStatus);
+              !['cancelled'].includes(o.orderStatus);
             if (retryable) {
               orderId = o._id;
             } else {

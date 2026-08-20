@@ -46,6 +46,8 @@ const userSchema = new mongoose.Schema(
         state: { type: String, default: '' },
         postcode: { type: String, default: '' },
         country: { type: String, default: 'Bangladesh' },
+        deliveryArea: { type: String, default: '' },
+        zoneId: { type: String, default: '' },
         isDefault: { type: Boolean, default: false },
       },
     ],
