@@ -71,13 +71,11 @@ import {
   authApi,
   orderApi,
   paymentApi,
-  deliveryApi,
   SavedAddress,
-  PathaoLocation,
 } from '@/lib/api';
 import RequireAuth from '@/components/store/layout/RequireAuth';
 
-type OrderStatus = 'pending' | 'processing' | 'cancelled' | 'send_courier';
+type OrderStatus = 'pending' | 'processing' | 'cancelled';
 type OrderItem = {
   name: string;
   price: number;
@@ -115,7 +113,6 @@ type Address = {
   postal: string;
   country: string;
   deliveryArea: string;
-  zoneId: string;
   isDefault: boolean;
 };
 
@@ -161,7 +158,6 @@ const mapBackendAddress = (a: SavedAddress): Address => ({
   postal: a.postcode,
   country: a.country,
   deliveryArea: a.deliveryArea || '',
-  zoneId: a.zoneId || '',
   isDefault: a.isDefault,
 });
 
@@ -177,11 +173,6 @@ const statusMeta: Record<
   processing: {
     label: 'Processing',
     className: 'bg-blue-100 text-blue-800',
-    Icon: Truck,
-  },
-  send_courier: {
-    label: 'Sent to courier',
-    className: 'bg-violet-100 text-violet-800',
     Icon: Truck,
   },
   cancelled: {
@@ -217,7 +208,6 @@ const addressSchema = z.object({
   postal: z.string().trim().min(1).max(20),
   country: z.string().trim().min(1).max(80),
   deliveryArea: z.string().trim().max(160).default(''),
-  zoneId: z.string().trim().max(60).default(''),
 });
 
 function AccountContent() {
@@ -321,8 +311,7 @@ function AccountContent() {
       pending: orders.filter(
         (o) =>
           o.status === 'processing' ||
-          o.status === 'pending' ||
-          o.status === 'send_courier'
+          o.status === 'pending'
       ).length,
       wishlist: wishlist.length,
       addresses: addresses.length,
@@ -356,7 +345,6 @@ function AccountContent() {
       postcode: values.postal,
       country: values.country,
       deliveryArea: values.deliveryArea,
-      zoneId: values.zoneId,
     };
     try {
       const { data } = id
@@ -1274,58 +1262,11 @@ function AddressDialog({
     postal: '',
     country: '',
     deliveryArea: '',
-    zoneId: '',
   };
   const [values, setValues] = useState(state.editing ?? empty);
   const [errors, setErrors] = useState<
     Partial<Record<keyof typeof empty, string>>
   >({});
-
-  // Pathao location data for the delivery-area search.
-  const [cities, setCities] = useState<PathaoLocation[]>([]);
-  const [zones, setZones] = useState<PathaoLocation[]>([]);
-  const [cityId, setCityId] = useState('');
-  const [zoneOpen, setZoneOpen] = useState(false);
-
-  // Load Pathao cities when the dialog opens.
-  useEffect(() => {
-    if (!state.open) return;
-    setValues(state.editing ?? empty);
-    setErrors({});
-    setZones([]);
-    setCityId('');
-    deliveryApi
-      .cities()
-      .then(({ data }) => {
-        if (data.success) {
-          setCities(data.cities);
-          const match = data.cities.find(
-            (c) => c.name === (state.editing?.city || '')
-          );
-          if (match) setCityId(String(match.id));
-        }
-      })
-      .catch(() => setCities([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.open]);
-
-  // Load zones for the selected city.
-  useEffect(() => {
-    if (!cityId) {
-      setZones([]);
-      return;
-    }
-    deliveryApi
-      .zones(cityId)
-      .then(({ data }) => {
-        if (data.success) setZones(data.cities);
-      })
-      .catch(() => setZones([]));
-  }, [cityId]);
-
-  const filteredZones = zones.filter((z) =>
-    z.name.toLowerCase().includes(values.deliveryArea.toLowerCase())
-  );
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1384,69 +1325,24 @@ function AddressDialog({
             onChange={(v) => setValues({ ...values, country: v })}
           />
 
-          {/* City (from Pathao) */}
-          <div className="space-y-1">
-            <Label>City</Label>
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={cityId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setCityId(id);
-                const city = cities.find((c) => String(c.id) === id);
-                setValues({
-                  ...values,
-                  city: city?.name || '',
-                });
-                setZoneOpen(false);
-              }}
-            >
-              <option value="">Select city…</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {errors.city && (
-              <p className="text-xs text-destructive">{errors.city}</p>
-            )}
-          </div>
+          {/* City */}
+          <Field
+            label="City"
+            v={values.city}
+            e={errors.city}
+            onChange={(v) => setValues({ ...values, city: v })}
+          />
 
-          {/* Delivery area (searchable Pathao zones) */}
+          {/* Delivery area */}
           <div className="sm:col-span-2 space-y-1">
             <Label className="mb-1 block">Delivery area</Label>
-            <div className="relative">
-              <Input
-                value={values.deliveryArea}
-                placeholder="Search area, e.g. Chuadanga, Jibannagar…"
-                onChange={(e) => {
-                  setValues({ ...values, deliveryArea: e.target.value });
-                  setZoneOpen(true);
-                }}
-                onFocus={() => zones.length && setZoneOpen(true)}
-              />
-              {zoneOpen && filteredZones.length > 0 && (
-                <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
-                  {filteredZones.map((z) => (
-                    <li
-                      key={z.id}
-                      className="cursor-pointer rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                      onMouseDown={() => {
-                        setValues({
-                          ...values,
-                          deliveryArea: z.name,
-                          zoneId: String(z.id),
-                        });
-                        setZoneOpen(false);
-                      }}
-                    >
-                      {z.name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <Input
+              value={values.deliveryArea}
+              placeholder="e.g. Chuadanga, Jibannagar…"
+              onChange={(e) =>
+                setValues({ ...values, deliveryArea: e.target.value })
+              }
+            />
             {errors.deliveryArea && (
               <p className="text-xs text-destructive">{errors.deliveryArea}</p>
             )}

@@ -143,8 +143,6 @@ function OrderStatusBadge({ status }: { status: OrderStatus }) {
       'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
     processing:
       'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-    send_courier:
-      'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800',
     cancelled:
       'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
   };
@@ -346,7 +344,7 @@ export default function AdminDashboardPage() {
         {
           title: 'Orders',
           value: stats.orders.toLocaleString(),
-          change: `${stats.ordersByStatus.pending} pending · ${stats.ordersByStatus.processing} processing · ${stats.ordersByStatus.send_courier} sent to courier`,
+          change: `${stats.ordersByStatus.pending} pending · ${stats.ordersByStatus.processing} processing`,
           trend: 'flat' as const,
           icon: <ShoppingCart className="h-4 w-4" />,
           color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',

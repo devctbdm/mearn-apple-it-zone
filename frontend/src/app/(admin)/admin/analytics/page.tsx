@@ -217,11 +217,6 @@ export default function AnalyticsPage() {
           color: '#3b82f6',
         },
         {
-          name: 'Sent to courier',
-          value: stats.ordersByStatus.send_courier,
-          color: '#8b5cf6',
-        },
-        {
           name: 'Cancelled',
           value: stats.ordersByStatus.cancelled,
           color: '#ef4444',

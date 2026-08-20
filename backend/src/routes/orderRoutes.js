@@ -9,7 +9,6 @@ import {
   updateAdvance, // admin only
   getOrderStats, // admin only
 } from '../controllers/orderController.js';
-import { assignCourier } from '../controllers/courierController.js';
 import { protect, adminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -25,6 +24,5 @@ router.get('/', protect, adminOnly, getAllOrders); // list all orders
 router.put('/:id/status', protect, adminOnly, updateOrderStatus);
 router.put('/:id/payment-status', protect, adminOnly, updatePaymentStatus);
 router.put('/:id/advance', protect, adminOnly, updateAdvance);
-router.post('/:id/courier', protect, adminOnly, assignCourier);
 
 export default router;

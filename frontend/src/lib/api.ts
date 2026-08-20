@@ -343,7 +343,6 @@ export type SavedAddress = {
   postcode: string;
   country: string;
   deliveryArea?: string;
-  zoneId?: string;
   isDefault: boolean;
 };
 
@@ -402,8 +401,7 @@ export type LoginResponse = {
 export type OrderStatus =
   | 'pending'
   | 'processing'
-  | 'cancelled'
-  | 'send_courier';
+  | 'cancelled';
 
 export type OrderItem = {
   product: string | { _id: string; name: string };
@@ -446,7 +444,6 @@ export type Order = {
   advanceAmount?: number;
   advancePaid?: number;
   advanceReference?: string;
-  courier?: string | { _id: string; name: string; slug: string } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -456,7 +453,6 @@ export type OrderStats = {
   pending: number;
   processing: number;
   cancelled: number;
-  send_courier: number;
 };
 
 export const orderApi = {
@@ -607,7 +603,6 @@ export type DashboardStats = {
     processing: number;
     pending: number;
     cancelled: number;
-    send_courier: number;
   };
   recentOrders: Order[];
   topProducts: {
@@ -647,7 +642,6 @@ export type AnalyticsStats = {
       processing: number;
       pending: number;
       cancelled: number;
-      send_courier: number;
     };
   };
   monthly: AnalyticsPoint[];
@@ -1035,181 +1029,5 @@ export const holidayApi = {
 
   updateConfig: (data: Partial<HolidayConfig>) =>
     api.put<{ success: boolean; config: HolidayConfig }>('/holiday', data),
-};
-
-export type DeliveryStatus =
-  | 'pending'
-  | 'picked_up'
-  | 'in_transit'
-  | 'delivered'
-  | 'failed'
-  | 'cancelled';
-
-export type DeliveryHistoryEntry = {
-  status: string;
-  note?: string;
-  timestamp?: string;
-};
-
-export type Delivery = {
-  _id: string;
-  order?: string | null;
-  consignmentId: string;
-  merchantOrderId: string;
-  storeId: number | null;
-  recipient: {
-    name: string;
-    phone: string;
-    secondaryPhone?: string;
-    address: string;
-    cityId: number | null;
-    zoneId: number | null;
-    areaId: number | null;
-    cityName?: string;
-    zoneName?: string;
-    areaName?: string;
-  };
-  deliveryType: number;
-  itemType: number;
-  itemQuantity: number;
-  itemWeight: number;
-  amountToCollect: number;
-  specialInstruction?: string;
-  itemDescription?: string;
-  status: DeliveryStatus;
-  pathaoStatus?: string;
-  deliveryFee?: number;
-  trackingUrl?: string;
-  history?: DeliveryHistoryEntry[];
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type PathaoLocation = { id: number; name: string };
-
-export type DeliveryListResponse = {
-  success: boolean;
-  deliveries: Delivery[];
-};
-
-export const deliveryApi = {
-  list: (params?: { status?: string; search?: string }) =>
-    api.get<DeliveryListResponse>('/deliveries', { params }),
-
-  get: (id: string) =>
-    api.get<{ success: boolean; delivery: Delivery }>(`/deliveries/${id}`),
-
-  create: (data: {
-    orderId?: string;
-    storeId: number;
-    recipient: {
-      name: string;
-      phone: string;
-      secondaryPhone?: string;
-      address: string;
-      cityId: number;
-      zoneId: number;
-      areaId: number;
-      cityName?: string;
-      zoneName?: string;
-      areaName?: string;
-    };
-    deliveryType?: number;
-    itemType?: number;
-    itemQuantity?: number;
-    itemWeight?: number;
-    amountToCollect?: number;
-    specialInstruction?: string;
-    itemDescription?: string;
-    merchantOrderId?: string;
-  }) => api.post<{ success: boolean; delivery: Delivery }>('/deliveries', data),
-
-  updateStatus: (id: string, status: DeliveryStatus, note?: string) =>
-    api.put<{ success: boolean; delivery: Delivery }>(`/deliveries/${id}/status`, {
-      status,
-      note,
-    }),
-
-  track: (id: string) =>
-    api.post<{ success: boolean; delivery: Delivery }>(
-      `/deliveries/${id}/track`
-    ),
-
-  stores: () =>
-    api.get<{ success: boolean; stores: PathaoLocation[] }>(
-      '/deliveries/pathao/stores'
-    ),
-
-  cities: () =>
-    api.get<{ success: boolean; cities: PathaoLocation[] }>(
-      '/deliveries/pathao/cities'
-    ),
-
-  zones: (cityId: number | string) =>
-    api.get<{ success: boolean; cities: PathaoLocation[] }>(
-      `/deliveries/pathao/cities/${cityId}/zones`
-    ),
-
-  areas: (zoneId: number | string) =>
-    api.get<{ success: boolean; areas: PathaoLocation[] }>(
-      `/deliveries/pathao/zones/${zoneId}/areas`
-    ),
-
-  pushDraft: (
-    id: string,
-    data: {
-      storeId: number;
-      cityId: number;
-      zoneId: number;
-      areaId: number;
-      cityName?: string;
-      zoneName?: string;
-      areaName?: string;
-    }
-  ) =>
-    api.post<{ success: boolean; delivery: Delivery }>(
-      `/deliveries/${id}/push`,
-      data
-    ),
-};
-
-export type Courier = {
-  _id: string;
-  name: string;
-  slug: string;
-  active: boolean;
-  description?: string;
-  color?: string;
-  config?: Record<string, unknown>;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type CourierListResponse = {
-  success: boolean;
-  couriers: Courier[];
-};
-
-export const courierApi = {
-  list: () =>
-    api.get<CourierListResponse>('/couriers'),
-
-  create: (data: { name: string; slug?: string; description?: string; color?: string }) =>
-    api.post<{ success: boolean; courier: Courier }>('/couriers', data),
-
-  update: (
-    id: string,
-    data: { name?: string; active?: boolean; description?: string; color?: string }
-  ) =>
-    api.put<{ success: boolean; courier: Courier }>(`/couriers/${id}`, data),
-
-  delete: (id: string) =>
-    api.delete<{ success: boolean; message: string }>(`/couriers/${id}`),
-
-  assign: (orderId: string, courierSlug: string) =>
-    api.post<{ success: boolean; order: Order; delivery?: Delivery | null }>(
-      `/orders/${orderId}/courier`,
-      { courier: courierSlug }
-    ),
 };
 

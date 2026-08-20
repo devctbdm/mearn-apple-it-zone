@@ -7,7 +7,6 @@ import './src/models/User.js';
 import './src/models/Product.js';
 import './src/models/Cart.js';
 import Order from './src/models/Order.js';
-import Courier from './src/models/Courier.js';
 import { backfillOrderNumbers } from './src/utils/orderNumber.js';
 
 dotenv.config();
@@ -23,21 +22,6 @@ backfillOrderNumbers()
     if (n) console.log(`🆔 Backfilled ${n} order number(s)`);
   })
   .catch((e) => console.error('Order number backfill failed:', e.message));
-
-// Seed default couriers (Pathao today; more can be added from admin later).
-Courier.countDocuments()
-  .then(async (count) => {
-    if (count === 0) {
-      await Courier.create({
-        name: 'Pathao',
-        slug: 'pathao',
-        active: true,
-        description: 'Pathao Courier (sandbox)',
-      });
-      console.log('🚚 Seeded default courier: Pathao');
-    }
-  })
-  .catch((e) => console.error('Courier seed failed:', e.message));
 
 // Migrate legacy order statuses that were removed from the enum.
 Order.updateMany(

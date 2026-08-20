@@ -70,12 +70,9 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['pending', 'processing', 'cancelled', 'send_courier'],
+      enum: ['pending', 'processing', 'cancelled'],
       default: 'pending',
     },
-    // Courier assigned to fulfil this order (slug from the Courier table),
-    // e.g. "pathao". Empty until an admin assigns one.
-    courier: { type: String, default: '', index: true },
     note: {
       type: String,
       trim: true,

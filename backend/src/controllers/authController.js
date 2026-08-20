@@ -565,7 +565,6 @@ export const addAddress = async (req, res) => {
       postcode,
       country,
       deliveryArea,
-      zoneId,
     } = req.body;
 
     const user = await User.findById(req.user._id);
@@ -584,7 +583,6 @@ export const addAddress = async (req, res) => {
       postcode: postcode || '',
       country: country || 'Bangladesh',
       deliveryArea: deliveryArea || '',
-      zoneId: zoneId || '',
       isDefault: isFirst,
     });
 
@@ -611,7 +609,6 @@ export const updateAddress = async (req, res) => {
       postcode,
       country,
       deliveryArea,
-      zoneId,
     } = req.body;
 
     const user = await User.findById(req.user._id);
@@ -633,7 +630,6 @@ export const updateAddress = async (req, res) => {
     if (postcode !== undefined) address.postcode = postcode;
     if (country !== undefined) address.country = country;
     if (deliveryArea !== undefined) address.deliveryArea = deliveryArea;
-    if (zoneId !== undefined) address.zoneId = zoneId;
 
     await user.save();
     res.json({ success: true, addresses: user.addresses });

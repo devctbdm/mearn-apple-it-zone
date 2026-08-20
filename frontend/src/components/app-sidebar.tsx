@@ -71,10 +71,6 @@ const data = {
           title: 'All Orders',
           url: '/admin/orders',
         },
-        {
-          title: 'Delivery',
-          url: '/admin/delivery',
-        },
       ],
     },
     {
@@ -172,10 +168,6 @@ const data = {
         {
           title: 'SMS',
           url: '/admin/sms',
-        },
-        {
-          title: 'Pathao',
-          url: '/admin/pathao',
         },
         {
           title: 'Maintenance',
