@@ -521,8 +521,8 @@ function AccountContent() {
                       transition={{ duration: 0.25 }}
                       className="space-y-3"
                     >
-                      {paginatedOrders.map((o) => {
-                  const meta = statusMeta[o.status];
+                       {paginatedOrders.map((o) => {
+                  const meta = statusMeta[o.status] || statusMeta.pending;
                   const Icon = meta.Icon;
                   return (
                     <div
