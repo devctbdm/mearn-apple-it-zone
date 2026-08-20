@@ -189,9 +189,9 @@ export default function OrdersPage() {
   useEffect(() => {
     if (editOrder) {
       const c = editOrder.courier;
-      const id =
-        typeof c === 'object' && c ? c._id : typeof c === 'string' ? c : '';
-      setSelectedCourier(id);
+      const slug =
+        typeof c === 'object' && c ? c.slug : typeof c === 'string' ? c : '';
+      setSelectedCourier(slug);
     }
   }, [editOrder]);
 
@@ -1068,7 +1068,7 @@ export default function OrdersPage() {
                     </SelectItem>
                   ) : (
                     couriers.map((c) => (
-                      <SelectItem key={c._id} value={c._id}>
+                      <SelectItem key={c._id} value={c.slug}>
                         {c.name}
                       </SelectItem>
                     ))

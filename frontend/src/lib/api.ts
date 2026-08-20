@@ -1206,10 +1206,10 @@ export const courierApi = {
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/couriers/${id}`),
 
-  assign: (orderId: string, courierId: string) =>
+  assign: (orderId: string, courierSlug: string) =>
     api.post<{ success: boolean; order: Order; delivery?: Delivery | null }>(
       `/orders/${orderId}/courier`,
-      { courierId }
+      { courier: courierSlug }
     ),
 };
 

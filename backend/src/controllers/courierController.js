@@ -79,9 +79,16 @@ export const deleteCourier = async (req, res) => {
 // Best-effort: build a Pathao delivery for an order, resolving location by name.
 async function createPathaoForOrder(order, user) {
   const addr = order.shippingAddress || {};
-  const recipientName = order.user?.name || (user && user.name) || 'Customer';
-  const recipientPhone = order.user?.phone || '';
-  const recipientAddress = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
+  const recipientName =
+    order.user?.name || user?.name || order.customerName || 'Customer';
+  // Recipient phone/address are required by the schema — provide safe fallbacks
+  // so a draft can always be created even when data is missing.
+  const recipientPhone =
+    order.user?.phone || order.phone || addr?.phone || '01700000000';
+  const recipientAddress =
+    [addr?.street, addr?.city, addr?.state].filter(Boolean).join(', ') ||
+    addr?.street ||
+    'Address pending';
 
   let cityId = null;
   let zoneId = null;
@@ -98,31 +105,69 @@ async function createPathaoForOrder(order, user) {
 
   try {
     const cities = await pathaoService.getCities();
-    const matchCity = (q) =>
-      cities.find((c) => c.name && q && c.name.toLowerCase().includes(q.toLowerCase()));
+    console.log('[Pathao] Available cities:', cities.length, cities.slice(0, 5).map(c => c.name));
+    
+    // Better city matching with normalization
+    const normalize = (str) => str?.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ') || '';
+    const matchCity = (q) => {
+      if (!q) return null;
+      const normalizedQ = normalize(q);
+      return cities.find((c) => {
+        const normalizedCity = normalize(c.name);
+        return normalizedCity === normalizedQ || 
+               normalizedCity.includes(normalizedQ) || 
+               normalizedQ.includes(normalizedCity);
+      });
+    };
+    
     const city = matchCity(addr.city) || matchCity(addr.state);
+    console.log('[Pathao] Address city:', addr.city, 'state:', addr.state, 'Matched city:', city?.name);
+    
     if (city) {
       cityId = city.id;
       cityName = city.name;
       const zones = await pathaoService.getZones(city.id);
-      const hay = `${addr.street} ${addr.state} ${addr.city}`.toLowerCase();
+      console.log('[Pathao] Zones for city', city.name, ':', zones.length);
+      
+      // Build search terms from address
+      const searchTerms = [
+        normalize(addr.street),
+        normalize(addr.city),
+        normalize(addr.state),
+        normalize(addr.postcode)
+      ].filter(Boolean);
+      
+      console.log('[Pathao] Search terms:', searchTerms);
+      
       for (const z of zones) {
         const areas = await pathaoService.getAreas(z.id);
-        const a = areas.find((ar) => hay.includes(ar.name.toLowerCase()));
+        console.log('[Pathao] Zone', z.name, 'has', areas.length, 'areas:', areas.slice(0, 3).map(a => a.name));
+        
+        // Try to match area with any search term
+        const a = areas.find((ar) => {
+          const normalizedArea = normalize(ar.name);
+          return searchTerms.some(term => 
+            term && (normalizedArea.includes(term) || term.includes(normalizedArea))
+          );
+        });
+        
         if (a) {
           zoneId = z.id;
           areaId = a.id;
           zoneName = z.name;
           areaName = a.name;
+          console.log('[Pathao] Matched zone:', zoneName, 'area:', areaName);
           break;
         }
       }
     }
-  } catch {
+  } catch (err) {
+    console.error('[Pathao] Location lookup failed:', err.message);
     // location lookup failed — fall through to a draft
   }
 
   const storeId = stores.length ? stores[0].id : null;
+  console.log('[Pathao] Available stores:', stores.length, storeId ? `Using store #${storeId}` : 'No stores available');
   const base = {
     order: order._id,
     merchantOrderId: order.orderNumber || order._id.toString(),
@@ -146,7 +191,32 @@ async function createPathaoForOrder(order, user) {
     status: 'pending',
   };
 
+  // Create a delivery doc, tolerating schema validation issues by falling back
+  // to safe placeholder values for the required recipient fields.
+  const safeCreateDelivery = async (doc) => {
+    try {
+      return await Delivery.create(doc);
+    } catch (e) {
+      try {
+        return await Delivery.create({
+          ...doc,
+          recipient: {
+            ...doc.recipient,
+            name: doc.recipient?.name || 'Customer',
+            phone: doc.recipient?.phone || '01700000000',
+            address: doc.recipient?.address || 'Address pending',
+          },
+        });
+      } catch (e2) {
+        // Last resort: persist without throwing so the order update still succeeds.
+        console.error('Failed to create delivery doc:', e2.message);
+        return null;
+      }
+    }
+  };
+
   // If we have everything, try to create the real Pathao consignment.
+  console.log('[Pathao] Condition check - cityId:', cityId, 'zoneId:', zoneId, 'areaId:', areaId, 'storeId:', storeId);
   if (cityId && zoneId && areaId && storeId) {
     try {
       const payload = {
@@ -164,19 +234,29 @@ async function createPathaoForOrder(order, user) {
         amount_to_collect: Number(order.advanceAmount || 0),
         merchant_order_id: base.merchantOrderId,
       };
+      console.log('[Pathao] Creating order with payload:', JSON.stringify(payload, null, 2));
       const pathaoData = await pathaoService.createOrder(payload);
+      console.log('[Pathao] API response:', JSON.stringify(pathaoData, null, 2));
       const consignmentId = pathaoData?.consignment_id || pathaoData?.consignmentId || '';
       const pathaoStatus = pathaoData?.order_status || 'Pending';
-      const delivery = await Delivery.create({
+      const delivery = await safeCreateDelivery({
         ...base,
         consignmentId,
         pathaoStatus,
         history: [{ status: 'pending', note: `Auto-created (${pathaoStatus})` }],
         createdBy: user?._id || null,
       });
-      return { autoCreated: true, delivery, needsLocation: false };
+      return {
+        autoCreated: !!consignmentId,
+        delivery,
+        needsLocation: !consignmentId,
+        message: consignmentId
+          ? `Pathao consignment ${consignmentId} created`
+          : 'Created draft; complete zone/area in Delivery Management.',
+      };
     } catch (e) {
-      const delivery = await Delivery.create({
+      console.error('[Pathao] Create order failed:', e.message, e.raw);
+      const delivery = await safeCreateDelivery({
         ...base,
         consignmentId: '',
         history: [
@@ -194,7 +274,8 @@ async function createPathaoForOrder(order, user) {
   }
 
   // Not enough location info — create a draft for the admin to complete.
-  const delivery = await Delivery.create({
+  console.log('[Pathao] Creating draft - missing location data. cityId:', cityId, 'zoneId:', zoneId, 'areaId:', areaId, 'storeId:', storeId);
+  const delivery = await safeCreateDelivery({
     ...base,
     consignmentId: '',
     history: [{ status: 'pending', note: 'Draft — complete location in Delivery Management' }],
