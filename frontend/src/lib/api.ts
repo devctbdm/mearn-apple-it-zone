@@ -166,7 +166,7 @@ export type Customer = {
     postcode: string;
     country: string;
   };
-  status: string;
+  status: string | null;
   createdAt: string;
   orderCount: number;
   totalSpent: number;

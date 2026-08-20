@@ -112,7 +112,7 @@ export default function CustomersPage() {
         name: editForm.name,
         email: editForm.email,
         phone: editForm.phone,
-        status: editForm.status,
+        status: editForm.status || undefined,
       });
       toast.success(`Customer ${editForm.name} updated`);
       setEditCustomer(null);
@@ -175,7 +175,7 @@ export default function CustomersPage() {
         </div>
         <Select
           value={statusFilter}
-          onValueChange={(v) => { setStatusFilter(v); setPage(1); }}
+          onValueChange={(v) => { setStatusFilter(v || "all"); setPage(1); }}
         >
           <SelectTrigger className="sm:w-48">
             <SelectValue placeholder="Filter by status" />
@@ -229,8 +229,8 @@ export default function CustomersPage() {
                   <TableCell>${customer.totalSpent.toFixed(2)}</TableCell>
                   <TableCell>{new Date(customer.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Badge className={statusVariant[customer.status]} variant="secondary">
-                      {customer.status}
+                    <Badge className={statusVariant[customer.status || 'inactive']} variant="secondary">
+                      {customer.status || 'inactive'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -339,8 +339,8 @@ export default function CustomersPage() {
                 </div>
                 <div>
                   <div className="font-medium">Status</div>
-                  <Badge className={statusVariant[viewCustomer.status]} variant="secondary">
-                    {viewCustomer.status}
+                  <Badge className={statusVariant[viewCustomer.status || 'inactive']} variant="secondary">
+                    {viewCustomer.status || 'inactive'}
                   </Badge>
                 </div>
               </div>
@@ -385,7 +385,7 @@ export default function CustomersPage() {
               </div>
               <div className="grid gap-1.5">
                 <Label>Status</Label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <Select value={editForm.status || "active"} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
