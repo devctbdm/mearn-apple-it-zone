@@ -1,6 +1,5 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -14,16 +13,6 @@ import {
   MenubarSubTrigger,
   MenubarTrigger,
 } from '@/components/ui/menubar';
-
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-
-import { MenuIcon } from 'lucide-react';
 
 import { categoryApi } from '@/lib/api';
 
@@ -73,10 +62,6 @@ function buildTree(
 
 export const CategoryNav = () => {
   const router = useRouter();
-
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set()
-  );
   const [categories, setCategories] = useState<TreeCategory[]>([]);
   const [scrolled, setScrolled] = useState(false);
 
@@ -97,18 +82,6 @@ export const CategoryNav = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(categoryId)) {
-        newSet.delete(categoryId);
-      } else {
-        newSet.add(categoryId);
-      }
-      return newSet;
-    });
-  };
 
   const renderCategory = (cat: TreeCategory, depth = 0) => {
     if (cat.active === false) return null;
@@ -153,91 +126,17 @@ export const CategoryNav = () => {
     }
   };
 
-  const renderMobileCategory = (cat: TreeCategory, depth = 0) => {
-    if (cat.active === false) return null;
-
-    const paddingLeft = depth * 16;
-    const isExpanded = expandedCategories.has(cat.id);
-    const hasChildren = cat.children.length > 0;
-
-    if (hasChildren) {
-      return (
-        <div key={cat.id}>
-          <div
-            className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-100 rounded"
-            style={{ paddingLeft }}
-          >
-            <span
-              className="font-medium flex-1"
-              onClick={() => router.push(`/products/${cat.slug}`)}
-            >
-              {cat.name}
-            </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCategory(cat.id);
-              }}
-              className="p-1 hover:bg-gray-200 rounded"
-            >
-              {isExpanded ? (
-                <ChevronDownIcon className="h-4 w-4" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-          {isExpanded && (
-            <div className="flex flex-col">
-              {cat.children.map((child) =>
-                renderMobileCategory(child, depth + 1)
-              )}
-            </div>
-          )}
-        </div>
-      );
-    } else {
-      return (
-        <div
-          key={cat.id}
-          className="py-2 hover:bg-gray-100 rounded cursor-pointer"
-          style={{ paddingLeft }}
-          onClick={() => router.push(`/products/${cat.slug}`)}
-        >
-          {cat.name}
-        </div>
-      );
-    }
-  };
-
   return (
     <div
-      className={`sticky top-16 z-40 border-b border-gray-200 bg-background/95 py-2 backdrop-blur transition-all duration-300 lg:top-20 ${
+      className={`hidden lg:block sticky top-16 z-40 border-b border-gray-200 bg-background/95 py-2 backdrop-blur transition-all duration-300 lg:top-20 ${
         scrolled ? 'shadow-xl' : 'shadow-lg'
       }`}
     >
-      {/* Desktop Menu */}
+      {/* Desktop Menu (mobile category menu lives in TopNav) */}
       <div className="hidden lg:block">
         <Menubar className="w-full max-w-7xl mx-auto border-0 rounded-none shadow-none">
           {categories.map((cat) => renderCategory(cat))}
         </Menubar>
-      </div>
-
-      {/* Mobile Menu */}
-      <div className="lg:hidden px-4">
-        <Sheet>
-          <SheetTrigger>
-            <MenuIcon className="h-5 w-5" />
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80 overflow-y-auto px-4">
-            <SheetHeader>
-              <SheetTitle>Categories</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 flex flex-col gap-2">
-              {categories.map((cat) => renderMobileCategory(cat, 0))}
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
     </div>
   );

@@ -7,203 +7,98 @@ const Footer = () => {
   return (
     <footer className="bg-slate-900 text-white mb-12 xl:mb-0 py-8">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <div className="flex flex-col gap-6 py-4">
-              <h1 className="text-2xl font-semibold">support</h1>
-              <div className="flex items-center gap-3 border-l-2 border-gray-600 pl-2 rounded-md">
-                <Phone className="w-5 h-5" />
-                <Separator className="my-2 h-9" orientation="vertical" />
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-400">
-                    9:00 AM - 8:00 PM
-                  </span>
-                  <span className="text-2xl font-bold text-gray-300">
-                    01911059059
-                  </span>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Support */}
+          <div className="flex flex-col gap-5 py-4">
+            <h3 className="text-xl sm:text-2xl font-semibold">Support</h3>
+            <div className="flex items-center gap-3 border-l-2 border-gray-600 pl-2 rounded-md">
+              <Phone className="w-5 h-5 shrink-0" />
+              <Separator className="my-2 h-9" orientation="vertical" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs text-gray-400">9:00 AM - 8:00 PM</span>
+                <span className="text-lg sm:text-xl font-bold text-gray-300 wrap-break-word">
+                  01911059059
+                </span>
               </div>
-              <div className="flex items-center gap-3 border-l-2 border-gray-600 pl-2 rounded-md">
-                <MapPinCheck className="w-5 h-5" />
-                <Separator className="my-2 h-9" orientation="vertical" />
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-400">Store Locator</span>
-                  <span className="text-lg font-extrabold text-gray-300">
-                    Dhaka, Bangladesh
-                  </span>
-                </div>
+            </div>
+            <div className="flex items-center gap-3 border-l-2 border-gray-600 pl-2 rounded-md">
+              <MapPinCheck className="w-5 h-5 shrink-0" />
+              <Separator className="my-2 h-9" orientation="vertical" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs text-gray-400">Store Locator</span>
+                <span className="text-base sm:text-lg font-bold text-gray-300">
+                  Dhaka, Bangladesh
+                </span>
               </div>
             </div>
           </div>
-          <div>
-            <div className="flex flex-col gap-6 py-4">
-              <h1 className="text-2xl font-semibold">About Us</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
-                <div>
-                  <ul>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Affiliate Program
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Online Delivery
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Refund and Returns policy
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Blog
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <ul>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        EMI Terms
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Privacy Policy
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Refund and Returns policy
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Contact Us
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <ul>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        About Us
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Terms and Conditions
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Career
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/"
-                        className="text-sm text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                      >
-                        Brands
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+
+          {/* About Us */}
+          <div className="flex flex-col gap-5 py-4">
+            <h3 className="text-xl sm:text-2xl font-semibold">About Us</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+              {[
+                'Affiliate Program',
+                'Online Delivery',
+                'Refund and Returns policy',
+                'Blog',
+                'EMI Terms',
+                'Privacy Policy',
+                'Contact Us',
+                'Terms and Conditions',
+                'Career',
+                'Brands',
+              ].map((label) => (
+                <Link
+                  key={label}
+                  href="/"
+                  className="text-sm text-gray-400 hover:text-blue-500 transition-colors duration-200"
+                >
+                  {label}
+                </Link>
+              ))}
             </div>
           </div>
-          <div>
-            <div className="flex flex-col gap-6 py-4">
-              <h1 className="text-2xl font-semibold">Stay Connected</h1>
-              <div>
-                <h2 className="text-lg font-bold text-gray-300">
-                  Apple IT Zone
-                </h2>
-                <p className="text-sm text-gray-400">
-                  Head Office: 28 Kazi Nazrul Islam Ave,Navana Zohura Square,
-                  Dhaka 1000
-                </p>
-                <p className="text-sm text-gray-400">Phone: +8801712345678</p>
-                <p className="text-sm text-gray-400">
-                  Email: info@appleitzone.com
-                </p>
-              </div>
+
+          {/* Stay Connected */}
+          <div className="flex flex-col gap-5 py-4">
+            <h3 className="text-xl sm:text-2xl font-semibold">Stay Connected</h3>
+            <div className="space-y-1">
+              <h4 className="text-base sm:text-lg font-bold text-gray-300">
+                Apple IT Zone
+              </h4>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Head Office: 28 Kazi Nazrul Islam Ave, Navana Zohura Square, Dhaka 1000
+              </p>
+              <p className="text-sm text-gray-400">Phone: +8801712345678</p>
+              <p className="text-sm text-gray-400 break-all">
+                Email: info@appleitzone.com
+              </p>
             </div>
           </div>
         </div>
-        <Separator className="h-0.5 bg-gray-700" />
-        <div className="flex justify-center my-4">
+
+        <Separator className="h-0.5 bg-gray-700 my-4" />
+
+        <div className="flex justify-center">
           <ul className="flex flex-wrap gap-4">
-            <li className="transition duration-200 ease-in-out hover:scale-105">
-              <Link href="/" className="text-gray-400 hover:text-blue-600">
-                <FaWhatsapp size={24} />
-              </Link>
-            </li>
-            <li className="transition duration-200 ease-in-out hover:scale-105">
-              <Link href="/" className="text-gray-400 hover:text-blue-600">
-                <FaFacebook size={24} />
-              </Link>
-            </li>
-            <li className="transition duration-200 ease-in-out hover:scale-105">
-              <Link href="/" className="text-gray-400 hover:text-blue-600">
-                <FaYoutube size={24} />
-              </Link>
-            </li>
-            <li className="transition duration-200 ease-in-out hover:scale-105">
-              <Link href="/" className="text-gray-400 hover:text-blue-600">
-                <FaInstagram size={24} />
-              </Link>
-            </li>
+            {[FaWhatsapp, FaFacebook, FaYoutube, FaInstagram].map((Icon, i) => (
+              <li key={i} className="transition duration-200 ease-in-out hover:scale-105">
+                <Link href="/" className="text-gray-400 hover:text-blue-500">
+                  <Icon size={22} />
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
-        <Separator className="h-0.5 bg-gray-700" />
-        <div className="py-4 flex flex-col lg:flex-row items-center justify-center lg:justify-between gap-4 text-xs text-gray-400">
+
+        <Separator className="h-0.5 bg-gray-700 my-4" />
+
+        <div className="flex flex-col lg:flex-row items-center justify-center lg:justify-between gap-2 text-xs text-gray-400 text-center">
+          <p>© {new Date().getFullYear()} Apple IT Zone. All rights reserved.</p>
           <p>
-            © {new Date().getFullYear()} Apple IT Zone. All rights reserved.
-          </p>
-          <p className="text-center lg:text-right">
             Powered by:{' '}
-            <span className="text-blue-600 font-semibold italic">
-              Apple IT Zone
-            </span>
+            <span className="text-blue-500 font-semibold italic">Apple IT Zone</span>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/store';
 import { SearchBar } from '@/components/store/layout/SearchBar';
+import { MobileCategoryMenu } from '@/components/store/layout/MobileCategoryMenu';
 import { useUI } from '@/store';
 
 import { useState, useEffect } from 'react';
@@ -35,11 +36,19 @@ const TopNav = () => {
         scrolled ? 'shadow-lg shadow-black/20' : ''
       }`}
     >
-      <div className="w-full max-w-7xl mx-auto flex h-16 items-center justify-between gap-4 lg:h-20 px-2">
-        <Logo />
+      <div className="w-full max-w-7xl mx-auto flex h-16 items-center gap-2 lg:h-20 px-2">
+        {/* Mobile category menu (hamburger) */}
+        <div className="lg:hidden">
+          <MobileCategoryMenu />
+        </div>
 
-        <div className="xl:hidden items-center justify-center flex flex-row gap-x-2">
-          {/* Search button mobile */}
+        {/* Logo: centered on mobile, left-aligned on desktop */}
+        <div className="flex flex-1 justify-center lg:flex-none lg:justify-start">
+          <Logo />
+        </div>
+
+        {/* Search + Cart buttons (mobile) */}
+        <div className="xl:hidden flex items-center justify-center gap-x-2">
           <Button
             type="button"
             className="h-10 w-10 rounded-full p-0 hover:scale-105 transition-transform"
@@ -49,7 +58,6 @@ const TopNav = () => {
             <Search className="h-4 w-4" />
           </Button>
 
-          {/* Cart button with badge */}
           <Button
             type="button"
             className="relative h-10 w-10 rounded-full p-0 hover:scale-105 transition-transform"
@@ -66,16 +74,15 @@ const TopNav = () => {
           </Button>
         </div>
 
-        {/* Search Bar - Desktop */}
+        {/* Search Bar - Desktop only */}
         <div className="hidden flex-1 max-w-xl xl:block">
           <div className="relative group">
             <SearchBar variant="desktop" commandKeyShortcut />
           </div>
         </div>
 
-        {/* Right Actions */}
+        {/* Right Actions (desktop) */}
         <div className="hidden xl:flex items-center gap-1 sm:gap-2">
-          {/* Offers */}
           <Link
             href="/offers"
             className="group relative hidden items-center gap-2.5 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-300 transition-all duration-300 hover:bg-white/10 hover:text-white sm:flex"
@@ -96,7 +103,6 @@ const TopNav = () => {
             </Badge>
           </Link>
 
-          {/* Holiday Special */}
           <Link
             href="/holiday"
             className="group hidden items-center gap-2 rounded-xl bg-linear-to-r from-amber-500/10 to-orange-500/10 px-3.5 py-2 text-sm font-medium text-amber-400 transition-all duration-300 hover:from-amber-500/20 hover:to-orange-500/20 hover:text-amber-300 sm:flex"
@@ -108,7 +114,6 @@ const TopNav = () => {
             </span>
           </Link>
 
-          {/* Divider */}
           <div className="hidden items-center gap-2 sm:flex">
             <User className="h-5 w-5 text-slate-400" />
 
