@@ -1,8 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { useEffect, useState } from 'react';
 
 import { NavMain } from '@/components/nav-main';
+import { notificationApi } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { NavUser } from '@/components/nav-user';
 import { TeamSwitcher } from '@/components/team-switcher';
 import {
@@ -141,7 +144,6 @@ const data = {
       title: 'Notifications',
       url: '/admin/notifications',
       icon: <BellCheck />,
-      badge: 10,
     },
     {
       title: 'Settings',
@@ -184,11 +186,45 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth();
+  const [unread, setUnread] = useState(0);
   const sidebarUser = {
     name: user?.name || 'Guest',
     email: user?.email || 'Not signed in',
     avatar: '',
   };
+
+  // Keep the notifications badge in sync with the live unread count.
+  useEffect(() => {
+    let active = true;
+    const load = () =>
+      notificationApi
+        .unreadCount()
+        .then((res) => {
+          if (active) setUnread(res.data.unreadCount);
+        })
+        .catch(() => {});
+
+    load();
+
+    const socket = getSocket();
+    const onNew = () => setUnread((u) => u + 1);
+    socket.on('notification:new', onNew);
+    // The notifications page dispatches this when items are marked read.
+    window.addEventListener('notifications-updated', load);
+
+    return () => {
+      active = false;
+      socket.off('notification:new', onNew);
+      window.removeEventListener('notifications-updated', load);
+    };
+  }, []);
+
+  // Inject the live unread count into the Notifications nav item.
+  const navMain = data.navMain.map((item) =>
+    item.title === 'Notifications'
+      ? { ...item, badge: unread > 0 ? unread : undefined }
+      : item
+  );
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -196,7 +232,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={sidebarUser} />

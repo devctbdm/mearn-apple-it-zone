@@ -1078,3 +1078,55 @@ export const holidayApi = {
     api.put<{ success: boolean; config: HolidayConfig }>('/holiday', data),
 };
 
+export type AdminNotificationCategory =
+  | 'order'
+  | 'delivery'
+  | 'rider'
+  | 'payment'
+  | 'system';
+
+export type AdminNotification = {
+  _id: string;
+  title: string;
+  description: string;
+  category: AdminNotificationCategory;
+  read: boolean;
+  link?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const notificationApi = {
+  // Fetch a paginated list of notifications. Returns the list plus the
+  // running unread count so the UI can stay in sync with new events.
+  list: (params?: {
+    page?: number;
+    limit?: number;
+    read?: boolean;
+    category?: string;
+  }) =>
+    api.get<{
+      success: boolean;
+      notifications: AdminNotification[];
+      total: number;
+      unreadCount: number;
+      page: number;
+      pages: number;
+    }>('/notifications', { params }),
+
+  unreadCount: () =>
+    api.get<{ success: boolean; unreadCount: number }>(
+      '/notifications/unread-count'
+    ),
+
+  markRead: (id: string) =>
+    api.patch<{ success: boolean; notification: AdminNotification }>(
+      `/notifications/${id}/read`
+    ),
+
+  markAllRead: () =>
+    api.post<{ success: boolean; message: string }>(
+      '/notifications/read-all'
+    ),
+};
+

@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   CheckCheck,
@@ -8,8 +8,6 @@ import {
   User,
   Megaphone,
   CreditCard,
-  MapPin,
-  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,22 +16,29 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import {
+  notificationApi,
+  type AdminNotification,
+  type AdminNotificationCategory,
+} from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 
-type NotificationCategory =
-  'order' | 'delivery' | 'rider' | 'payment' | 'system';
 type Filter = 'all' | 'unread' | 'orders';
 
-interface Notification {
-  id: string;
-  title: string;
-  description: string;
-  category: NotificationCategory;
-  read: boolean;
-  time: string;
-}
+const PAGE_SIZE = 5;
 
-const categoryIcon: Record<NotificationCategory, React.ElementType> = {
+const categoryIcon: Record<AdminNotificationCategory, React.ElementType> = {
   order: Package,
   delivery: Truck,
   rider: User,
@@ -41,7 +46,7 @@ const categoryIcon: Record<NotificationCategory, React.ElementType> = {
   system: Megaphone,
 };
 
-const categoryColor: Record<NotificationCategory, string> = {
+const categoryColor: Record<AdminNotificationCategory, string> = {
   order: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
   delivery:
     'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
@@ -52,79 +57,64 @@ const categoryColor: Record<NotificationCategory, string> = {
   system: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 };
 
-const initialNotifications: Notification[] = [
-  {
-    id: 'ntf-1',
-    title: 'New order received',
-    description: 'Order #ORD-1025 has been placed by Rahul Ahmed for ৳84,999.',
-    category: 'order',
-    read: false,
-    time: '2 min ago',
-  },
-  {
-    id: 'ntf-2',
-    title: 'Rider assigned',
-    description: 'Pathao rider Karim H. is assigned to order #ORD-1020.',
-    category: 'rider',
-    read: false,
-    time: '15 min ago',
-  },
-  {
-    id: 'ntf-3',
-    title: 'Order delivered',
-    description: 'Order #ORD-1015 has been delivered successfully.',
-    category: 'delivery',
-    read: false,
-    time: '1 hour ago',
-  },
-  {
-    id: 'ntf-4',
-    title: 'Payment confirmed',
-    description: 'bKash payment of ৳32,500 for order #ORD-1018 is confirmed.',
-    category: 'payment',
-    read: true,
-    time: '3 hours ago',
-  },
-  {
-    id: 'ntf-5',
-    title: 'Order cancelled',
-    description: 'Order #ORD-1012 was cancelled by the customer.',
-    category: 'order',
-    read: true,
-    time: '5 hours ago',
-  },
-  {
-    id: 'ntf-6',
-    title: 'Rider reached pickup',
-    description:
-      'Rider Hasan M. has reached the pickup location for order #ORD-1020.',
-    category: 'rider',
-    read: true,
-    time: 'Yesterday',
-  },
-  {
-    id: 'ntf-7',
-    title: 'Low stock alert',
-    description:
-      'iPhone 15 Pro Max 256GB is running low in inventory (4 left).',
-    category: 'system',
-    read: true,
-    time: 'Yesterday',
-  },
-  {
-    id: 'ntf-8',
-    title: 'Delivery failed',
-    description: 'Order #ORD-1008 delivery failed. Customer not available.',
-    category: 'delivery',
-    read: true,
-    time: '2 days ago',
-  },
-];
+function timeAgo(iso?: string): string {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr > 1 ? 's' : ''} ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} day${day > 1 ? 's' : ''} ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+// Absolute, human-readable date & time with AM/PM (e.g. "22 Aug 2026, 03:45 PM").
+function formatDateTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const time = d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${date}, ${time}`;
+}
+
+// Build a compact page list with ellipsis for many pages.
+function getPageItems(
+  current: number,
+  totalPages: number
+): (number | 'ellipsis')[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const items: (number | 'ellipsis')[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(totalPages - 1, current + 1);
+  if (start > 2) items.push('ellipsis');
+  for (let i = start; i <= end; i++) items.push(i);
+  if (end < totalPages - 1) items.push('ellipsis');
+  items.push(totalPages);
+  return items;
+}
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] =
-    useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const [newOrdersEnabled, setNewOrdersEnabled] = useState(true);
   const [advancePaymentEnabled, setAdvancePaymentEnabled] = useState(true);
@@ -132,32 +122,95 @@ export default function NotificationsPage() {
   const [riderUpdatesEnabled, setRiderUpdatesEnabled] = useState(true);
   const [promotionsEnabled, setPromotionsEnabled] = useState(false);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications]
-  );
-  const orderCount = useMemo(
-    () => notifications.filter((n) => n.category === 'order').length,
-    [notifications]
-  );
+  const loadPage = (p = page, f = filter) => {
+    const params: Record<string, unknown> = { page: p, limit: PAGE_SIZE };
+    if (f === 'unread') params.read = 'false';
+    if (f === 'orders') params.category = 'order';
 
-  const filtered = useMemo(() => {
-    return notifications.filter((n) => {
-      if (filter === 'unread') return !n.read;
-      if (filter === 'orders') return n.category === 'order';
-      return true;
-    });
-  }, [notifications, filter]);
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    toast.success('All notifications marked as read');
+    notificationApi
+      .list(params)
+      .then((res) => {
+        if (res.data.success) {
+          setNotifications(res.data.notifications);
+          setUnreadCount(res.data.unreadCount);
+          setTotal(res.data.total);
+          setPages(res.data.pages);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
-  const markAsRead = (id: string) => {
+  const loadOrderCount = () => {
+    notificationApi
+      .list({ category: 'order', limit: 1 })
+      .then((res) => {
+        if (res.data.success) setOrderCount(res.data.total);
+      })
+      .catch(() => {});
+  };
+
+  // Keep refs to the latest loaders for the socket handler (avoids stale state).
+  const loadPageRef = useRef(loadPage);
+  const loadOrderCountRef = useRef(loadOrderCount);
+  useEffect(() => {
+    loadPageRef.current = loadPage;
+    loadOrderCountRef.current = loadOrderCount;
+  });
+
+  // Reload whenever page or filter changes.
+  useEffect(() => {
+    loadPage();
+  }, [page, filter]);
+
+  // Initial order-count load + live updates over Socket.io.
+  useEffect(() => {
+    loadOrderCount();
+
+    const socket = getSocket();
+    const onNew = () => {
+      loadPageRef.current();
+      loadOrderCountRef.current?.();
+    };
+    socket.on('notification:new', onNew);
+
+    return () => {
+      socket.off('notification:new', onNew);
+    };
+  }, []);
+
+  const goToPage = (p: number) => {
+    if (p < 1 || p > pages) return;
+    setPage(p);
+  };
+
+  const pageItems = useMemo(() => getPageItems(page, pages), [page, pages]);
+
+  const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await notificationApi.markAllRead();
+      toast.success('All notifications marked as read');
+      window.dispatchEvent(new Event('notifications-updated'));
+      loadPage();
+      loadOrderCount();
+    } catch {
+      toast.error('Failed to mark all as read');
+    }
+  };
+
+  const markAsRead = async (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n._id === id ? { ...n, read: true } : n))
     );
+    try {
+      await notificationApi.markRead(id);
+      window.dispatchEvent(new Event('notifications-updated'));
+      loadPage();
+      loadOrderCount();
+    } catch {
+      // optimistic update already applied; ignore network failure
+    }
   };
 
   return (
@@ -207,7 +260,10 @@ export default function NotificationsPage() {
 
               <Tabs
                 value={filter}
-                onValueChange={(v) => setFilter(v as Filter)}
+                onValueChange={(v) => {
+                  setFilter(v as Filter);
+                  setPage(1);
+                }}
                 className="w-full"
               >
                 <TabsList className="w-full justify-start sm:w-auto">
@@ -232,70 +288,134 @@ export default function NotificationsPage() {
 
             <CardContent className="pt-0">
               <ScrollArea className="h-130 pr-3">
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <div className="flex h-64 flex-col items-center justify-center text-center text-muted-foreground">
+                    <Bell className="mb-3 h-10 w-10 opacity-20" />
+                    <p>Loading notifications…</p>
+                  </div>
+                ) : notifications.length === 0 ? (
                   <div className="flex h-64 flex-col items-center justify-center text-center text-muted-foreground">
                     <Bell className="mb-3 h-10 w-10 opacity-20" />
                     <p>No notifications found.</p>
                     <p className="text-sm">You are all caught up.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {filtered.map((n) => {
-                      const Icon = categoryIcon[n.category];
-                      return (
-                        <div
-                          key={n.id}
-                          onClick={() => markAsRead(n.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ')
-                              markAsRead(n.id);
-                          }}
-                          className={`group relative flex items-start gap-4 rounded-xl border p-4 transition-colors hover:bg-accent/50 ${
-                            n.read ? 'opacity-80' : 'bg-accent/30'
-                          }`}
-                        >
-                          {!n.read && (
-                            <span className="absolute right-4 top-4 h-2 w-2 rounded-full bg-primary" />
-                          )}
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${categoryColor[n.category]}`}
+                  <AnimatePresence initial={false}>
+                    <div className="space-y-2">
+                      {notifications.map((n) => {
+                        const Icon = categoryIcon[n.category];
+                        return (
+                          <motion.div
+                            key={n._id}
+                            layout
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.97 }}
+                            transition={{ duration: 0.2 }}
+                            onClick={() => markAsRead(n._id)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ')
+                                markAsRead(n._id);
+                            }}
+                            className={`group relative flex items-start gap-4 rounded-xl border p-4 transition-colors hover:bg-accent/50 ${
+                              n.read ? 'opacity-80' : 'bg-accent/30'
+                            }`}
                           >
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-medium leading-tight">
-                                {n.title}
-                              </p>
-                              <span className="text-xs whitespace-nowrap text-muted-foreground">
-                                {n.time}
-                              </span>
+                            {!n.read && (
+                              <span className="absolute right-4 top-4 h-2 w-2 rounded-full bg-primary" />
+                            )}
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${categoryColor[n.category]}`}
+                            >
+                              <Icon className="h-5 w-5" />
                             </div>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {n.description}
-                            </p>
-                            <div className="mt-2 flex items-center gap-3">
-                              <Badge
-                                variant="outline"
-                                className="text-xs capitalize"
-                              >
-                                {n.category}
-                              </Badge>
-                              {!n.read && (
-                                <span className="text-xs font-medium text-primary">
-                                  New
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-medium leading-tight">
+                                  {n.title}
+                                </p>
+                                <span className="text-xs whitespace-nowrap text-muted-foreground">
+                                  {timeAgo(n.createdAt)}
                                 </span>
-                              )}
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {n.description}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground/70">
+                                {formatDateTime(n.createdAt)}
+                              </p>
+                              <div className="mt-2 flex items-center gap-3">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs capitalize"
+                                >
+                                  {n.category}
+                                </Badge>
+                                {!n.read && (
+                                  <span className="text-xs font-medium text-primary">
+                                    New
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </AnimatePresence>
                 )}
               </ScrollArea>
+
+              {pages > 1 && (
+                <Pagination className="mt-4">
+                  <PaginationContent>
+                    {page > 1 && (
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            goToPage(page - 1);
+                          }}
+                        />
+                      </PaginationItem>
+                    )}
+                    {pageItems.map((p) =>
+                      p === 'ellipsis' ? (
+                        <PaginationItem key="ellipsis">
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            href="#"
+                            isActive={p === page}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              goToPage(p);
+                            }}
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    )}
+                    {page < pages && (
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            goToPage(page + 1);
+                          }}
+                        />
+                      </PaginationItem>
+                    )}
+                  </PaginationContent>
+                </Pagination>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -358,31 +478,6 @@ export default function NotificationsPage() {
                   checked={promotionsEnabled}
                   onCheckedChange={setPromotionsEnabled}
                 />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-linear-to-br from-primary/5 via-primary/10 to-primary/5">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-3">
-                <div className="bg-primary text-primary-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
-                  <Clock className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium">Quiet hours</p>
-                  <p className="text-sm text-muted-foreground">
-                    Disable non-critical alerts between 10:00 PM and 7:00 AM.
-                  </p>
-                  <Button
-                    variant="link"
-                    className="h-auto px-0 py-1 text-sm"
-                    onClick={() =>
-                      toast.info('Quiet hours settings coming soon')
-                    }
-                  >
-                    Configure schedule
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>

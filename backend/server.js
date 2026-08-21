@@ -1,5 +1,6 @@
 import app from './src/app.js';
 import { connectDB, disconnectDB } from './src/config/database.js';
+import { initSocket } from './src/socket.js';
 import dotenv from 'dotenv';
 
 // Import models to register schemas
@@ -55,6 +56,9 @@ Order.find({ orderNumber: { $regex: /^AIZ-/i } })
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
+// Attach Socket.io for real-time admin notifications
+initSocket(server);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {

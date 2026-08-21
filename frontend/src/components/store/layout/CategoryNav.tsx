@@ -78,6 +78,7 @@ export const CategoryNav = () => {
     new Set()
   );
   const [categories, setCategories] = useState<TreeCategory[]>([]);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     categoryApi
@@ -88,6 +89,13 @@ export const CategoryNav = () => {
         }
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const toggleCategory = (categoryId: string) => {
@@ -203,9 +211,13 @@ export const CategoryNav = () => {
   };
 
   return (
-    <div className="border-b border-gray-200 shadow-lg py-2">
+    <div
+      className={`sticky top-16 z-40 border-b border-gray-200 bg-background/95 py-2 backdrop-blur transition-all duration-300 lg:top-20 ${
+        scrolled ? 'shadow-xl' : 'shadow-lg'
+      }`}
+    >
       {/* Desktop Menu */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Menubar className="w-full max-w-7xl mx-auto border-0 rounded-none shadow-none">
           {categories.map((cat) => renderCategory(cat))}
         </Menubar>

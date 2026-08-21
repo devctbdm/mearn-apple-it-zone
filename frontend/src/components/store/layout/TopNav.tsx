@@ -13,6 +13,7 @@ import Logo from '@/components/store/logo/Logo';
 const TopNav = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { toggleCartDrawer } = useUI();
 
   const { totalItems } = useCart();
@@ -21,8 +22,19 @@ const TopNav = () => {
     setIsLoggedIn(!!localStorage.getItem('mobile_token'));
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="w-full border-b border-white/10 bg-slate-900">
+    <header
+      className={`sticky top-0 z-50 w-full border-b border-white/10 bg-slate-900/95 backdrop-blur transition-all duration-300 ${
+        scrolled ? 'shadow-lg shadow-black/20' : ''
+      }`}
+    >
       <div className="w-full max-w-7xl mx-auto flex h-16 items-center justify-between gap-4 lg:h-20 px-2">
         <Logo />
 

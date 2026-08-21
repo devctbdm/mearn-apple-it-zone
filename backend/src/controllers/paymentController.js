@@ -1,6 +1,7 @@
 import SSLCommerzPayment from "sslcommerz-lts";
 import Order from "../models/Order.js";
 import PaymentGateway from "../models/PaymentGateway.js";
+import { createNotification } from "../services/notificationService.js";
 
 // @desc    Load SSLCommerz credentials from DB config, falling back to env
 const getSSLCommerzConfig = async () => {
@@ -164,6 +165,8 @@ export const validatePayment = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
+    const wasPaid = order.payment.status === "paid";
+
     const norm = (s) => (typeof s === "string" ? s.trim().toUpperCase() : "");
     const SUCCESS = ["VALID", "VALIDATED"];
 
@@ -221,6 +224,16 @@ export const validatePayment = async (req, res) => {
     }
     await order.save();
 
+    if (!wasPaid && order.payment.status === "paid") {
+      await createNotification({
+        category: "payment",
+        title: "Payment confirmed",
+        description: `Payment of ৳${order.payment.amount || order.totalAmount} for order ${order.orderNumber} is confirmed.`,
+        link: `/admin/orders?id=${order._id}`,
+        order: order._id,
+      });
+    }
+
     res.json({
       success: true,
       valid: outcome === "paid",
@@ -253,6 +266,8 @@ export const ipnListener = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
+
+    const wasPaid = order.payment.status === "paid";
 
     const norm = (s) => (typeof s === "string" ? s.trim().toUpperCase() : "");
     const SUCCESS = ["VALID", "VALIDATED"];
@@ -290,6 +305,16 @@ export const ipnListener = async (req, res) => {
     }
     await order.save();
 
+    if (!wasPaid && order.payment.status === "paid") {
+      await createNotification({
+        category: "payment",
+        title: "Payment confirmed",
+        description: `Payment of ৳${order.payment.amount || order.totalAmount} for order ${order.orderNumber} is confirmed.`,
+        link: `/admin/orders?id=${order._id}`,
+        order: order._id,
+      });
+    }
+
     res.status(200).json({ success: true });
   } catch (error) {
     console.error("SSLCommerz IPN Error:", error);
@@ -316,6 +341,8 @@ export const queryTransaction = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
+
+    const wasPaid = order.payment.status === "paid";
 
     const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
     const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
@@ -350,6 +377,16 @@ export const queryTransaction = async (req, res) => {
     }
 
     if (updated) await order.save();
+
+    if (!wasPaid && order.payment.status === "paid") {
+      await createNotification({
+        category: "payment",
+        title: "Payment confirmed",
+        description: `Payment of ৳${order.payment.amount || order.totalAmount} for order ${order.orderNumber} is confirmed.`,
+        link: `/admin/orders?id=${order._id}`,
+        order: order._id,
+      });
+    }
 
     res.json({
       success: true,

@@ -5,6 +5,7 @@ import PromoCode from "../models/PromoCode.js";
 import { expandPromoCategories } from "../utils/categoryTree.js";
 import { getNextOrderNumber } from "../utils/orderNumber.js";
 import { notifyOrderStatusChange } from "../services/smsService.js";
+import { createNotification } from "../services/notificationService.js";
 
 // @desc    Create a new order
 // @route   POST /api/orders
@@ -125,6 +126,15 @@ export const createOrder = async (req, res) => {
         phone: req.user.phone,
       }).catch(() => {});
     }
+
+    // Real-time admin notification for the new order
+    await createNotification({
+      category: "order",
+      title: "New order received",
+      description: `Order ${order.orderNumber} placed by ${req.user.name || "a customer"} for ৳${totalAmount}.`,
+      link: `/admin/orders?id=${order._id}`,
+      order: order._id,
+    });
 
     res.status(201).json({
       success: true,
@@ -343,6 +353,17 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
+    // Real-time admin notification for the status change
+    const label =
+      status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
+    await createNotification({
+      category: "order",
+      title: `Order ${label}`,
+      description: `Order ${order.orderNumber} status is now ${label}.`,
+      link: `/admin/orders?id=${order._id}`,
+      order: order._id,
+    });
+
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -370,6 +391,7 @@ export const updatePaymentStatus = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
+    const prevPaymentStatus = order.payment.status;
     order.payment.status = status;
     if (status === "Paid") {
       order.payment.paidAt = order.payment.paidAt || new Date();
@@ -377,6 +399,16 @@ export const updatePaymentStatus = async (req, res) => {
       order.payment.paidAt = undefined;
     }
     await order.save();
+
+    if (prevPaymentStatus !== "Paid" && status === "Paid") {
+      await createNotification({
+        category: "payment",
+        title: "Payment confirmed",
+        description: `Payment of ৳${order.totalAmount} for order ${order.orderNumber} is confirmed.`,
+        link: `/admin/orders?id=${order._id}`,
+        order: order._id,
+      });
+    }
 
     res.json({ success: true, order });
   } catch (error) {
@@ -397,6 +429,8 @@ export const updateAdvance = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
+
+    const wasPaid = order.payment.status === "paid";
 
     if (advanceAmount !== undefined) {
       const amt = Number(advanceAmount);
@@ -439,6 +473,17 @@ export const updateAdvance = async (req, res) => {
     }
 
     await order.save();
+
+    if (!wasPaid && order.payment.status === "paid") {
+      await createNotification({
+        category: "payment",
+        title: "Advance payment received",
+        description: `Order ${order.orderNumber} is now fully paid (advance ৳${order.advancePaid}).`,
+        link: `/admin/orders?id=${order._id}`,
+        order: order._id,
+      });
+    }
+
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
