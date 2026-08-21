@@ -28,6 +28,7 @@ import smsRoutes from './routes/smsRoutes.js';
 import maintenanceRoutes from './routes/maintenanceRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
 import holidayRoutes from './routes/holidayRoutes.js';
+import homeSliderTextRoutes from './routes/homeSliderTextRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -127,6 +128,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/holiday', holidayRoutes);
+app.use('/api/home-slider-texts', homeSliderTextRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

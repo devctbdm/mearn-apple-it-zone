@@ -12,6 +12,7 @@ import {
   Download,
   Printer,
   Clock,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +81,8 @@ type StatusFilter = OrderStatus | 'all';
 const statusVariant: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+  confirmed: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100',
+  send_courier: 'bg-violet-100 text-violet-800 hover:bg-violet-100',
   cancelled: 'bg-red-100 text-red-800 hover:bg-red-100',
 };
 
@@ -149,6 +152,8 @@ export default function OrdersPage() {
     total: number;
     pending: number;
     processing: number;
+    confirmed: number;
+    send_courier: number;
     cancelled: number;
   } | null>(null);
   const [query, setQuery] = useState('');
@@ -474,6 +479,18 @@ export default function OrdersPage() {
       color: 'text-blue-600',
     },
     {
+      label: 'Confirmed',
+      value: stats?.confirmed ?? 0,
+      icon: CheckCircle2,
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'Send To Courier',
+      value: stats?.send_courier ?? 0,
+      icon: Truck,
+      color: 'text-violet-600',
+    },
+    {
       label: 'Cancelled',
       value: stats?.cancelled ?? 0,
       icon: XCircle,
@@ -528,6 +545,8 @@ export default function OrdersPage() {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="send_courier">Send To Courier</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -971,6 +990,8 @@ export default function OrdersPage() {
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="send_courier">Send To Courier</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>

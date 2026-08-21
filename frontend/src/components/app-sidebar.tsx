@@ -166,6 +166,10 @@ const data = {
           url: '/admin/slider',
         },
         {
+          title: 'Home Slide Text',
+          url: '/admin/homeslidertext',
+        },
+        {
           title: 'SMS',
           url: '/admin/sms',
         },

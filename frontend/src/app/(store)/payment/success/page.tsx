@@ -188,7 +188,7 @@ function SuccessContent() {
                 </Link>
               </Button>
               <Button variant="outline" className="w-full">
-                <Link href="/account" className="flex items-center gap-2">
+                <Link href="/accounts" className="flex items-center gap-2">
                   <FileText className="size-4" />
                   View order
                 </Link>

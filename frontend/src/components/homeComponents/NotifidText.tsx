@@ -1,19 +1,36 @@
-// app/page.tsx
-import Marquee from '@/components/homeComponents/Marquee';
+'use client';
 
-const notifications = [
-  'New iPhone 15 Pro Max available in-store',
-  '20% off on all MacBooks this week',
-  'Free shipping on orders over $100',
-  'Latest iPad Pro now on sale',
-  'Apple Watch Series 9 discount ends soon',
-];
+import { useEffect, useState } from 'react';
+import Marquee from '@/components/homeComponents/Marquee';
+import { homeSliderTextApi } from '@/lib/api';
+
 
 export default function NotifidText() {
+  const [texts, setTexts] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    homeSliderTextApi
+      .getAll({ active: true })
+      .then(({ data }) => {
+        if (!alive) return;
+        const list = (data.texts || [])
+          .map((t) => t.text)
+          .filter((t) => t && t.trim());
+        if (list.length) setTexts(list);
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="bg-gray-100 rounded-md py-2">
       <Marquee speed="slow">
-        {notifications.map((notification, index) => (
+        {texts.map((notification, index) => (
           <span key={index}>{notification}</span>
         ))}
       </Marquee>

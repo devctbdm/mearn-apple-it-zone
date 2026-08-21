@@ -75,7 +75,7 @@ import {
 } from '@/lib/api';
 import RequireAuth from '@/components/store/layout/RequireAuth';
 
-type OrderStatus = 'pending' | 'processing' | 'cancelled';
+type OrderStatus = 'pending' | 'processing' | 'confirmed' | 'send_courier' | 'cancelled';
 type OrderItem = {
   name: string;
   price: number;
@@ -90,7 +90,14 @@ type Order = {
   items: OrderItem[];
   orderNumber?: string;
   coupon?: { code: string; discount: number };
-  payment?: { method: string; status: string };
+  payment?: {
+    method: string;
+    status: string;
+    tran_id?: string;
+    amount?: number;
+    val_id?: string;
+    paidAt?: string;
+  };
   advanceAmount?: number;
   advancePaid?: number;
   shippingAddress?: {
@@ -175,12 +182,130 @@ const statusMeta: Record<
     className: 'bg-blue-100 text-blue-800',
     Icon: Truck,
   },
+  confirmed: {
+    label: 'Confirmed',
+    className: 'bg-emerald-100 text-emerald-800',
+    Icon: CheckCircle2,
+  },
+  send_courier: {
+    label: 'Sent to Courier',
+    className: 'bg-violet-100 text-violet-800',
+    Icon: Truck,
+  },
   cancelled: {
     label: 'Cancelled',
     className: 'bg-rose-100 text-rose-800',
     Icon: XCircle,
   },
 };
+
+const fmtDate = (d?: string) =>
+  d
+    ? new Date(d).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : undefined;
+
+type TimelineStep = {
+  title: string;
+  description?: string;
+  date?: string;
+  state: 'done' | 'current' | 'upcoming';
+};
+
+const ORDER_STAGES = ['pending', 'processing', 'confirmed', 'send_courier'] as const;
+type Stage = (typeof ORDER_STAGES)[number];
+
+// Reconstruct the order journey from the order's current state.
+function buildTimeline(o: Order, phone?: string): TimelineStep[] {
+  const steps: TimelineStep[] = [];
+  const stage = (ORDER_STAGES as readonly string[]).indexOf(o.status);
+  const reached = (req: Stage) => stage >= ORDER_STAGES.indexOf(req);
+
+  steps.push({
+    title: 'Order Placed',
+    description: `Order ${
+      o.orderNumber || o.id.slice(-6).toUpperCase()
+    } placed successfully.`,
+    date: fmtDate(o.date),
+    state: 'done',
+  });
+
+  if (o.status === 'cancelled') {
+    steps.push({
+      title: 'Cancelled',
+      description: 'This order was cancelled.',
+      state: 'current',
+    });
+    return steps;
+  }
+
+  steps.push({
+    title: 'Confirmation Call',
+    description: reached('processing')
+      ? 'Our operator called and confirmed your order.'
+      : 'Our operator will call you to confirm this order. If we can’t reach you, we’ll retry.',
+    state: reached('processing') ? 'done' : 'current',
+  });
+
+  steps.push({
+    title: 'Processing',
+    description: 'Your order is being prepared.',
+    state: reached('processing') ? 'done' : 'upcoming',
+  });
+
+  if (o.advanceAmount && o.advanceAmount > 0) {
+    const paid = (o.advancePaid || 0) >= o.advanceAmount;
+    steps.push({
+      title: paid ? 'Advance Payment Paid' : 'Pending for advance payment',
+      description: paid
+        ? `Advance ৳${o.advancePaid?.toLocaleString()} received.`
+        : `Please pay ৳${o.advanceAmount.toLocaleString()} advance to confirm this order.`,
+      date: paid ? fmtDate(o.date) : undefined,
+      state: paid ? 'done' : 'current',
+    });
+  }
+
+  const pay = o.payment;
+  if (pay?.status === 'paid') {
+    steps.push({
+      title: 'Payment Paid',
+      description: `Payer Info: ${phone || '—'}${
+        pay.val_id ? ` · Gateway Status: ${pay.val_id}` : ' · Gateway Status: 0000'
+      }`,
+      date: fmtDate(pay.paidAt || o.date),
+      state: 'done',
+    });
+  } else if (pay?.method === 'cod') {
+    steps.push({
+      title: 'Cash on Delivery',
+      description: 'Payment is due on delivery.',
+      state: 'done',
+    });
+  } else {
+    steps.push({
+      title: 'Payment Pending',
+      description: 'Awaiting payment for this order.',
+      state: 'upcoming',
+    });
+  }
+
+  steps.push({
+    title: 'Confirmed',
+    description: 'Order confirmed by admin and is being prepared.',
+    state: reached('confirmed') ? 'done' : 'upcoming',
+  });
+
+  steps.push({
+    title: 'Send To Courier',
+    description: 'Order handed to the courier for delivery.',
+    state: reached('send_courier') ? 'done' : 'upcoming',
+  });
+
+  return steps;
+}
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(60),
@@ -220,6 +345,7 @@ function AccountContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [orderPage, setOrderPage] = useState(1);
+  const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const { wishlist: wishItems, removeFromWishlist } = useWishlist();
@@ -308,11 +434,7 @@ function AccountContent() {
       .reduce((a, o) => a + o.total, 0);
     return {
       orders: orders.length,
-      pending: orders.filter(
-        (o) =>
-          o.status === 'processing' ||
-          o.status === 'pending'
-      ).length,
+      pending: orders.filter((o) => o.status !== 'cancelled').length,
       wishlist: wishlist.length,
       addresses: addresses.length,
       totalSpent,
@@ -529,23 +651,32 @@ function AccountContent() {
                       key={o.id}
                       className="rounded-lg border bg-card p-4"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">
-                            Order {o.orderNumber || o.id.slice(-6).toUpperCase()}
-                          </p>
-                          <Badge
-                            variant="secondary"
-                            className={meta.className}
-                          >
-                            <Icon className="mr-1 h-3 w-3" />
-                            {meta.label}
-                          </Badge>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">
+                              Order {o.orderNumber || o.id.slice(-6).toUpperCase()}
+                            </p>
+                            <Badge
+                              variant="secondary"
+                              className={meta.className}
+                            >
+                              <Icon className="mr-1 h-3 w-3" />
+                              {meta.label}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <p className="font-semibold">
+                              ৳{o.total.toLocaleString()}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setViewOrder(o)}
+                            >
+                              View
+                            </Button>
+                          </div>
                         </div>
-                        <p className="font-semibold">
-                          ৳{o.total.toLocaleString()}
-                        </p>
-                      </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {new Date(o.date).toLocaleDateString()} · {o.items.length}{' '}
                         item{o.items.length > 1 ? 's' : ''}
@@ -916,6 +1047,13 @@ function AccountContent() {
           })
         }
         onSave={saveAddress}
+      />
+
+      {/* Order detail dialog */}
+      <OrderViewDialog
+        order={viewOrder}
+        phone={user?.phone}
+        onClose={() => setViewOrder(null)}
       />
 
       {/* Delete address */}
@@ -1384,6 +1522,231 @@ function AddressDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OrderViewDialog({
+  order,
+  phone,
+  onClose,
+}: {
+  order: Order | null;
+  phone?: string;
+  onClose: () => void;
+}) {
+  if (!order) return null;
+  const meta = statusMeta[order.status] || statusMeta.pending;
+  const Icon = meta.Icon;
+  const steps = buildTimeline(order, phone);
+  const subtotal = order.items.reduce(
+    (s, it) => s + it.price * it.quantity,
+    0
+  );
+  const couponDiscount = order.coupon?.discount || 0;
+  const advancePaid = order.advancePaid || 0;
+  const due = Math.max(0, order.total - advancePaid);
+
+  return (
+    <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <DialogTitle>
+              Order {order.orderNumber || order.id.slice(-6).toUpperCase()}
+            </DialogTitle>
+            <Badge variant="secondary" className={meta.className}>
+              <Icon className="mr-1 h-3 w-3" />
+              {meta.label}
+            </Badge>
+          </div>
+          <DialogDescription>
+            Placed on {fmtDate(order.date)}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Left: order details */}
+          <div className="space-y-4 md:col-span-2">
+            {/* Section 1: order info */}
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Order information
+              </p>
+              <p className="mt-1 font-medium">
+                {order.orderNumber || `#${order.id.slice(-6).toUpperCase()}`}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span>Status: {meta.label}</span>
+                <span>·</span>
+                <span>
+                  Payment:{' '}
+                  {order.payment
+                    ? `${order.payment.method.toUpperCase()} (${order.payment.status})`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Section 2: shipping + summary */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Shipping address
+                </p>
+                <div className="mt-2 space-y-0.5 text-sm">
+                  <p className="font-medium">
+                    {order.shippingAddress?.street || '—'}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {[
+                      order.shippingAddress?.city,
+                      order.shippingAddress?.state,
+                      order.shippingAddress?.postcode,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {order.shippingAddress?.country}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Order summary
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>৳{subtotal.toLocaleString()}</span>
+                  </div>
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Coupon ({order.coupon?.code})
+                      </span>
+                      <span className="text-green-600">
+                        -৳{couponDiscount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {advancePaid > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Advance paid</span>
+                      <span>৳{advancePaid.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-medium">
+                    <span>Total</span>
+                    <span>৳{order.total.toLocaleString()}</span>
+                  </div>
+                  {advancePaid > 0 && due > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Due on delivery
+                      </span>
+                      <span>৳{due.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: products */}
+            <div className="rounded-lg border bg-card p-4">
+              <p className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">
+                Products
+              </p>
+              <div className="space-y-2">
+                {order.items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 rounded-md border p-2"
+                  >
+                    {it.image ? (
+                      <img
+                        src={it.image}
+                        alt={it.name}
+                        className="h-12 w-12 shrink-0 rounded-md border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{it.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        ৳{it.price.toLocaleString()} × {it.quantity}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium">
+                      ৳{(it.price * it.quantity).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: order history */}
+          <div className="rounded-lg border bg-card p-4">
+            <p className="mb-3 text-sm font-medium">Order History</p>
+            <ol className="space-y-0">
+              {steps.map((s, i) => {
+                const last = i === steps.length - 1;
+                const dot =
+                  s.state === 'done'
+                    ? 'border-green-500 bg-green-500 text-white'
+                    : s.state === 'current'
+                    ? 'border-blue-500 bg-blue-500 text-white'
+                    : 'border-muted-foreground/30 bg-background text-muted-foreground';
+                return (
+                  <li key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${dot}`}
+                      >
+                        {s.state === 'done' ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : s.state === 'current' ? (
+                          <Clock className="h-3.5 w-3.5" />
+                        ) : (
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        )}
+                      </span>
+                      {!last && (
+                        <span className="my-1 w-px flex-1 bg-border" />
+                      )}
+                    </div>
+                    <div className={last ? 'pb-0' : 'pb-4'}>
+                      <p className="text-sm font-medium">{s.title}</p>
+                      {s.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {s.description}
+                        </p>
+                      )}
+                      {s.date && (
+                        <p className="mt-0.5 text-xs text-muted-foreground/70">
+                          {s.date}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -30,7 +30,7 @@ async function getStore() {
 
 // Core send helper. Never throws — returns a result object so callers
 // (order flow, auth flow, admin controller) never break on SMS failures.
-export async function sendSms({ numbers, message, senderId }) {
+export async function sendSms({ numbers, message, senderId, skipSignature }) {
   const result = {
     success: false,
     skipped: false,
@@ -58,9 +58,10 @@ export async function sendSms({ numbers, message, senderId }) {
   }
 
   const useSender = (senderId && String(senderId).trim()) || setting.senderId || '';
-  const fullMessage = setting.signature
-    ? `${String(message).trim()}\n${setting.signature}`
-    : String(message).trim();
+  const fullMessage =
+    !skipSignature && setting.signature
+      ? `${String(message).trim()}\n${setting.signature}`
+      : String(message).trim();
 
   const body = new URLSearchParams();
   body.append('api_key', setting.apiKey);
@@ -142,4 +143,62 @@ export async function sendLoginOtp({ phone, otp, expirySeconds = 60 }) {
     `${store.name} login verification code: ${otp}. ` +
     `Valid for ${expirySeconds} seconds. Do not share this code with anyone.`;
   return sendSms({ numbers: phone, message });
+}
+
+// Order-status notification templates. `{name}`, `{oid}`, `{store}` and
+// `{total}` are filled from the order data. Keep them short to fit one SMS.
+const STATUS_TEMPLATES = {
+  pending: (d) =>
+    `Hello ${d.name}, your order ${d.oid} from ${d.store} is currently pending. ` +
+    `Total: ৳${Number(d.total).toLocaleString()}. We’ll update you shortly. Thank you! ❤️`,
+  processing: (d) =>
+    `Hello ${d.name}, your order ${d.oid} from ${d.store} is now processing. ` +
+    `Total: ৳${Number(d.total).toLocaleString()}. We’re preparing your order. ❤️`,
+  confirmed: (d) =>
+    `Hello ${d.name}, your order ${d.oid} from ${d.store} is confirmed! 🎉 ` +
+    `Total: ৳${Number(d.total).toLocaleString()}. Thank you for shopping with us. ❤️`,
+  send_courier: (d) =>
+    `Hello ${d.name}, your order ${d.oid} from ${d.store} has been sent to the courier. ` +
+    `📦 Your order is on its way!`,
+  cancelled: (d) =>
+    `Hello ${d.name}, your order ${d.oid} from ${d.store} has been cancelled. ` +
+    `If you have any questions, please contact us. Thank you.`,
+};
+
+export function getOrderStatusMessage(
+  status,
+  { name, orderId, storeName, total }
+) {
+  const tpl = STATUS_TEMPLATES[status];
+  if (!tpl) return '';
+  return tpl({
+    name,
+    oid: orderId,
+    store: storeName,
+    total: Number(total) || 0,
+  });
+}
+
+// Send the order-status SMS for a given status change. `order.orderNumber`
+// is rendered as `#123`; falls back to `ORD-XXXXX` when missing.
+export async function notifyOrderStatusChange({ order, status, name, phone }) {
+  const store = await getStore();
+  const raw = order.orderNumber || orderId(order);
+  const oid = `#${String(raw).replace(/^#/, '')}`;
+  const message = getOrderStatusMessage(status, {
+    name: name || 'Customer',
+    orderId: oid,
+    storeName: store.name,
+    total: order.totalAmount,
+  });
+  if (!message) {
+    return { success: false, skipped: true, reason: 'No template for status' };
+  }
+  return sendSms({
+    numbers: phone,
+    message,
+    // Every order-status template already includes "from [Store Name]", so
+    // skip the store signature to avoid repeating the store name.
+    skipSignature: true,
+  });
 }

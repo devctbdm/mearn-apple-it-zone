@@ -4,10 +4,7 @@ import Product from "../models/Product.js";
 import PromoCode from "../models/PromoCode.js";
 import { expandPromoCategories } from "../utils/categoryTree.js";
 import { getNextOrderNumber } from "../utils/orderNumber.js";
-import {
-  notifyOrderPlaced,
-  notifyOrderCancelled,
-} from "../services/smsService.js";
+import { notifyOrderStatusChange } from "../services/smsService.js";
 
 // @desc    Create a new order
 // @route   POST /api/orders
@@ -121,8 +118,9 @@ export const createOrder = async (req, res) => {
 
     // Fire-and-forget SMS confirmation (never blocks the order response)
     if (req.user?.phone) {
-      notifyOrderPlaced({
+      notifyOrderStatusChange({
         order,
+        status: "pending",
         name: req.user.name || "Customer",
         phone: req.user.phone,
       }).catch(() => {});
@@ -275,13 +273,19 @@ export const getOrderStats = async (req, res) => {
       total: 0,
       pending: 0,
       processing: 0,
+      confirmed: 0,
+      send_courier: 0,
       cancelled: 0,
     };
     grouped.forEach((g) => {
       if (stats[g._id] !== undefined) stats[g._id] = g.count;
     });
     stats.total =
-      stats.pending + stats.processing + stats.cancelled;
+      stats.pending +
+      stats.processing +
+      stats.confirmed +
+      stats.send_courier +
+      stats.cancelled;
     res.json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -294,7 +298,7 @@ export const getOrderStats = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ["pending", "processing", "cancelled"];
+    const validStatuses = ["pending", "processing", "confirmed", "send_courier", "cancelled"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -320,17 +324,20 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
+    const prevStatus = order.orderStatus;
     order.orderStatus = status;
     await order.save();
 
-    // Fire-and-forget SMS notification when an order is cancelled
-    if (status === "Cancelled") {
-      await order.populate("user", "name phone");
-      const phone = order.user?.phone;
+    // Fire-and-forget SMS on every status change (pending → processing →
+    // confirmed → send_courier → cancelled) using the status templates.
+    if (status !== prevStatus) {
+      const populated = await order.populate("user", "name phone");
+      const phone = populated.user?.phone;
       if (phone) {
-        notifyOrderCancelled({
+        notifyOrderStatusChange({
           order,
-          name: order.user?.name || "Customer",
+          status,
+          name: populated.user?.name || "Customer",
           phone,
         }).catch(() => {});
       }

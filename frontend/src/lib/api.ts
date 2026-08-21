@@ -82,6 +82,21 @@ export type Slider = {
   updatedAt?: string;
 };
 
+export type HomeSliderText = {
+  _id: string;
+  text: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type HomeSliderTextForm = {
+  text: string;
+  active: boolean;
+  sortOrder: number;
+};
+
 export type SliderForm = {
   title: string;
   description: string;
@@ -115,6 +130,30 @@ export const sliderApi = {
 
   reorder: (orders: { id: string; sortOrder: number }[]) =>
     api.put<{ success: boolean; message: string }>('/sliders/reorder', { orders }),
+};
+
+export const homeSliderTextApi = {
+  getAll: (params?: { active?: boolean }) =>
+    api.get<{ success: boolean; texts: HomeSliderText[] }>('/home-slider-texts', {
+      params: params ? { active: params.active ? 'true' : undefined } : undefined,
+    }),
+
+  create: (data: HomeSliderTextForm) =>
+    api.post<{ success: boolean; text: HomeSliderText }>('/home-slider-texts', data),
+
+  update: (id: string, data: Partial<HomeSliderTextForm>) =>
+    api.put<{ success: boolean; text: HomeSliderText }>(
+      `/home-slider-texts/${id}`,
+      data
+    ),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/home-slider-texts/${id}`),
+
+  reorder: (orders: { id: string; sortOrder: number }[]) =>
+    api.put<{ success: boolean; message: string }>('/home-slider-texts/reorder', {
+      orders,
+    }),
 };
 
 export type AdminUser = {
@@ -401,6 +440,8 @@ export type LoginResponse = {
 export type OrderStatus =
   | 'pending'
   | 'processing'
+  | 'confirmed'
+  | 'send_courier'
   | 'cancelled';
 
 export type OrderItem = {
@@ -452,6 +493,8 @@ export type OrderStats = {
   total: number;
   pending: number;
   processing: number;
+  confirmed: number;
+  send_courier: number;
   cancelled: number;
 };
 
@@ -602,6 +645,8 @@ export type DashboardStats = {
   ordersByStatus: {
     processing: number;
     pending: number;
+    confirmed: number;
+    send_courier: number;
     cancelled: number;
   };
   recentOrders: Order[];
@@ -641,6 +686,8 @@ export type AnalyticsStats = {
     ordersByStatus: {
       processing: number;
       pending: number;
+      confirmed: number;
+      send_courier: number;
       cancelled: number;
     };
   };

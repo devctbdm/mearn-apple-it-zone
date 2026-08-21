@@ -32,6 +32,7 @@
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
     "slugify": "^1.6.9",
+    "socket.io": "^4.8.3",
     "sslcommerz-lts": "^1.2.0",
     "uuid": "^14.0.1"
   },
