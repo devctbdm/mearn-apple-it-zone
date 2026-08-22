@@ -5,7 +5,7 @@ import PromoCode from "../models/PromoCode.js";
 import { expandPromoCategories } from "../utils/categoryTree.js";
 import { getNextOrderNumber } from "../utils/orderNumber.js";
 import { notifyOrderStatusChange } from "../services/smsService.js";
-import { notifyOrderConfirmation } from "../services/emailService.js";
+import { notifyOrderConfirmation, notifyOrderStatusEmail } from "../services/emailService.js";
 import { createNotification } from "../services/notificationService.js";
 
 // @desc    Create a new order
@@ -348,17 +348,26 @@ export const updateOrderStatus = async (req, res) => {
     order.orderStatus = status;
     await order.save();
 
-    // Fire-and-forget SMS on every status change (pending → processing →
-    // confirmed → send_courier → cancelled) using the status templates.
+    // Fire-and-forget SMS + email on every status change (pending →
+    // processing → confirmed → send_courier → cancelled).
     if (status !== prevStatus) {
-      const populated = await order.populate("user", "name phone");
+      const populated = await order.populate("user", "name phone email");
       const phone = populated.user?.phone;
+      const email = populated.user?.email;
       if (phone) {
         notifyOrderStatusChange({
           order,
           status,
           name: populated.user?.name || "Customer",
           phone,
+        }).catch(() => {});
+      }
+      if (email) {
+        notifyOrderStatusEmail({
+          order,
+          status,
+          name: populated.user?.name || "Customer",
+          email,
         }).catch(() => {});
       }
     }

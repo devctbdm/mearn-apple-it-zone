@@ -1,19 +1,28 @@
 // backend/scripts/test-email.js
-// Sends a sample order-confirmation email so you can verify Resend + template.
+// Sends sample order emails so you can verify Resend + templates.
 //
 // Usage:
-//   node scripts/test-email.js your@gmail.com
+//   node scripts/test-email.js your@gmail.com              -> order confirmation
+//   node scripts/test-email.js your@gmail.com send_courier -> a status update
+//   (statuses: pending | processing | confirmed | send_courier | cancelled)
 //
 // IMPORTANT (free tier): without a verified domain, onboarding@resend.dev can
 // only deliver to the email address that owns the Resend API key. Use THAT
 // address here, or you'll get a 403 "You can only send testing emails to
 // your own email address" error.
 import 'dotenv/config';
-import { sendEmail, orderConfirmationTemplate } from '../src/services/emailService.js';
+import {
+  sendEmail,
+  orderConfirmationTemplate,
+  orderStatusUpdateTemplate,
+} from '../src/services/emailService.js';
 
 const to = process.argv[2];
+const status = process.argv[3]; // optional
 if (!to) {
-  console.error('Usage: node scripts/test-email.js <recipient@email.com>');
+  console.error(
+    'Usage: node scripts/test-email.js <recipient@email.com> [status]'
+  );
   process.exit(1);
 }
 
@@ -48,16 +57,28 @@ const fakeOrder = {
   ],
 };
 
-console.log(`Sending test order email to ${to} ...`);
+console.log(`Sending test email to ${to} ...`);
+const html = status
+  ? orderStatusUpdateTemplate({
+      order: fakeOrder,
+      name: to.split('@')[0],
+      status,
+      storeName: process.env.STORE_NAME || 'Apple IT Zone',
+      storeUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+    })
+  : orderConfirmationTemplate({
+      order: fakeOrder,
+      name: to.split('@')[0],
+      storeName: process.env.STORE_NAME || 'Apple IT Zone',
+      storeUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+    });
+
 const result = await sendEmail({
   to,
-  subject: `[TEST] Order confirmed — #${fakeOrder.orderNumber}`,
-  html: orderConfirmationTemplate({
-    order: fakeOrder,
-    name: to.split('@')[0],
-    storeName: process.env.STORE_NAME || 'Apple IT Zone',
-    storeUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-  }),
+  subject: status
+    ? `[TEST] ${status} — #${fakeOrder.orderNumber}`
+    : `[TEST] Order confirmed — #${fakeOrder.orderNumber}`,
+  html,
 });
 
 console.log(result);

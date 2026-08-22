@@ -133,9 +133,9 @@ function layout({ storeName, storeUrl, title, body }) {
 </html>`;
 }
 
-/** Order confirmation — sent right after checkout. */
-export function orderConfirmationTemplate({ order, name, storeName, storeUrl }) {
-  const rows = (order.items || [])
+/** Compact line-item table shared by all order-related templates. */
+function itemsTableHtml(order) {
+  return (order.items || [])
     .map(
       (it) => `
         <tr>
@@ -158,6 +158,11 @@ export function orderConfirmationTemplate({ order, name, storeName, storeUrl }) 
         </tr>`
     )
     .join('');
+}
+
+/** Order confirmation — sent right after checkout. */
+export function orderConfirmationTemplate({ order, name, storeName, storeUrl }) {
+  const rows = itemsTableHtml(order);
 
   const discountRow =
     order.coupon?.discount > 0
@@ -225,6 +230,102 @@ export async function notifyOrderConfirmation({ order, name, email }) {
     html: orderConfirmationTemplate({
       order,
       name,
+      storeName: store.name,
+      storeUrl: store.url,
+    }),
+  });
+}
+
+/** Per-status headline/description for the status-change email. */
+const EMAIL_STATUS_META = {
+  pending: {
+    label: 'Order pending',
+    icon: '⏳',
+    color: '#d97706',
+    desc: "We've received your order and it's waiting to be processed. We'll keep you updated.",
+  },
+  processing: {
+    label: 'Order processing',
+    icon: '🛠️',
+    color: '#2563eb',
+    desc: 'Good news! Your order is being prepared right now.',
+  },
+  confirmed: {
+    label: 'Order confirmed',
+    icon: '✅',
+    color: '#059669',
+    desc: 'Your order is confirmed and scheduled for packing. Thank you for shopping with us!',
+  },
+  send_courier: {
+    label: 'Shipped via courier',
+    icon: '📦',
+    color: '#7c3aed',
+    desc: 'Your parcel has been handed to the courier and is on its way to your address.',
+  },
+  cancelled: {
+    label: 'Order cancelled',
+    icon: '❌',
+    color: '#dc2626',
+    desc: 'Your order has been cancelled. Any paid amount will be refunded. Contact us if you have questions.',
+  },
+};
+
+/** Order status update — mirrors the SMS status templates. */
+export function orderStatusUpdateTemplate({
+  order,
+  name,
+  status,
+  storeName,
+  storeUrl,
+}) {
+  const meta = EMAIL_STATUS_META[status] || EMAIL_STATUS_META.pending;
+  const rows = itemsTableHtml(order);
+
+  return layout({
+    storeName,
+    storeUrl,
+    title: `${meta.label} — #${order.orderNumber}`,
+    body: `
+      <div style="text-align:center;padding:8px 0 4px;">
+        <div style="font-size:40px;line-height:1;">${meta.icon}</div>
+        <h2 style="margin:10px 0 6px;font-size:22px;color:${meta.color};">${meta.label}</h2>
+        <p style="margin:0;font-size:14px;color:#374151;">${escapeHtml(meta.desc)}</p>
+      </div>
+
+      <p style="margin:20px 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;">Hello ${escapeHtml(name)}, here's your order</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+        ${
+          order.coupon?.discount > 0
+            ? `<tr>
+                 <td style="padding:4px 0;font-size:14px;color:#059669;">Discount (${escapeHtml(order.coupon.code)})</td>
+                 <td align="right" style="padding:4px 0;font-size:14px;color:#059669;">−${money(order.coupon.discount)}</td>
+               </tr>`
+            : ''
+        }
+        <tr>
+          <td style="padding:8px 0;font-size:15px;font-weight:700;">Total</td>
+          <td align="right" style="padding:8px 0;font-size:15px;font-weight:700;">${money(order.totalAmount)}</td>
+        </tr>
+      </table>
+
+      <div style="text-align:center;margin-top:28px;">
+        <a href="${storeUrl}/accounts" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">View order details</a>
+      </div>
+    `,
+  });
+}
+
+export async function notifyOrderStatusEmail({ order, name, email, status }) {
+  const store = await getStore();
+  return sendEmail({
+    to: email,
+    subject: `${EMAIL_STATUS_META[status]?.label || 'Order update'} — #${order.orderNumber} | ${store.name}`,
+    html: orderStatusUpdateTemplate({
+      order,
+      name,
+      status,
       storeName: store.name,
       storeUrl: store.url,
     }),
