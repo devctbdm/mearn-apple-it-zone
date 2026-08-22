@@ -33,6 +33,7 @@
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
     "redis": "^6.2.1",
+    "resend": "^6.21.0",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.3",
     "sslcommerz-lts": "^1.2.0",

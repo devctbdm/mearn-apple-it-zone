@@ -1,5 +1,6 @@
 import SSLCommerzPayment from "sslcommerz-lts";
 import Order from "../models/Order.js";
+import User from "../models/User.js";
 import PaymentGateway from "../models/PaymentGateway.js";
 import { createNotification } from "../services/notificationService.js";
 
@@ -77,6 +78,30 @@ export const initiatePayment = async (req, res) => {
       ? `${order._id}_adv_${Date.now()}`
       : `${order._id}_${Date.now()}`;
 
+    // Build reliable customer details: request body -> order shipping address
+    // -> buyer's account record. Empty gateway fields show up as "N/A" in the
+    // SSLCommerz dashboard, so we never send blank values when a fallback exists.
+    const buyer = await User.findById(order.user).select(
+      "name email phone address"
+    );
+    const addr = order.shippingAddress || {};
+    const firstNonEmpty = (...vals) =>
+      vals.map((v) => (typeof v === "string" ? v.trim() : v)).find(Boolean) ||
+      "";
+    const cusName =
+      firstNonEmpty(customer.name, addr.fullName, buyer?.name) || "Customer";
+    const cusEmail = firstNonEmpty(customer.email, buyer?.email);
+    const cusPhone = firstNonEmpty(
+      customer.phone,
+      addr.phone,
+      buyer?.phone
+    );
+    const cusAdd1 = firstNonEmpty(customer.address, addr.street);
+    const cusCity = firstNonEmpty(customer.city, addr.city);
+    const cusState = firstNonEmpty(customer.state, addr.state);
+    const cusPostcode = firstNonEmpty(customer.postcode, addr.postcode, "1207");
+    const cusCountry = firstNonEmpty(customer.country, addr.country, "Bangladesh");
+
     const { storeId, storePassword, isLive } = await getSSLCommerzConfig();
     const sslcz = new SSLCommerzPayment(storeId, storePassword, isLive);
 
@@ -88,7 +113,6 @@ export const initiatePayment = async (req, res) => {
       fail_url: `${process.env.FRONTEND_URL}/payment/fail?tran_id=${tran_id}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?tran_id=${tran_id}`,
       ipn_url: `${process.env.BACKEND_URL}/api/payment/ipn?tran_id=${tran_id}`,
-      productcategory: "General",
       product_name: isAdvance
         ? "Apple IT Zone Order (Advance)"
         : "Apple IT Zone Order",
@@ -96,20 +120,21 @@ export const initiatePayment = async (req, res) => {
       product_profile: "general",
       shipping_method: "COURIER",
       num_of_item: order.items.length,
-      ship_name: customer.name || "Customer",
-      ship_add1: customer.address || "",
-      ship_city: customer.city || "",
-      ship_state: customer.state || "",
-      ship_postcode: customer.postcode || "1207",
-      ship_country: customer.country || "Bangladesh",
-      cus_name: customer.name || "Customer",
-      cus_email: customer.email || "",
-      cus_phone: customer.phone || "",
-      cus_add1: customer.address || "",
-      cus_city: customer.city || "",
-      cus_state: customer.state || "",
-      cus_postcode: customer.postcode || "1207",
-      cus_country: customer.country || "Bangladesh",
+      ship_name: cusName,
+      ship_add1: cusAdd1,
+      ship_city: cusCity,
+      ship_state: cusState,
+      ship_postcode: cusPostcode,
+      ship_country: cusCountry,
+      cus_name: cusName,
+      cus_email: cusEmail || "noreply@appleitzone.com",
+      cus_phone: cusPhone || "01700000000",
+      cus_add1: cusAdd1,
+      cus_add2: "",
+      cus_city: cusCity,
+      cus_state: cusState,
+      cus_postcode: cusPostcode,
+      cus_country: cusCountry,
       value_a: order._id.toString(),
       value_b: isAdvance ? "advance" : "full",
     };

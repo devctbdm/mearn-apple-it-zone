@@ -5,6 +5,7 @@ import PromoCode from "../models/PromoCode.js";
 import { expandPromoCategories } from "../utils/categoryTree.js";
 import { getNextOrderNumber } from "../utils/orderNumber.js";
 import { notifyOrderStatusChange } from "../services/smsService.js";
+import { notifyOrderConfirmation } from "../services/emailService.js";
 import { createNotification } from "../services/notificationService.js";
 
 // @desc    Create a new order
@@ -124,6 +125,15 @@ export const createOrder = async (req, res) => {
         status: "pending",
         name: req.user.name || "Customer",
         phone: req.user.phone,
+      }).catch(() => {});
+    }
+
+    // Fire-and-forget email confirmation (never blocks the order response)
+    if (req.user?.email) {
+      notifyOrderConfirmation({
+        order,
+        name: req.user.name || "Customer",
+        email: req.user.email,
       }).catch(() => {});
     }
 

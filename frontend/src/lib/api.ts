@@ -463,6 +463,8 @@ export type Order = {
     | { _id: string; name: string; email: string; phone?: string };
   items: OrderItem[];
   shippingAddress: {
+    fullName?: string;
+    phone?: string;
     street: string;
     city: string;
     state: string;

@@ -252,6 +252,8 @@ const CheckoutContent = () => {
             quantity: i.quantity,
           })),
           shippingAddress: {
+            fullName: selectedAddress.fullName || user.name,
+            phone: selectedAddress.phone || user.phone,
             street: selectedAddress.street,
             city: selectedAddress.city,
             state: selectedAddress.state,
