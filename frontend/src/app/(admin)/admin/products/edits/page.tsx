@@ -56,6 +56,11 @@ type ProductFormValue = {
   sku: string;
   productCode: string;
   brand: string;
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  focusKeyword: string;
+  imageAlts: string;
   categories: string[];
   price: number;
   regularPrice: number;
@@ -127,6 +132,11 @@ export default function EditsProductsPage() {
     sku: "",
     productCode: "",
     brand: "",
+    slug: "",
+    metaTitle: "",
+    metaDescription: "",
+    focusKeyword: "",
+    imageAlts: "",
     categories: [],
     price: 0,
     regularPrice: 0,
@@ -166,7 +176,12 @@ export default function EditsProductsPage() {
           name: p.name || "",
           sku: p.sku || "",
           productCode: p.productCode || "",
-          brand: p.specifications?.brand || p.specifications?._keySpecs?.Brand || "",
+          brand: p.brand || p.specifications?.brand || p.specifications?._keySpecs?.Brand || "",
+          slug: p.slug || "",
+          metaTitle: p.seo?.metaTitle || "",
+          metaDescription: p.seo?.metaDescription || "",
+          focusKeyword: p.seo?.focusKeyword || "",
+          imageAlts: (p.imageAlts || []).join(", "),
           categories: p.categories?.length ? p.categories : (p.category ? [p.category] : []),
           price: p.discountPrice > 0 ? p.discountPrice : p.price || 0,
           regularPrice: p.price || 0,
@@ -225,6 +240,12 @@ export default function EditsProductsPage() {
       fd.append("holiday", String(form.holiday));
       if (form.sku) fd.append("sku", form.sku);
       if (form.productCode) fd.append("productCode", form.productCode);
+      if (form.brand) fd.append("brand", form.brand);
+      if (form.slug) fd.append("slug", form.slug);
+      if (form.metaTitle) fd.append("metaTitle", form.metaTitle);
+      if (form.metaDescription) fd.append("metaDescription", form.metaDescription);
+      if (form.focusKeyword) fd.append("focusKeyword", form.focusKeyword);
+      if (form.imageAlts.trim()) fd.append("imageAlts", JSON.stringify(form.imageAlts.split(",").map((s) => s.trim()).filter(Boolean)));
 
       const specs: Record<string, any> = { _keySpecs: {}, _keyFeatures: {}, _specGroups: {} };
       if (form.brand) {
@@ -441,6 +462,71 @@ function ProductForm({
             onChange={(e) => onChange({ description: e.target.value })}
             placeholder="One-line summary shown in listings"
           />
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4 space-y-4">
+        <div>
+          <h3 className="font-medium">Search Engine Optimization (SEO)</h3>
+          <p className="text-xs text-muted-foreground">
+            Helps Google show this product when customers search for it.
+            Leave blank to auto-generate sensible defaults.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>URL Slug</Label>
+            <Input
+              value={value.slug}
+              placeholder="auto-from-name"
+              onChange={(e) => onChange({ slug: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">e.g. msi-27-inch-monitor</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Brand</Label>
+            <Input
+              value={value.brand}
+              placeholder="e.g. MSI, ASUS, TP-Link"
+              onChange={(e) => onChange({ brand: e.target.value })}
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label>Meta Title</Label>
+            <Input
+              value={value.metaTitle}
+              placeholder="Shown as the browser tab and Google title"
+              onChange={(e) => onChange({ metaTitle: e.target.value })}
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label>Meta Description</Label>
+            <Textarea
+              rows={2}
+              value={value.metaDescription}
+              placeholder="Short summary shown under the title in Google search results"
+              onChange={(e) => onChange({ metaDescription: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Focus Keyword</Label>
+            <Input
+              value={value.focusKeyword}
+              placeholder="e.g. msi monitor"
+              onChange={(e) => onChange({ focusKeyword: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Image Alt Text</Label>
+            <Input
+              value={value.imageAlts}
+              placeholder="Comma separated, e.g. MSI monitor front, MSI monitor side"
+              onChange={(e) => onChange({ imageAlts: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used for accessibility and image search
+            </p>
+          </div>
         </div>
       </div>
 

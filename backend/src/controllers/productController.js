@@ -2,6 +2,7 @@
 
 import Product from '../models/Product.js';
 import { cloudinary } from '../middleware/upload.js';
+import slugify from 'slugify';
 
 // @desc    Get all products (with filters)
 // @route   GET /api/products
@@ -115,7 +116,7 @@ export const getProductsByCategory = async (req, res) => {
 // @access  Private/Admin
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical } = req.body;
 
     // Handle uploaded images
     const imageUrls = req.files ? req.files.map((file) => file.path) : [];
@@ -137,15 +138,33 @@ export const createProduct = async (req, res) => {
     const parsedCategories = parseArray(categories);
     const primaryCategory = parsedCategories.length > 0 ? parsedCategories[0] : category;
 
+    const baseSlug =
+      slug && String(slug).trim()
+        ? slugify(String(slug), { lower: true, strict: true })
+        : slugify(name, { lower: true, strict: true });
+
+    const seo = {
+      metaTitle: metaTitle ? String(metaTitle) : `${name} - Apple IT Zone`,
+      metaDescription: metaDescription
+        ? String(metaDescription)
+        : description
+          ? String(description).substring(0, 320)
+          : '',
+      focusKeyword: focusKeyword ? String(focusKeyword) : '',
+      canonical: canonical ? String(canonical) : '',
+    };
+
     const product = new Product({
       name,
-      slug: name.toLowerCase().replace(/\s+/g, '-'),
+      slug: baseSlug,
       description,
       price,
       discountPrice: discountPrice || 0,
       costPrice: costPrice || 0,
       category: primaryCategory || category,
       categories: parsedCategories,
+      brand: brand || undefined,
+      imageAlts: parseArray(imageAlts),
       stock,
       sku: sku || undefined,
       productCode: productCode || undefined,
@@ -158,6 +177,7 @@ export const createProduct = async (req, res) => {
       content: content
         ? (typeof content === 'string' ? JSON.parse(content) : content)
         : [],
+      seo,
       images: imageUrls,
       createdBy: req.user._id,
     });
@@ -181,13 +201,21 @@ export const updateProduct = async (req, res) => {
     }
 
     // Update fields
-    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical } = req.body;
     if (name) {
       product.name = name;
-      product.slug = name.toLowerCase().replace(/\s+/g, '-');
+      if (!slug) {
+        product.slug = slugify(name, { lower: true, strict: true });
+      }
+    }
+    if (slug && String(slug).trim()) {
+      product.slug = slugify(String(slug), { lower: true, strict: true });
     }
     if (description !== undefined) {
       product.description = description;
+    }
+    if (brand !== undefined) {
+      product.brand = brand;
     }
     if (price) {
       product.price = price;
@@ -250,6 +278,35 @@ export const updateProduct = async (req, res) => {
         product.content = typeof content === 'string' ? JSON.parse(content) : content;
       } catch {
         product.content = content;
+      }
+    }
+    if (imageAlts !== undefined) {
+      product.imageAlts = parseArray(imageAlts);
+    }
+    if (
+      metaTitle !== undefined ||
+      metaDescription !== undefined ||
+      focusKeyword !== undefined ||
+      canonical !== undefined
+    ) {
+      product.seo = product.seo || {};
+      if (metaTitle !== undefined) {
+        product.seo.metaTitle = metaTitle
+          ? String(metaTitle)
+          : `${product.name} - Apple IT Zone`;
+      }
+      if (metaDescription !== undefined) {
+        product.seo.metaDescription = metaDescription
+          ? String(metaDescription)
+          : product.description
+            ? String(product.description).substring(0, 320)
+            : '';
+      }
+      if (focusKeyword !== undefined) {
+        product.seo.focusKeyword = focusKeyword ? String(focusKeyword) : '';
+      }
+      if (canonical !== undefined) {
+        product.seo.canonical = canonical ? String(canonical) : '';
       }
     }
 

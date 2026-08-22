@@ -42,6 +42,11 @@ const productSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    brand: {
+      type: String,
+      trim: true,
+      index: true,
+    },
     category: {
       type: String,
       required: [true, 'Please provide a category'],
@@ -63,6 +68,10 @@ const productSchema = new mongoose.Schema(
         validator: (v) => v && v.length > 0,
         message: 'At least one image is required',
       },
+    },
+    imageAlts: {
+      type: [String],
+      default: [],
     },
     stock: {
       type: Number,
@@ -90,6 +99,12 @@ const productSchema = new mongoose.Schema(
     content: {
       type: [mongoose.Schema.Types.Mixed], // Rich content blocks (title, text, image, link)
       default: [],
+    },
+    seo: {
+      metaTitle: { type: String, trim: true },
+      metaDescription: { type: String, trim: true },
+      focusKeyword: { type: String, trim: true },
+      canonical: { type: String, trim: true },
     },
     ratings: [
       {
@@ -125,9 +140,9 @@ const productSchema = new mongoose.Schema(
   }
 );
 
-// ---- Auto-generate slug from name before saving ----
+// ---- Auto-generate slug from name before saving (only if no custom slug set) ----
 productSchema.pre('save', function () {
-  if (this.isModified('name') || !this.slug) {
+  if (!this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
 });

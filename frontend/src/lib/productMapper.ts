@@ -11,12 +11,20 @@ export type RawProduct = {
   category: string;
   categories?: string[];
   productCode?: string;
+  brand?: string;
   images: string[];
+  imageAlts?: string[];
   stock: number;
   status: string;
   featured: boolean;
   specifications: Record<string, any>;
   content?: any[];
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    focusKeyword?: string;
+    canonical?: string;
+  };
   ratings: any[];
   averageRating: number;
   createdAt: string;
@@ -34,11 +42,14 @@ export function toProductShape(p: RawProduct): Product {
     category: p.category || '',
     path: [],
     productCode: p.productCode || '',
+    brand: p.brand || '',
     images: p.images || [],
+    imageAlts: p.imageAlts || [],
     stock: p.stock ?? 0,
     featured: !!p.featured,
     specifications: p.specifications || {},
     content: p.content || [],
+    seo: p.seo || {},
     averageRating: p.averageRating || 0,
     ratings: p.ratings || [],
     createdAt: p.createdAt,
