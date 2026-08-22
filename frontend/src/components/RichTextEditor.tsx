@@ -46,7 +46,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
   if (!editor) {
     return (
-      <div className="min-h-[200px] rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+      <div className="min-h-50 rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
         Loading editor…
       </div>
     );
@@ -164,7 +164,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
       <EditorContent
         editor={editor}
-        className="min-h-[200px] rounded-md border bg-white p-3 text-sm focus-within:ring-1 focus-within:ring-ring"
+        className="min-h-50 rounded-md border bg-white p-3 text-sm focus-within:ring-1 focus-within:ring-ring"
       />
       <p className="text-xs text-muted-foreground">
         Use the toolbar to make text bold, italic, add lists, or insert links.
