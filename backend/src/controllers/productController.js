@@ -3,6 +3,7 @@
 import Product from '../models/Product.js';
 import { cloudinary } from '../middleware/upload.js';
 import slugify from 'slugify';
+import { cacheGet, cacheSet, cacheDel } from '../config/redis.js';
 
 // @desc    Get all products (with filters)
 // @route   GET /api/products
@@ -10,6 +11,14 @@ import slugify from 'slugify';
 export const getAllProducts = async (req, res) => {
   try {
     const { category, minPrice, maxPrice, search, sort, page = 1, limit = 12, holiday } = req.query;
+
+    // Try cache first (key includes the full query so each filter combo is cached separately)
+    const cacheKey = `products:list:${JSON.stringify(req.query)}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
     const query = {};
 
     if (holiday === 'true' || holiday === true) {
@@ -54,14 +63,16 @@ export const getAllProducts = async (req, res) => {
       .limit(Number(limit))
       .skip((Number(page) - 1) * Number(limit));
 
-    res.json({
+    const payload = {
       success: true,
       count: products.length,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
       products,
-    });
+    };
+    await cacheSet(cacheKey, JSON.stringify(payload), Number(process.env.REDIS_TTL) || 300);
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -72,10 +83,16 @@ export const getAllProducts = async (req, res) => {
 // @access  Public
 export const getProductById = async (req, res) => {
   try {
+    const cacheKey = `product:id:${req.params.id}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const product = await Product.findById(req.params.id).populate('ratings.user', 'name');
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+    await cacheSet(cacheKey, JSON.stringify({ success: true, product }), Number(process.env.REDIS_TTL) || 300);
     res.json({ success: true, product });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -87,10 +104,16 @@ export const getProductById = async (req, res) => {
 // @access  Public
 export const getProductBySlug = async (req, res) => {
   try {
+    const cacheKey = `product:slug:${req.params.slug}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const product = await Product.findOne({ slug: req.params.slug }).populate('ratings.user', 'name');
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+    await cacheSet(cacheKey, JSON.stringify({ success: true, product }), Number(process.env.REDIS_TTL) || 300);
     res.json({ success: true, product });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -183,6 +206,9 @@ export const createProduct = async (req, res) => {
     });
 
     await product.save();
+    // Invalidate cached product lists + detail pages
+    await cacheDel('products:*');
+    await cacheDel('product:*');
     res.status(201).json({ success: true, product });
   } catch (error) {
     console.error('Create Product Error:', error);
@@ -202,6 +228,21 @@ export const updateProduct = async (req, res) => {
 
     // Update fields
     const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical } = req.body;
+
+    const parseArray = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.filter((v) => typeof v === 'string' && v.trim());
+      if (typeof val === 'string') {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' && v.trim()) : [];
+        } catch {
+          return [val];
+        }
+      }
+      return [];
+    };
+
     if (name) {
       product.name = name;
       if (!slug) {
@@ -230,19 +271,6 @@ export const updateProduct = async (req, res) => {
       product.category = category;
     }
     if (categories !== undefined) {
-      const parseArray = (val) => {
-        if (!val) return [];
-        if (Array.isArray(val)) return val.filter((v) => typeof v === 'string' && v.trim());
-        if (typeof val === 'string') {
-          try {
-            const parsed = JSON.parse(val);
-            return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' && v.trim()) : [];
-          } catch {
-            return [val];
-          }
-        }
-        return [];
-      };
       product.categories = parseArray(categories);
       if (product.categories.length > 0 && !category) {
         product.category = product.categories[0];
@@ -325,6 +353,9 @@ export const updateProduct = async (req, res) => {
     }
 
     await product.save();
+    // Invalidate cached product lists + detail pages
+    await cacheDel('products:*');
+    await cacheDel('product:*');
     res.json({ success: true, product });
   } catch (error) {
     console.error('Update Product Error:', error);
@@ -371,6 +402,8 @@ export const addRating = async (req, res) => {
 
     product.averageRating = product.calculateAverageRating();
     await product.save();
+    // Average rating / review count changed — drop cached product detail
+    await cacheDel('product:*');
 
     res.json({ success: true, product });
   } catch (error) {
@@ -399,6 +432,9 @@ export const deleteProduct = async (req, res) => {
     }
 
     await product.deleteOne();
+    // Invalidate cached product lists + detail pages
+    await cacheDel('products:*');
+    await cacheDel('product:*');
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Delete Product Error:', error);

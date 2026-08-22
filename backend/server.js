@@ -1,5 +1,6 @@
 import app from './src/app.js';
 import { connectDB, disconnectDB } from './src/config/database.js';
+import { connectRedis } from './src/config/redis.js';
 import { initSocket } from './src/socket.js';
 import dotenv from 'dotenv';
 
@@ -16,6 +17,9 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
 await connectDB();
+
+// Connect to Redis (non-fatal if unavailable)
+await connectRedis();
 
 // Assign sequential order numbers (#1, #2, ...) to any existing orders
 backfillOrderNumbers()
