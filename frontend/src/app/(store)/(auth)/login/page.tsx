@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAppStore, useAuth, useCart } from '@/store';
 import Link from 'next/link';
+import { TwoFactorStep } from '@/components/TwoFactorStep';
+import type { LoginResponse } from '@/lib/api';
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(1, 'Email or phone is required').max(255),
@@ -47,6 +49,10 @@ export default function LoginPage() {
   >({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Two-factor (SMS OTP) step state
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [twoFactorExpiresIn, setTwoFactorExpiresIn] = useState<number>(0);
 
   useEffect(() => {
     if (!user && !isAuthenticated) {
@@ -96,6 +102,14 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
+      const loginData = data as LoginResponse;
+      if (loginData.twoFactorRequired && loginData.pendingToken) {
+        setPendingToken(loginData.pendingToken);
+        setTwoFactorExpiresIn(loginData.expiresIn || 0);
+        toast.success('A verification code was sent to your phone.');
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem('mobile_token', data.token);
         document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
@@ -128,6 +142,27 @@ export default function LoginPage() {
     }
   };
 
+  const handleTwoFactorSuccess = async (token: string, user: any) => {
+    if (token) {
+      localStorage.setItem('mobile_token', token);
+      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+    useAppStore.setState({
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    await fetchUser().catch(() => {});
+    await syncCartWithBackend().catch(() => {});
+    const role = user?.role || useAppStore.getState().user?.role;
+    toast.success(`Welcome back, ${user?.name || 'User'}!`);
+    if (role === 'admin' || role === 'super_admin') {
+      router.push('/admin/dashboard');
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className="bg-muted/30 px-4 py-10">
       <div className="mx-auto max-w-md">
@@ -140,12 +175,23 @@ export default function LoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle>{pendingToken ? 'Verify it’s you' : 'Login'}</CardTitle>
             <CardDescription>
-              Enter your email or phone and password.
+              {pendingToken
+                ? 'Enter the code we sent to your phone to finish signing in.'
+                : 'Enter your email or phone and password.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {pendingToken ? (
+              <TwoFactorStep
+                pendingToken={pendingToken}
+                expiresIn={twoFactorExpiresIn}
+                onSuccess={handleTwoFactorSuccess}
+                onBack={() => setPendingToken(null)}
+              />
+            ) : (
+            <>
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="identifier">Phone / E-Mail</Label>
@@ -218,7 +264,18 @@ export default function LoginPage() {
                 </Link>{' '}
                 to get started.
               </p>
+              <p className="mt-3 border-t pt-3 text-muted-foreground">
+                Store staff?{' '}
+                <Link
+                  href="/admin/login"
+                  className="text-primary underline underline-offset-4"
+                >
+                  Admin Login
+                </Link>
+              </p>
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       </div>

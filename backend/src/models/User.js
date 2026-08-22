@@ -46,6 +46,7 @@ const userSchema = new mongoose.Schema(
         state: { type: String, default: '' },
         postcode: { type: String, default: '' },
         country: { type: String, default: 'Bangladesh' },
+        deliveryArea: { type: String, default: '' },
         isDefault: { type: Boolean, default: false },
       },
     ],
@@ -61,6 +62,11 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    twoFactorOtp: String,
+    twoFactorOtpExpire: Date,
+    twoFactorAttempts: { type: Number, default: 0 },
+    loginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
   },
   {
     timestamps: true, // Adds createdAt & updatedAt

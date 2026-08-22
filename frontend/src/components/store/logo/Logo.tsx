@@ -7,24 +7,27 @@ const Logo = () => {
   return (
     <div>
       <Link href="/" className="flex items-center gap-2">
-        <Image
+        <div className="relative w-10 h-10">
+          <Image
           src="/Apple.svg"
           alt="Apple IT Zone"
-          width={40}
-          height={40}
+          fill
           priority
-          className="object-contain max-sm:w-12 max-sm:h-12"
-          style={{ width: "40px", height: "40px" }}
+          className="object-contain"
+          sizes="40px"
         />
-        <Image
+        </div>
+
+        <div className="relative w-32 h-12">
+          <Image
           src="/LText.svg"
           alt="Apple IT Zone"
-          width={150}
-          height={150}
+          fill
           priority
-          className="object-contain max-sm:w-28 max-sm:h-28"
-          style={{ width: "150px", height: "150px" }}
+          className="object-contain"
+          sizes="128px"
         />
+        </div>
       </Link>
     </div>
   );

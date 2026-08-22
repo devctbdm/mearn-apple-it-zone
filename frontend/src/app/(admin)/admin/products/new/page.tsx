@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import {
   Plus,
   Star,
+  Gift,
   ArrowLeft,
   Trash2,
   Type as TypeIcon,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { categoryApi, productApi } from '@/lib/api';
+import { SiteHeader } from '@/components/site-header';
 
 type Status = 'active' | 'draft' | 'out_of_stock';
 
@@ -53,12 +55,19 @@ type ProductFormValue = {
   sku: string;
   productCode: string;
   brand: string;
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  focusKeyword: string;
+  imageAlts: string;
   categories: string[];
   price: number;
   regularPrice: number;
+  costPrice: number;
   stock: number;
   status: Status;
   featured: boolean;
+  holiday: boolean;
   description: string;
   images: string[];
   keySpecs: KeySpec[];
@@ -82,12 +91,19 @@ export default function NewProductPage() {
     sku: '',
     productCode: '',
     brand: '',
+    slug: '',
+    metaTitle: '',
+    metaDescription: '',
+    focusKeyword: '',
+    imageAlts: '',
     categories: [],
     price: 0,
     regularPrice: 0,
+    costPrice: 0,
     stock: 0,
     status: 'active',
     featured: false,
+    holiday: false,
     description: '',
     images: [],
     keySpecs: [],
@@ -133,11 +149,19 @@ export default function NewProductPage() {
       }
       fd.append('category', form.categories[0]);
       fd.append('categories', JSON.stringify(form.categories));
+      fd.append('costPrice', String(Number(form.costPrice) || 0));
       fd.append('stock', String(form.stock));
       fd.append('status', form.status);
       fd.append('featured', String(form.featured));
+      fd.append('holiday', String(form.holiday));
       if (form.sku) fd.append('sku', form.sku);
       if (form.productCode) fd.append('productCode', form.productCode);
+      if (form.brand) fd.append('brand', form.brand);
+      if (form.slug) fd.append('slug', form.slug);
+      if (form.metaTitle) fd.append('metaTitle', form.metaTitle);
+      if (form.metaDescription) fd.append('metaDescription', form.metaDescription);
+      if (form.focusKeyword) fd.append('focusKeyword', form.focusKeyword);
+      if (form.imageAlts.trim()) fd.append('imageAlts', JSON.stringify(form.imageAlts.split(',').map((s) => s.trim()).filter(Boolean)));
 
       const specs: Record<string, any> = {
         _keySpecs: {},
@@ -179,6 +203,8 @@ export default function NewProductPage() {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -214,6 +240,7 @@ export default function NewProductPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }
 
@@ -302,6 +329,20 @@ function ProductForm({
           </p>
         </div>
         <div className="space-y-1.5">
+          <Label>Buy Price ($)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={value.costPrice}
+            placeholder="What you pay to buy it"
+            onChange={(e) => onChange({ costPrice: Number(e.target.value) })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Purchase cost (hidden from customers)
+          </p>
+        </div>
+        <div className="space-y-1.5">
           <Label>Stock</Label>
           <Input
             type="number"
@@ -310,6 +351,11 @@ function ProductForm({
             onChange={(e) => onChange({ stock: Number(e.target.value) })}
           />
         </div>
+        <ProfitSummary
+          sellPrice={Number(value.price) || 0}
+          regularPrice={Number(value.regularPrice) || 0}
+          costPrice={Number(value.costPrice) || 0}
+        />
         <div className="col-span-2 space-y-1.5">
           <Label>Status</Label>
           <Select
@@ -340,6 +386,20 @@ function ProductForm({
             onCheckedChange={(v) => onChange({ featured: v })}
           />
         </div>
+        <div className="col-span-2 flex items-center justify-between rounded-md border p-3">
+          <div className="space-y-0.5">
+            <Label className="flex items-center gap-2">
+              <Gift className="h-4 w-4 text-rose-500" /> Holiday deal
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Show this product under Top Holiday Deals on the storefront.
+            </p>
+          </div>
+          <Switch
+            checked={value.holiday}
+            onCheckedChange={(v) => onChange({ holiday: v })}
+          />
+        </div>
         <div className="col-span-2 space-y-1.5">
           <Label>Short summary</Label>
           <Textarea
@@ -348,6 +408,73 @@ function ProductForm({
             onChange={(e) => onChange({ description: e.target.value })}
             placeholder="One-line summary shown in listings"
           />
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4 space-y-4">
+        <div>
+          <h3 className="font-medium">Search Engine Optimization (SEO)</h3>
+          <p className="text-xs text-muted-foreground">
+            Helps Google show this product when customers search for it.
+            Leave blank to auto-generate sensible defaults.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>URL Slug</Label>
+            <Input
+              value={value.slug}
+              placeholder="auto-from-name"
+              onChange={(e) => onChange({ slug: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              e.g. msi-27-inch-monitor
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Brand</Label>
+            <Input
+              value={value.brand}
+              placeholder="e.g. MSI, ASUS, TP-Link"
+              onChange={(e) => onChange({ brand: e.target.value })}
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label>Meta Title</Label>
+            <Input
+              value={value.metaTitle}
+              placeholder="Shown as the browser tab and Google title"
+              onChange={(e) => onChange({ metaTitle: e.target.value })}
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label>Meta Description</Label>
+            <Textarea
+              rows={2}
+              value={value.metaDescription}
+              placeholder="Short summary shown under the title in Google search results"
+              onChange={(e) => onChange({ metaDescription: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Focus Keyword</Label>
+            <Input
+              value={value.focusKeyword}
+              placeholder="e.g. msi monitor"
+              onChange={(e) => onChange({ focusKeyword: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Image Alt Text</Label>
+            <Input
+              value={value.imageAlts}
+              placeholder="Comma separated, e.g. MSI monitor front, MSI monitor side"
+              onChange={(e) => onChange({ imageAlts: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used for accessibility and image search
+            </p>
+          </div>
         </div>
       </div>
 
@@ -377,6 +504,85 @@ function ProductForm({
         value={value.content}
         onChange={(content) => onChange({ content })}
       />
+    </div>
+  );
+}
+
+/* --------------------------- Profit calculator --------------------------- */
+
+function ProfitSummary({
+  sellPrice,
+  regularPrice,
+  costPrice,
+}: {
+  sellPrice: number;
+  regularPrice: number;
+  costPrice: number;
+}) {
+  const profit = sellPrice - costPrice;
+  const hasCost = costPrice > 0;
+  const margin = hasCost && sellPrice > 0 ? (profit / sellPrice) * 100 : null;
+  const isLoss = profit < 0;
+
+  return (
+    <div className="col-span-2 rounded-md border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Profit per unit
+          </div>
+          <div
+            className={`text-xl font-bold ${
+              isLoss
+                ? 'text-destructive'
+                : profit > 0
+                  ? 'text-emerald-600'
+                  : 'text-muted-foreground'
+            }`}
+          >
+            {profit > 0 ? '+' : ''}
+            ${profit.toFixed(2)}
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs">
+          <div>
+            <span className="text-muted-foreground">Buy: </span>
+            <span className="font-medium">${costPrice.toFixed(2)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Sell: </span>
+            <span className="font-medium">${sellPrice.toFixed(2)}</span>
+          </div>
+          {margin !== null && (
+            <div>
+              <span className="text-muted-foreground">Margin: </span>
+              <span
+                className={`font-medium ${
+                  isLoss ? 'text-destructive' : 'text-emerald-600'
+                }`}
+              >
+                {margin.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      {!hasCost ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Enter a buy price to see your profit on each sale.
+        </p>
+      ) : isLoss ? (
+        <p className="mt-1 text-xs text-destructive">
+          You're selling below your buy price — this item loses{' '}
+          ${Math.abs(profit).toFixed(2)} per unit.
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {regularPrice > sellPrice
+            ? 'Customers see the crossed-out regular price as the original.'
+            : 'Profit = sell price − buy price.'}
+        </p>
+      )}
     </div>
   );
 }
@@ -625,7 +831,7 @@ function SpecsEditor({
             </div>
             <div className="space-y-2 p-3">
               {g.fields.map((f) => (
-                <div key={f.id} className="grid grid-cols-12 gap-2">
+                <div key={f.id} className="grid grid-cols-12 gap-2 items-start">
                   <Input
                     className="col-span-4 h-8"
                     value={f.label}
@@ -634,13 +840,14 @@ function SpecsEditor({
                     }
                     placeholder="Label (e.g. Size)"
                   />
-                  <Input
-                    className="col-span-7 h-8"
+                  <Textarea
+                    className="col-span-7 min-h-9 resize-none"
+                    rows={1}
                     value={f.value}
                     onChange={(e) =>
                       updateField(g.id, f.id, { value: e.target.value })
                     }
-                    placeholder="Value (e.g. 6.7 inch)"
+                    placeholder="Value (e.g. 6.7 inch) — press Enter for a new line"
                   />
                   <Button
                     type="button"

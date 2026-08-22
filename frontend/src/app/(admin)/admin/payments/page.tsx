@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -32,6 +31,7 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { paymentSettingsApi, type PaymentGateway } from '@/lib/api';
+import { SiteHeader } from '@/components/site-header';
 
 type SslCommerz = {
   status: boolean;
@@ -77,7 +77,6 @@ type Settings = {
   nagad: Nagad;
   cod: Cod;
 };
-
 
 function SecretInput({
   id,
@@ -221,9 +220,7 @@ export default function AdminPaymentPage() {
     try {
       const { data } = await paymentSettingsApi.getAll();
       const gateways = data.gateways || [];
-      const byName = Object.fromEntries(
-        gateways.map((g) => [g.name, g])
-      );
+      const byName = Object.fromEntries(gateways.map((g) => [g.name, g]));
       setSettings({
         sslcommerz: {
           status: byName['sslcommerz']?.enabled ?? true,
@@ -301,27 +298,6 @@ export default function AdminPaymentPage() {
             storePassword: s.storePassword,
           };
           break;
-        case 'bkash':
-          payload.config = {
-            label: s.label,
-            sandbox: s.sandbox,
-            appKey: s.appKey,
-            appSecret: s.appSecret,
-            username: s.username,
-            password: s.password,
-          };
-          break;
-        case 'nagad':
-          payload.config = {
-            label: s.label,
-            description: s.description,
-            sandbox: s.sandbox,
-            merchantId: s.merchantId,
-            merchantNumber: s.merchantNumber,
-            publicKey: s.publicKey,
-            privateKey: s.privateKey,
-          };
-          break;
         case 'cod':
           payload.config = {
             label: s.label,
@@ -382,406 +358,228 @@ export default function AdminPaymentPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground">
-          Loading payment settings…
-        </div>
-      ) : (
-        <>
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-          Payment management
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Configure Bangladeshi payment gateways — SSLCommerz, bKash, Nagad and
-          Cash on Delivery.
-        </p>
-      </header>
+    <>
+      <SiteHeader />
+      <div className="space-y-6 p-4 md:p-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            Loading payment settings…
+          </div>
+        ) : (
+          <>
+            <header className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                Payment management
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Configure Bangladeshi payment gateways — SSLCommerz, bKash,
+                Nagad and Cash on Delivery.
+              </p>
+            </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className="text-2xl font-semibold">{s.value}</p>
-              </div>
-              <s.icon className="size-5 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {stats.map((s) => (
+                <Card key={s.label}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{s.label}</p>
+                      <p className="text-2xl font-semibold">{s.value}</p>
+                    </div>
+                    <s.icon className="size-5 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-      <Tabs defaultValue="sslcommerz" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="sslcommerz">
-            <CreditCard className="mr-2 size-4" /> SSLCommerz
-          </TabsTrigger>
-          <TabsTrigger value="bkash">
-            <Smartphone className="mr-2 size-4" /> bKash
-          </TabsTrigger>
-          <TabsTrigger value="nagad">
-            <Wallet className="mr-2 size-4" /> Nagad
-          </TabsTrigger>
-          <TabsTrigger value="cod">
-            <Truck className="mr-2 size-4" /> Cash on Delivery
-          </TabsTrigger>
-        </TabsList>
+            <Tabs defaultValue="sslcommerz" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                <TabsTrigger value="sslcommerz">
+                  <CreditCard className="mr-2 size-4" /> SSLCommerz
+                </TabsTrigger>
 
-        {/* SSLCommerz */}
-        <TabsContent value="sslcommerz" className="mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    SSLCommerz
-                    <Badge
-                      variant={
-                        settings!.sslcommerz.status ? 'default' : 'secondary'
-                      }
+                <TabsTrigger value="cod">
+                  <Truck className="mr-2 size-4" /> Cash on Delivery
+                </TabsTrigger>
+              </TabsList>
+
+              {/* SSLCommerz */}
+              <TabsContent value="sslcommerz" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          SSLCommerz
+                          <Badge
+                            variant={
+                              settings!.sslcommerz.status
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {settings!.sslcommerz.status
+                              ? 'Enabled'
+                              : 'Disabled'}
+                          </Badge>
+                          {settings!.sslcommerz.sandbox && (
+                            <Badge variant="outline">Sandbox</Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription>
+                          Cards, internet banking and mobile banking aggregator.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <StatusRow
+                      idPrefix="ssl"
+                      status={settings!.sslcommerz.status}
+                      sandbox={settings!.sslcommerz.sandbox}
+                      onStatus={(v) => update('sslcommerz', { status: v })}
+                      onSandbox={(v) => update('sslcommerz', { sandbox: v })}
+                    />
+                    <Field
+                      label="Description"
+                      htmlFor="ssl-desc"
+                      hint="Shown to the customer on the checkout page."
                     >
-                      {settings!.sslcommerz.status ? 'Enabled' : 'Disabled'}
-                    </Badge>
-                    {settings!.sslcommerz.sandbox && (
-                      <Badge variant="outline">Sandbox</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    Cards, internet banking and mobile banking aggregator.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <StatusRow
-                idPrefix="ssl"
-                status={settings!.sslcommerz.status}
-                sandbox={settings!.sslcommerz.sandbox}
-                onStatus={(v) => update('sslcommerz', { status: v })}
-                onSandbox={(v) => update('sslcommerz', { sandbox: v })}
-              />
-              <Field
-                label="Description"
-                htmlFor="ssl-desc"
-                hint="Shown to the customer on the checkout page."
-              >
-                <Textarea
-                  id="ssl-desc"
-                  rows={3}
-                  value={settings!.sslcommerz.description}
-                  onChange={(e) =>
-                    update('sslcommerz', { description: e.target.value })
-                  }
-                />
-              </Field>
-              <Separator />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Store ID" htmlFor="ssl-store-id">
-                  <Input
-                    id="ssl-store-id"
-                    className="font-mono"
-                    value={settings!.sslcommerz.storeId}
-                    onChange={(e) =>
-                      update('sslcommerz', { storeId: e.target.value })
-                    }
-                    placeholder="yourstore0live"
-                  />
-                </Field>
-                <Field label="Store Password" htmlFor="ssl-store-pass">
-                  <SecretInput
-                    id="ssl-store-pass"
-                    value={settings!.sslcommerz.storePassword}
-                    onChange={(v) => update('sslcommerz', { storePassword: v })}
-                    placeholder="yourstore0live@ssl"
-                  />
-                </Field>
-              </div>
-              <Actions methodKey="sslcommerz" name="SSLCommerz" />
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      <Textarea
+                        id="ssl-desc"
+                        rows={3}
+                        value={settings!.sslcommerz.description}
+                        onChange={(e) =>
+                          update('sslcommerz', { description: e.target.value })
+                        }
+                      />
+                    </Field>
+                    <Separator />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Store ID" htmlFor="ssl-store-id">
+                        <Input
+                          id="ssl-store-id"
+                          className="font-mono"
+                          value={settings!.sslcommerz.storeId}
+                          onChange={(e) =>
+                            update('sslcommerz', { storeId: e.target.value })
+                          }
+                          placeholder="yourstore0live"
+                        />
+                      </Field>
+                      <Field label="Store Password" htmlFor="ssl-store-pass">
+                        <SecretInput
+                          id="ssl-store-pass"
+                          value={settings!.sslcommerz.storePassword}
+                          onChange={(v) =>
+                            update('sslcommerz', { storePassword: v })
+                          }
+                          placeholder="yourstore0live@ssl"
+                        />
+                      </Field>
+                    </div>
+                    <Actions methodKey="sslcommerz" name="SSLCommerz" />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-        {/* bKash */}
-        <TabsContent value="bkash" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                bKash
-                <Badge
-                  variant={settings!.bkash.status ? 'default' : 'secondary'}
-                >
-                  {settings!.bkash.status ? 'Enabled' : 'Disabled'}
-                </Badge>
-                {settings!.bkash.sandbox && (
-                  <Badge variant="outline">Sandbox</Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                bKash Checkout (PGW) merchant credentials.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <StatusRow
-                idPrefix="bkash"
-                status={settings!.bkash.status}
-                sandbox={settings!.bkash.sandbox}
-                onStatus={(v) => update('bkash', { status: v })}
-                onSandbox={(v) => update('bkash', { sandbox: v })}
-              />
-              <Field
-                label="Label"
-                htmlFor="bkash-label"
-                hint="Title shown at checkout."
-              >
-                <Input
-                  id="bkash-label"
-                  value={settings!.bkash.label}
-                  onChange={(e) => update('bkash', { label: e.target.value })}
-                />
-              </Field>
-              <Separator />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="App Key" htmlFor="bkash-app-key">
-                  <SecretInput
-                    id="bkash-app-key"
-                    value={settings!.bkash.appKey}
-                    onChange={(v) => update('bkash', { appKey: v })}
-                    placeholder="App key from bKash merchant panel"
-                  />
-                </Field>
-                <Field label="App Secret" htmlFor="bkash-app-secret">
-                  <SecretInput
-                    id="bkash-app-secret"
-                    value={settings!.bkash.appSecret}
-                    onChange={(v) => update('bkash', { appSecret: v })}
-                    placeholder="App secret"
-                  />
-                </Field>
-                <Field label="Username" htmlFor="bkash-username">
-                  <Input
-                    id="bkash-username"
-                    className="font-mono"
-                    value={settings!.bkash.username}
-                    onChange={(e) =>
-                      update('bkash', { username: e.target.value })
-                    }
-                    placeholder="01XXXXXXXXX"
-                  />
-                </Field>
-                <Field label="Password" htmlFor="bkash-password">
-                  <SecretInput
-                    id="bkash-password"
-                    value={settings!.bkash.password}
-                    onChange={(v) => update('bkash', { password: v })}
-                    placeholder="Merchant password"
-                  />
-                </Field>
-              </div>
-              <Actions methodKey="bkash" name="bKash" />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Nagad */}
-        <TabsContent value="nagad" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Nagad
-                <Badge
-                  variant={settings!.nagad.status ? 'default' : 'secondary'}
-                >
-                  {settings!.nagad.status ? 'Enabled' : 'Disabled'}
-                </Badge>
-                {settings!.nagad.sandbox && (
-                  <Badge variant="outline">Sandbox</Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Nagad merchant keys for payment initialization and signing.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <StatusRow
-                idPrefix="nagad"
-                status={settings!.nagad.status}
-                sandbox={settings!.nagad.sandbox}
-                onStatus={(v) => update('nagad', { status: v })}
-                onSandbox={(v) => update('nagad', { sandbox: v })}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Label" htmlFor="nagad-label">
-                  <Input
-                    id="nagad-label"
-                    value={settings!.nagad.label}
-                    onChange={(e) => update('nagad', { label: e.target.value })}
-                  />
-                </Field>
-                <Field label="Merchant ID" htmlFor="nagad-mid">
-                  <Input
-                    id="nagad-mid"
-                    className="font-mono"
-                    value={settings!.nagad.merchantId}
-                    onChange={(e) =>
-                      update('nagad', { merchantId: e.target.value })
-                    }
-                    placeholder="683002007104225"
-                  />
-                </Field>
-                <Field label="Merchant Number" htmlFor="nagad-mnum">
-                  <Input
-                    id="nagad-mnum"
-                    className="font-mono"
-                    value={settings!.nagad.merchantNumber}
-                    onChange={(e) =>
-                      update('nagad', { merchantNumber: e.target.value })
-                    }
-                    placeholder="01XXXXXXXXX"
-                  />
-                </Field>
-                <Field label="Description" htmlFor="nagad-desc">
-                  <Textarea
-                    id="nagad-desc"
-                    rows={2}
-                    value={settings!.nagad.description}
-                    onChange={(e) =>
-                      update('nagad', { description: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-              <Separator />
-              <div className="grid gap-4">
-                <Field
-                  label="Public Key"
-                  htmlFor="nagad-pub"
-                  hint="Nagad-issued PG public key (PEM body)."
-                >
-                  <Textarea
-                    id="nagad-pub"
-                    rows={4}
-                    className="font-mono text-xs"
-                    value={settings!.nagad.publicKey}
-                    onChange={(e) =>
-                      update('nagad', { publicKey: e.target.value })
-                    }
-                    placeholder="-----BEGIN PUBLIC KEY-----"
-                  />
-                </Field>
-                <Field
-                  label="Private Key"
-                  htmlFor="nagad-priv"
-                  hint="Your merchant private key. Stored server-side only."
-                >
-                  <Textarea
-                    id="nagad-priv"
-                    rows={4}
-                    className="font-mono text-xs"
-                    value={settings!.nagad.privateKey}
-                    onChange={(e) =>
-                      update('nagad', { privateKey: e.target.value })
-                    }
-                    placeholder="-----BEGIN RSA PRIVATE KEY-----"
-                  />
-                </Field>
-              </div>
-              <Actions methodKey="nagad" name="Nagad" />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Cash on Delivery */}
-        <TabsContent value="cod" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Cash on Delivery
-                <Badge variant={settings!.cod.status ? 'default' : 'secondary'}>
-                  {settings!.cod.status ? 'Enabled' : 'Disabled'}
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Collect payment in cash when the order is handed over.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <Label htmlFor="cod-status" className="text-sm font-medium">
-                    Status
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enable this method at checkout
-                  </p>
-                </div>
-                <Switch
-                  id="cod-status"
-                  checked={settings!.cod.status}
-                  onCheckedChange={(v) => update('cod', { status: v })}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Label" htmlFor="cod-label">
-                  <Input
-                    id="cod-label"
-                    value={settings!.cod.label}
-                    onChange={(e) => update('cod', { label: e.target.value })}
-                  />
-                </Field>
-                <Field
-                  label="Extra charge (৳)"
-                  htmlFor="cod-charge"
-                  hint="Handling fee added to COD orders."
-                >
-                  <Input
-                    id="cod-charge"
-                    inputMode="numeric"
-                    value={settings!.cod.extraCharge}
-                    onChange={(e) =>
-                      update('cod', { extraCharge: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Minimum order (৳)" htmlFor="cod-min">
-                  <Input
-                    id="cod-min"
-                    inputMode="numeric"
-                    value={settings!.cod.minOrder}
-                    onChange={(e) =>
-                      update('cod', { minOrder: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Maximum order (৳)" htmlFor="cod-max">
-                  <Input
-                    id="cod-max"
-                    inputMode="numeric"
-                    value={settings!.cod.maxOrder}
-                    onChange={(e) =>
-                      update('cod', { maxOrder: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-              <Field label="Description" htmlFor="cod-desc">
-                <Textarea
-                  id="cod-desc"
-                  rows={3}
-                  value={settings!.cod.description}
-                  onChange={(e) =>
-                    update('cod', { description: e.target.value })
-                  }
-                />
-              </Field>
-              <Actions methodKey="cod" name="Cash on Delivery" />
-            </CardContent>
-          </Card>
-        </TabsContent>
-       </Tabs>
-      </>
-    )}
-  </div>
-);
+              {/* Cash on Delivery */}
+              <TabsContent value="cod" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      Cash on Delivery
+                      <Badge
+                        variant={settings!.cod.status ? 'default' : 'secondary'}
+                      >
+                        {settings!.cod.status ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Collect payment in cash when the order is handed over.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div>
+                        <Label
+                          htmlFor="cod-status"
+                          className="text-sm font-medium"
+                        >
+                          Status
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Enable this method at checkout
+                        </p>
+                      </div>
+                      <Switch
+                        id="cod-status"
+                        checked={settings!.cod.status}
+                        onCheckedChange={(v) => update('cod', { status: v })}
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Label" htmlFor="cod-label">
+                        <Input
+                          id="cod-label"
+                          value={settings!.cod.label}
+                          onChange={(e) =>
+                            update('cod', { label: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field
+                        label="Extra charge (৳)"
+                        htmlFor="cod-charge"
+                        hint="Handling fee added to COD orders."
+                      >
+                        <Input
+                          id="cod-charge"
+                          inputMode="numeric"
+                          value={settings!.cod.extraCharge}
+                          onChange={(e) =>
+                            update('cod', { extraCharge: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Minimum order (৳)" htmlFor="cod-min">
+                        <Input
+                          id="cod-min"
+                          inputMode="numeric"
+                          value={settings!.cod.minOrder}
+                          onChange={(e) =>
+                            update('cod', { minOrder: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Maximum order (৳)" htmlFor="cod-max">
+                        <Input
+                          id="cod-max"
+                          inputMode="numeric"
+                          value={settings!.cod.maxOrder}
+                          onChange={(e) =>
+                            update('cod', { maxOrder: e.target.value })
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <Field label="Description" htmlFor="cod-desc">
+                      <Textarea
+                        id="cod-desc"
+                        rows={3}
+                        value={settings!.cod.description}
+                        onChange={(e) =>
+                          update('cod', { description: e.target.value })
+                        }
+                      />
+                    </Field>
+                    <Actions methodKey="cod" name="Cash on Delivery" />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </>
+  );
 }

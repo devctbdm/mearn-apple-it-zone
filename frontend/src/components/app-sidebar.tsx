@@ -1,151 +1,243 @@
 'use client';
 
 import * as React from 'react';
+import { useEffect, useState } from 'react';
+
 import { NavMain } from '@/components/nav-main';
-import { SuperAdminNav } from '@/components/nav-secondary';
+import { notificationApi } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { NavUser } from '@/components/nav-user';
-import { useAuth } from '@/hooks/useAuth';
+import { TeamSwitcher } from '@/components/team-switcher';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import {
-  LayoutDashboardIcon,
-  ListIcon,
-  ChartBarIcon,
-  FolderIcon,
-  UsersIcon,
-  FileTextIcon,
   Settings2Icon,
-  CircleHelpIcon,
-  FileChartColumnIcon,
-  Apple,
-  ShoppingBasket,
-  Gem,
-  Images,
-  User,
+  LayoutDashboard,
+  ShoppingCart,
+  ChartLine,
+  UsersRound,
+  UserStar,
+  ListSortAscending,
+  BellCheck,
   HandCoins,
 } from 'lucide-react';
-import Link from 'next/link';
+import AppleLogo from "@/Apple.png"
 
+import { useAuth } from '@/hooks/useAuth';
+
+// This is sample data.
 const data = {
+  teams: [
+    {
+      name: 'Apple IT Zone',
+      logo: AppleLogo,
+      plan: 'IT Zone',
+    },
+  ],
   navMain: [
     {
       title: 'Dashboard',
       url: '/admin/dashboard',
-      icon: <LayoutDashboardIcon />,
+      icon: <LayoutDashboard />,
     },
     {
       title: 'Products',
-      url: '/admin/products',
-      icon: <ShoppingBasket />,
-    },
-    {
-      title: 'Categories',
-      url: '/admin/categories',
-      icon: <ListIcon />,
-    },
-    {
-      title: 'Analytics',
-      url: '/admin/analytics',
-      icon: <ChartBarIcon />,
+      url: '#',
+      icon: <ShoppingCart />,
+      items: [
+        {
+          title: 'All Products',
+          url: '/admin/products',
+        },
+        {
+          title: 'New Product',
+          url: '/admin/products/new',
+        },
+
+        {
+          title: 'Categories',
+          url: '/admin/categories',
+        },
+      ],
     },
     {
       title: 'Orders',
-      url: '/admin/orders',
-      icon: <FolderIcon />,
+      url: '#',
+      icon: <ListSortAscending />,
+      items: [
+        {
+          title: 'All Orders',
+          url: '/admin/orders',
+        },
+      ],
     },
     {
-      title: 'Customers',
-      url: '/admin/customers',
-      icon: <UsersIcon />,
+      title: 'Analytics',
+      url: '#',
+      icon: <ChartLine />,
+      items: [
+        {
+          title: 'Overview',
+          url: '/admin/analytics',
+        },
+        {
+          title: 'Health Check',
+          url: '/admin/health',
+        },
+      ],
     },
-
     {
-      title: 'Invoices',
-      url: '/admin/invoice',
-      icon: <FileChartColumnIcon />,
+      title: 'Users',
+      url: '#',
+      icon: <UsersRound />,
+      items: [
+        {
+          title: 'Customers',
+          url: '/admin/customers',
+        },
+        {
+          title: 'Team',
+          url: '/admin/team',
+        },
+        {
+          title: 'Billing',
+          url: '/admin/invoice',
+        },
+      ],
+    },
+    {
+      title: 'Offers',
+      url: '#',
+      icon: <HandCoins />,
+      items: [
+        {
+          title: 'All Offers',
+          url: '/admin/offers',
+        },
+        {
+          title: 'New Offer',
+          url: '/admin/offers/new',
+        },
+      ],
     },
     {
       title: 'Reviews',
-      url: '/admin/reviews',
-      icon: <FileTextIcon />,
+      url: '#',
+      icon: <UserStar />,
+      items: [
+        {
+          title: 'Reviews',
+          url: '/admin/reviews',
+        },
+        {
+          title: 'Questions',
+          url: '/admin/questions',
+        },
+      ],
     },
     {
-      title: 'Questions',
-      url: '/admin/questions',
-      icon: <CircleHelpIcon />,
+      title: 'Notifications',
+      url: '/admin/notifications',
+      icon: <BellCheck />,
     },
-    {
-      title: 'Coupons',
-      url: '/admin/promo',
-      icon: <Gem />,
-    },
-    {
-      title: 'Sliders',
-      url: '/admin/slider',
-      icon: <Images />,
-    },
-  ],
-
-  navSuperadmin: [
-    {
-      title: 'Users',
-      url: '/admin/users',
-      icon: <User />,
-    },
-    {
-      title: 'Team',
-      url: '/admin/team',
-      icon: <UsersIcon />,
-    },
-    {
-      title: 'Payments',
-      url: '/admin/payments',
-      icon: <HandCoins />
-    },
-
     {
       title: 'Settings',
-      url: '/admin/settings',
+      url: '#',
       icon: <Settings2Icon />,
+      items: [
+        {
+          title: 'General',
+          url: '/admin/settings',
+        },
+        {
+          title: 'Payments',
+          url: '/admin/payments',
+        },
+        
+        {
+          title: 'Coupons',
+          url: '/admin/promo',
+        },
+        {
+          title: 'Slider',
+          url: '/admin/slider',
+        },
+        {
+          title: 'Home Slide Text',
+          url: '/admin/homeslidertext',
+        },
+        {
+          title: 'SMS',
+          url: '/admin/sms',
+        },
+        {
+          title: 'Maintenance',
+          url: '/admin/maintenance',
+        },
+      ],
     },
   ],
 };
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth();
+  const [unread, setUnread] = useState(0);
   const sidebarUser = {
     name: user?.name || 'Guest',
     email: user?.email || 'Not signed in',
     avatar: '',
   };
+
+  // Keep the notifications badge in sync with the live unread count.
+  useEffect(() => {
+    let active = true;
+    const load = () =>
+      notificationApi
+        .unreadCount()
+        .then((res) => {
+          if (active) setUnread(res.data.unreadCount);
+        })
+        .catch(() => {});
+
+    load();
+
+    const socket = getSocket();
+    const onNew = () => setUnread((u) => u + 1);
+    socket.on('notification:new', onNew);
+    // The notifications page dispatches this when items are marked read.
+    window.addEventListener('notifications-updated', load);
+
+    return () => {
+      active = false;
+      socket.off('notification:new', onNew);
+      window.removeEventListener('notifications-updated', load);
+    };
+  }, []);
+
+  // Inject the live unread count into the Notifications nav item.
+  const navMain = data.navMain.map((item) =>
+    item.title === 'Notifications'
+      ? { ...item, badge: unread > 0 ? unread : undefined }
+      : item
+  );
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-              render={<Link href="/admin/dashboard" />}
-            >
-              <Apple className="size-5!" />
-              <span className="text-base font-semibold">Apple it zone</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <SuperAdminNav items={data.navSuperadmin} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={sidebarUser} />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

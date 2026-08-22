@@ -82,6 +82,21 @@ export type Slider = {
   updatedAt?: string;
 };
 
+export type HomeSliderText = {
+  _id: string;
+  text: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type HomeSliderTextForm = {
+  text: string;
+  active: boolean;
+  sortOrder: number;
+};
+
 export type SliderForm = {
   title: string;
   description: string;
@@ -115,6 +130,30 @@ export const sliderApi = {
 
   reorder: (orders: { id: string; sortOrder: number }[]) =>
     api.put<{ success: boolean; message: string }>('/sliders/reorder', { orders }),
+};
+
+export const homeSliderTextApi = {
+  getAll: (params?: { active?: boolean }) =>
+    api.get<{ success: boolean; texts: HomeSliderText[] }>('/home-slider-texts', {
+      params: params ? { active: params.active ? 'true' : undefined } : undefined,
+    }),
+
+  create: (data: HomeSliderTextForm) =>
+    api.post<{ success: boolean; text: HomeSliderText }>('/home-slider-texts', data),
+
+  update: (id: string, data: Partial<HomeSliderTextForm>) =>
+    api.put<{ success: boolean; text: HomeSliderText }>(
+      `/home-slider-texts/${id}`,
+      data
+    ),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/home-slider-texts/${id}`),
+
+  reorder: (orders: { id: string; sortOrder: number }[]) =>
+    api.put<{ success: boolean; message: string }>('/home-slider-texts/reorder', {
+      orders,
+    }),
 };
 
 export type AdminUser = {
@@ -187,6 +226,9 @@ export const customerApi = {
 
   getById: (id: string) =>
     api.get<{ success: boolean; customer: Customer }>(`/customers/${id}`),
+
+  remove: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/customers/${id}`),
 };
 
 export type TeamMember = {
@@ -287,14 +329,26 @@ export const paymentApi = {
       state?: string;
       postcode?: string;
     };
-  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string }>('/payment/initiate', data),
+    advance?: boolean;
+  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string; advance?: boolean; message?: string }>('/payment/initiate', data),
   validate: (data: {
     tran_id: string;
     val_id?: string;
     status?: string;
     amount?: number;
     card_type?: string;
-  }) => api.post<{ success: boolean; valid: boolean; order?: string }>('/payment/validate', data),
+  }) => api.post<{ success: boolean; valid: boolean; advance?: boolean; order?: string }>('/payment/validate', data),
+  queryTransaction: (tran_id: string) =>
+    api.get<{
+      success: boolean;
+      gatewayStatus?: string;
+      paymentStatus?: string;
+      advancePaid?: number;
+      updated?: boolean;
+      order?: string;
+    }>(`/payment/transaction/${tran_id}`),
+  cancel: (data: { tran_id: string }) =>
+    api.post<{ success: boolean; message: string }>('/payment/cancel', data),
 };
 
 export type ActiveTeamMember = {
@@ -330,6 +384,7 @@ export type SavedAddress = {
   state: string;
   postcode: string;
   country: string;
+  deliveryArea?: string;
   isDefault: boolean;
 };
 
@@ -365,12 +420,31 @@ export const authApi = {
 
   setDefaultAddress: (id: string) =>
     api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}/default`),
+
+  verifyOtp: (data: { pendingToken: string; otp: string }) =>
+    api.post<{
+      success: boolean;
+      token?: string;
+      user?: AuthMe;
+      message?: string;
+    }>('/auth/verify-otp', data),
+};
+
+export type LoginResponse = {
+  success: boolean;
+  token?: string;
+  user?: AuthMe;
+  twoFactorRequired?: boolean;
+  pendingToken?: string;
+  expiresIn?: number;
+  message?: string;
 };
 
 export type OrderStatus =
+  | 'pending'
   | 'processing'
-  | 'shipped'
-  | 'delivered'
+  | 'confirmed'
+  | 'send_courier'
   | 'cancelled';
 
 export type OrderItem = {
@@ -383,11 +457,14 @@ export type OrderItem = {
 
 export type Order = {
   _id: string;
+  orderNumber?: string;
   user:
     | string
     | { _id: string; name: string; email: string; phone?: string };
   items: OrderItem[];
   shippingAddress: {
+    fullName?: string;
+    phone?: string;
     street: string;
     city: string;
     state: string;
@@ -402,26 +479,42 @@ export type Order = {
   payment: {
     method: string;
     status: string;
+    tran_id?: string;
+    amount?: number;
+    val_id?: string;
+    card_type?: string;
     paidAt?: string;
   };
   orderStatus: OrderStatus;
   note?: string;
+  advanceAmount?: number;
+  advancePaid?: number;
+  advanceReference?: string;
   createdAt: string;
   updatedAt: string;
 };
 
 export type OrderStats = {
   total: number;
+  pending: number;
   processing: number;
-  shipped: number;
-  delivered: number;
+  confirmed: number;
+  send_courier: number;
   cancelled: number;
 };
 
 export const orderApi = {
   getMyOrders: () =>
     api.get<{ success: boolean; orders: Order[] }>('/orders/my-orders'),
-  getAllOrders: (params?: { page?: number; limit?: number; status?: string }) =>
+
+  getById: (id: string) =>
+    api.get<{ success: boolean; order: Order }>(`/orders/${id}`),
+  getAllOrders: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }) =>
     api.get<{
       success: boolean;
       total: number;
@@ -446,6 +539,16 @@ export const orderApi = {
       `/orders/${id}/payment-status`,
       { status }
     ),
+
+  updateAdvance: (
+    id: string,
+    data: {
+      advanceAmount?: number;
+      advancePaid?: number;
+      advanceReference?: string;
+    }
+  ) =>
+    api.put<{ success: boolean; order: Order }>(`/orders/${id}/advance`, data),
 
   create: (data: {
     items: { product: string; quantity: number }[];
@@ -546,8 +649,9 @@ export type DashboardStats = {
   products: number;
   ordersByStatus: {
     processing: number;
-    shipped: number;
-    delivered: number;
+    pending: number;
+    confirmed: number;
+    send_courier: number;
     cancelled: number;
   };
   recentOrders: Order[];
@@ -586,8 +690,9 @@ export type AnalyticsStats = {
     repeatCustomerRate: number;
     ordersByStatus: {
       processing: number;
-      shipped: number;
-      delivered: number;
+      pending: number;
+      confirmed: number;
+      send_courier: number;
       cancelled: number;
     };
   };
@@ -625,6 +730,7 @@ export type ProductFormData = {
   stock: number;
   status: string;
   featured: boolean;
+  holiday: boolean;
   specifications?: Record<string, any>;
   images?: string[];
 };
@@ -775,6 +881,7 @@ export type PromoCode = {
   startDate: string | null;
   endDate: string | null;
   status: 'active' | 'inactive';
+  categories?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -808,6 +915,7 @@ export type PromoFormData = {
   startDate: string | null;
   endDate: string | null;
   status: 'active' | 'inactive';
+  categories?: string[];
 };
 
 export const promoApi = {
@@ -830,9 +938,200 @@ export const promoApi = {
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/promo/${id}`),
 
-  validate: (code: string, subtotal: number) =>
-    api.post<{ success: boolean; promo: Partial<PromoCode>; discount: number }>('/promo/validate', {
+  validate: (code: string, subtotal: number, items?: { product: string; quantity: number }[]) =>
+    api.post<{
+      success: boolean;
+      promo: Partial<PromoCode>;
+      discount: number;
+      matchingSubtotal?: number;
+    }>('/promo/validate', {
       code,
       subtotal,
+      items,
     }),
 };
+
+export type MaintenanceStatus = {
+  enabled: boolean;
+  message: string;
+  endAt: string | null;
+  contactEmail: string;
+  contactPhone: string;
+};
+
+export const maintenanceApi = {
+  getStatus: () =>
+    api.get<{ success: boolean; maintenance: MaintenanceStatus }>(
+      '/maintenance/status'
+    ),
+
+  update: (data: Partial<MaintenanceStatus>) =>
+    api.put<{ success: boolean; maintenance: MaintenanceStatus }>(
+      '/maintenance',
+      data
+    ),
+};
+
+export type SmsSettings = {
+  apiKey: string;
+  senderId: string;
+  signature: string;
+  enabled: boolean;
+  twoFactorEnabled?: boolean;
+  otpExpirySeconds?: number;
+};
+
+export type SmsBalance = {
+  success: boolean;
+  balance: number | null;
+  raw?: Record<string, unknown>;
+};
+
+export type SmsLog = {
+  _id: string;
+  to: string[];
+  message: string;
+  segments: number;
+  status: 'sent' | 'failed';
+  providerStatus: string;
+  providerMessage: string;
+  errorCode: string;
+  createdAt: string;
+};
+
+export const smsApi = {
+  getSettings: () => api.get<{ success: boolean; settings: SmsSettings }>('/sms/settings'),
+
+  updateSettings: (data: Partial<SmsSettings>) =>
+    api.put<{ success: boolean; settings: SmsSettings }>('/sms/settings', data),
+
+  getBalance: () => api.get<SmsBalance>('/sms/balance'),
+
+  send: (data: { numbers: string; message: string; senderId?: string }) =>
+    api.post<{
+      success: boolean;
+      log: SmsLog;
+      provider: Record<string, any>;
+      providerMessage: string;
+      numbers: string[];
+    }>('/sms/send', data),
+
+  getLogs: (params?: { page?: number; limit?: number }) =>
+    api.get<{
+      success: boolean;
+      logs: SmsLog[];
+      total: number;
+      page: number;
+      pages: number;
+    }>('/sms/logs', { params }),
+};
+
+// ---------------- Offers ----------------
+export type Offer = {
+  _id: string;
+  title: string;
+  slug: string;
+  shortDescription: string;
+  fullDescription: string;
+  image: string;
+  startDate?: string;
+  endDate?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const offerApi = {
+  getAll: (params?: Record<string, any>) =>
+    api.get<{ success: boolean; offers: Offer[] }>('/offers', { params }),
+
+  getById: (id: string) =>
+    api.get<{ success: boolean; offer: Offer }>(`/offers/${id}`),
+
+  getBySlug: (slug: string) =>
+    api.get<{ success: boolean; offer: Offer }>(`/offers/slug/${slug}`),
+
+  create: (data: FormData) =>
+    api.post<{ success: boolean; offer: Offer }>('/offers', data),
+
+  update: (id: string, data: FormData) =>
+    api.put<{ success: boolean; offer: Offer }>(`/offers/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/offers/${id}`),
+};
+
+export type HolidayConfig = {
+  _id?: string;
+  heroBadge?: string;
+  title?: string;
+  subtitle?: string;
+  discountPercent?: number;
+  endDate?: string | null;
+  couponCode?: string;
+  couponDescription?: string;
+  topDealsTitle?: string;
+  topDealsSubtitle?: string;
+  active?: boolean;
+};
+
+export const holidayApi = {
+  getConfig: () =>
+    api.get<{ success: boolean; config: HolidayConfig }>('/holiday'),
+
+  updateConfig: (data: Partial<HolidayConfig>) =>
+    api.put<{ success: boolean; config: HolidayConfig }>('/holiday', data),
+};
+
+export type AdminNotificationCategory =
+  | 'order'
+  | 'delivery'
+  | 'rider'
+  | 'payment'
+  | 'system';
+
+export type AdminNotification = {
+  _id: string;
+  title: string;
+  description: string;
+  category: AdminNotificationCategory;
+  read: boolean;
+  link?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const notificationApi = {
+  // Fetch a paginated list of notifications. Returns the list plus the
+  // running unread count so the UI can stay in sync with new events.
+  list: (params?: {
+    page?: number;
+    limit?: number;
+    read?: boolean;
+    category?: string;
+  }) =>
+    api.get<{
+      success: boolean;
+      notifications: AdminNotification[];
+      total: number;
+      unreadCount: number;
+      page: number;
+      pages: number;
+    }>('/notifications', { params }),
+
+  unreadCount: () =>
+    api.get<{ success: boolean; unreadCount: number }>(
+      '/notifications/unread-count'
+    ),
+
+  markRead: (id: string) =>
+    api.patch<{ success: boolean; notification: AdminNotification }>(
+      `/notifications/${id}/read`
+    ),
+
+  markAllRead: () =>
+    api.post<{ success: boolean; message: string }>(
+      '/notifications/read-all'
+    ),
+};
+

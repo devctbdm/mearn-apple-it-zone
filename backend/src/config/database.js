@@ -45,15 +45,10 @@ export const connectDB = async (retryCount = 0) => {
       error.message
     );
 
-    if (retryCount < MAX_RETRIES) {
-      const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-      console.log(`⏳ Retrying in ${retryDelay}ms...`);
-      await delay(retryDelay);
-      return connectDB(retryCount + 1);
-    }
-
-    console.error('❌ Max retries reached. Exiting...');
-    process.exit(1);
+    const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, Math.min(retryCount, 6));
+    console.log(`⏳ Retrying in ${retryDelay}ms...`);
+    await delay(retryDelay);
+    return connectDB(retryCount + 1);
   }
 };
 

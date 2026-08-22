@@ -24,6 +24,12 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
+import maintenanceRoutes from './routes/maintenanceRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
+import holidayRoutes from './routes/holidayRoutes.js';
+import homeSliderTextRoutes from './routes/homeSliderTextRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from 'node:dns/promises';
@@ -34,6 +40,30 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
+
+// ------- Trust proxy (correct req.ip behind Nginx/Cloudflare/load balancer) -------
+// Without this, every visitor shares the proxy's IP -> rate limiters would lock
+// everyone out together and session logs would record the wrong IP.
+// TRUST_PROXY accepts:
+//   'false'            -> app is exposed directly (no proxy)
+//   '1' | number       -> number of trusted proxy hops (Nginx on same host = 1)
+//   'true'             -> trust all hops (only ok if the proxy overwrites XFF)
+//   'ip1,ip2'          -> explicit proxy IPs/CIDRs (e.g. your load balancer)
+// Default when unset: 1 (the typical single-Nginx setup).
+const trustProxyEnv = process.env.TRUST_PROXY;
+let trustProxySetting;
+if (trustProxyEnv === undefined || trustProxyEnv === '') {
+  trustProxySetting = 1;
+} else if (trustProxyEnv === 'true') {
+  trustProxySetting = true;
+} else if (trustProxyEnv === 'false') {
+  trustProxySetting = false;
+} else if (!Number.isNaN(Number(trustProxyEnv))) {
+  trustProxySetting = Number(trustProxyEnv);
+} else {
+  trustProxySetting = trustProxyEnv.split(',').map((s) => s.trim());
+}
+app.set('trust proxy', trustProxySetting);
 
 // Disable ETag so cached API responses don't come back as 304 (breaks axios validateStatus)
 app.set('etag', false);
@@ -81,6 +111,8 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/verify-otp', authLimiter);
 
 // 4. Logging (dev format)
 if (process.env.NODE_ENV === 'development') {
@@ -117,6 +149,12 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/sms', smsRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/offers', offerRoutes);
+app.use('/api/holiday', holidayRoutes);
+app.use('/api/home-slider-texts', homeSliderTextRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

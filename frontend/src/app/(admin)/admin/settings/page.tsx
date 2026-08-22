@@ -59,12 +59,14 @@ import {
   authApi,
   storeApi,
   paymentSettingsApi,
+  smsApi,
   type TeamMember,
   type Session,
   type PaymentGateway,
 } from '@/lib/api';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
+import Link from 'next/link';
 
 type ShippingZone = {
   id: string;
@@ -190,6 +192,42 @@ export default function SettingsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await smsApi.getSettings();
+        if (data.success) {
+          setTwoFactorEnabled(!!data.settings.twoFactorEnabled);
+          setOtpExpirySeconds(data.settings.otpExpirySeconds || 60);
+          setSmsConfigured(!!data.settings.apiKey);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  const handleSave2fa = async () => {
+    setLoading2fa(true);
+    try {
+      const { data } = await smsApi.updateSettings({
+        twoFactorEnabled,
+        otpExpirySeconds,
+      });
+      if (data.success) {
+        setTwoFactorEnabled(!!data.settings.twoFactorEnabled);
+        setOtpExpirySeconds(data.settings.otpExpirySeconds || 60);
+        toast.success('Two-factor authentication settings saved');
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || 'Failed to save 2FA settings'
+      );
+    } finally {
+      setLoading2fa(false);
+    }
+  };
+
   const handleRevokeSession = async (id: string) => {
     try {
       await authApi.revokeSession(id);
@@ -206,6 +244,12 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
+
+  // Two-factor authentication (SMS) state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [otpExpirySeconds, setOtpExpirySeconds] = useState(60);
+  const [loading2fa, setLoading2fa] = useState(false);
+  const [smsConfigured, setSmsConfigured] = useState(true);
 
   const getPasswordStrength = (pw: string) => {
     let score = 0;
@@ -289,12 +333,13 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <SiteHeader
-        title="Settings"
-        description="Manage your store preferences and configuration"
-      />
-      <div className=" bg-card sticky top-0 z-30">
+      <SiteHeader />
+      <div className="bg-card sticky top-0 z-30">
+        <div className="flex items-center justify-between px-4">
+          <div >
+          <h2>Settings</h2>
+          <p>Manage your store preferences and configuration</p>
+        </div>
         <Button
           onClick={handleSave}
           disabled={!isDirty || isSaving}
@@ -303,6 +348,7 @@ export default function SettingsPage() {
           <Save className="h-4 w-4" />
           {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
+        </div>
       </div>
 
       <div className="px-4 py-2">
@@ -311,11 +357,6 @@ export default function SettingsPage() {
             <TabsTrigger value="profile" className="gap-2">
               <Store className="h-4 w-4" />
               <span className="hidden sm:inline">Profile</span>
-            </TabsTrigger>
-
-            <TabsTrigger value="notifications" className="gap-2">
-              <Bell className="h-4 w-4" />
-              <span className="hidden sm:inline">Alerts</span>
             </TabsTrigger>
 
             <TabsTrigger value="security" className="gap-2">
@@ -486,110 +527,6 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* ==================== NOTIFICATIONS TAB ==================== */}
-          <TabsContent value="notifications" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>
-                  Choose which events trigger an email alert
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {[
-                  {
-                    key: 'orders' as const,
-                    title: 'New Orders',
-                    description: 'Get notified when a customer places an order',
-                  },
-                  {
-                    key: 'marketing' as const,
-                    title: 'Marketing Emails',
-                    description: 'Receive promotional campaign updates',
-                  },
-                  {
-                    key: 'security' as const,
-                    title: 'Security Alerts',
-                    description:
-                      'Critical alerts for logins and password changes',
-                  },
-                  {
-                    key: 'stock' as const,
-                    title: 'Low Stock Warnings',
-                    description: 'Alert when inventory is below threshold',
-                  },
-                  {
-                    key: 'newsletter' as const,
-                    title: 'Newsletter Subscriptions',
-                    description: 'Daily digest of new subscriber signups',
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.key}
-                    className="flex items-center justify-between py-2"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-medium">{item.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.description}
-                      </div>
-                    </div>
-                    <Switch
-                      checked={notifications[item.key]}
-                      onCheckedChange={() => toggleNotification(item.key)}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Push Notifications</CardTitle>
-                <CardDescription>
-                  Browser and mobile push notification settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="font-medium">Browser Push</div>
-                    <div className="text-sm text-muted-foreground">
-                      Show desktop notifications for new orders
-                    </div>
-                  </div>
-                  <Switch
-                    checked={pushNotifications.browserPush}
-                    onCheckedChange={(checked) =>
-                      setPushNotifications((prev) => ({
-                        ...prev,
-                        browserPush: checked,
-                      }))
-                    }
-                  />
-                </div>
-                <Separator className="my-4" />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="font-medium">Mobile Push</div>
-                    <div className="text-sm text-muted-foreground">
-                      Send notifications to connected mobile devices
-                    </div>
-                  </div>
-                  <Switch
-                    checked={pushNotifications.mobilePush}
-                    onCheckedChange={(checked) =>
-                      setPushNotifications((prev) => ({
-                        ...prev,
-                        mobilePush: checked,
-                      }))
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* ==================== SECURITY TAB ==================== */}
           <TabsContent value="security" className="space-y-6">
             <Card>
@@ -674,10 +611,57 @@ export default function SettingsPage() {
                     </CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="gap-2">
-                    <KeyRound className="h-4 w-4" />
-                    Enable 2FA
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-medium">
+                        Require SMS code on admin login
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Staff (admin / manager / super admin) must enter a code
+                        sent to their phone before signing in.
+                      </div>
+                    </div>
+                    <Switch
+                      checked={twoFactorEnabled}
+                      onCheckedChange={setTwoFactorEnabled}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="otpExpiry">Code valid for</Label>
+                    <Select
+                      value={String(otpExpirySeconds)}
+                      onValueChange={(v) => setOtpExpirySeconds(Number(v))}
+                    >
+                      <SelectTrigger id="otpExpiry" className="sm:w-56">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30">30 seconds</SelectItem>
+                        <SelectItem value="60">1 minute</SelectItem>
+                        <SelectItem value="90">1 minute 30 seconds</SelectItem>
+                        <SelectItem value="120">2 minutes</SelectItem>
+                        <SelectItem value="180">3 minutes</SelectItem>
+                        <SelectItem value="300">5 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {!smsConfigured && (
+                    <p className="text-xs text-amber-600">
+                      SMS is not configured yet. Add your bulksmsbd API key in
+                      the{' '}
+                      <Link href="/admin/sms" className="underline">
+                        SMS settings
+                      </Link>{' '}
+                      page before enabling this.
+                    </p>
+                  )}
+
+                  <Button onClick={handleSave2fa} disabled={loading2fa}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {loading2fa ? 'Saving...' : 'Save 2FA settings'}
                   </Button>
                 </CardContent>
               </Card>

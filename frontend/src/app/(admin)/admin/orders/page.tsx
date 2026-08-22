@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Eye,
   Pencil,
@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Download,
   Printer,
+  Clock,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,20 +69,50 @@ import {
 } from '@/components/ui/pagination';
 import { toast } from 'sonner';
 import { SiteHeader } from '@/components/site-header';
-import { orderApi, type Order, type OrderStatus } from '@/lib/api';
+import {
+  orderApi,
+  paymentApi,
+  type Order,
+  type OrderStatus,
+} from '@/lib/api';
 
 type StatusFilter = OrderStatus | 'all';
 
 const statusVariant: Record<OrderStatus, string> = {
+  pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
   processing: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  shipped: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
-  delivered: 'bg-green-100 text-green-800 hover:bg-green-100',
+  confirmed: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100',
+  send_courier: 'bg-violet-100 text-violet-800 hover:bg-violet-100',
   cancelled: 'bg-red-100 text-red-800 hover:bg-red-100',
+};
+
+const paymentStatusVariant: Record<string, string> = {
+  paid: 'bg-green-100 text-green-800 hover:bg-green-100',
+  pending: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+  failed: 'bg-red-100 text-red-800 hover:bg-red-100',
+  cancelled: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+};
+
+const paymentStatusLabel = (s?: string) => {
+  switch (s) {
+    case 'paid':
+      return 'Paid';
+    case 'pending':
+      return 'Pending';
+    case 'failed':
+      return 'Failed';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
+  }
 };
 
 const PAGE_SIZE = 8;
 
 const shortId = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+
+const orderNo = (o: Order) => o.orderNumber || shortId(o._id);
 
 const formatAmount = (n: number) => `৳${n.toLocaleString()}`;
 
@@ -118,18 +150,29 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     total: number;
+    pending: number;
     processing: number;
-    shipped: number;
-    delivered: number;
+    confirmed: number;
+    send_courier: number;
     cancelled: number;
   } | null>(null);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editStatus, setEditStatus] = useState<OrderStatus>('processing');
   const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
+  const [advanceAmountDraft, setAdvanceAmountDraft] = useState('');
+  const [advancePaidDraft, setAdvancePaidDraft] = useState('');
+  const [advanceRefDraft, setAdvanceRefDraft] = useState('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -138,6 +181,7 @@ export default function OrdersPage() {
         page,
         limit: PAGE_SIZE,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: debouncedQuery || undefined,
       });
       if (data.success) {
         setOrders(data.orders);
@@ -149,10 +193,55 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, debouncedQuery]);
 
-  const fetchStats = useCallback(async () => {
+  // Re-query the real transaction status from SSLCommerz and sync it onto the order.
+  const syncPayment = async (order: Order) => {
+    const tranId = order.payment?.tran_id;
+    if (!tranId) {
+      toast.error('No gateway transaction for this order');
+      return;
+    }
     try {
+      setSyncingId(order._id);
+      const res = await paymentApi.queryTransaction(tranId);
+      if (res.data.paymentStatus) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === order._id
+              ? {
+                  ...o,
+                  payment: { ...o.payment, status: res.data.paymentStatus as Order['payment']['status'] },
+                  advancePaid: res.data.advancePaid ?? o.advancePaid,
+                }
+              : o
+          )
+        );
+        if (viewOrder?._id === order._id) {
+          setViewOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  payment: { ...prev.payment, status: res.data.paymentStatus as Order['payment']['status'] },
+                  advancePaid: res.data.advancePaid ?? prev.advancePaid,
+                }
+              : prev
+          );
+        }
+      }
+      toast.success(
+        res.data.updated
+          ? `Synced: payment is ${res.data.paymentStatus}`
+          : `Gateway status: ${res.data.gatewayStatus || res.data.paymentStatus} (no change)`
+      );
+    } catch {
+      toast.error('Failed to query SSLCommerz');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const fetchStats = useCallback(async () => {    try {
       const { data } = await orderApi.getStats();
       if (data.success) setStats(data.stats);
     } catch {
@@ -168,35 +257,14 @@ export default function OrdersPage() {
     fetchStats();
   }, [fetchStats]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter((o) => {
-      const cust = getCustomer(o);
-      const haystack = [
-        o._id,
-        cust?.name || '',
-        cust?.email || '',
-        o.shippingAddress.city,
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [orders, query]);
-
   const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
 
   const handleSaveStatus = async () => {
     if (!editOrder) return;
     try {
       await orderApi.updateStatus(editOrder._id, editStatus);
       toast.success(
-        `Order ${shortId(editOrder._id)} status updated to ${editStatus}`
+        `Order ${orderNo(editOrder)} status updated to ${editStatus}`
       );
       setEditOrder(null);
       fetchOrders();
@@ -210,12 +278,51 @@ export default function OrdersPage() {
     if (!cancelOrder) return;
     try {
       await orderApi.updateStatus(cancelOrder._id, 'cancelled');
-      toast.success(`Order ${shortId(cancelOrder._id)} cancelled`);
+      toast.success(`Order ${orderNo(cancelOrder)} cancelled`);
       setCancelOrder(null);
       fetchOrders();
       fetchStats();
     } catch {
       toast.error('Failed to cancel order');
+    }
+  };
+
+  const handleSaveAdvanceAmount = async () => {
+    if (!viewOrder) return;
+    try {
+      const amt = Number(advanceAmountDraft) || 0;
+      const { data } = await orderApi.updateAdvance(viewOrder._id, {
+        advanceAmount: amt,
+      });
+      if (data.success) {
+        setViewOrder({ ...viewOrder, advanceAmount: amt });
+        toast.success('Advance amount updated');
+        fetchOrders();
+      }
+    } catch {
+      toast.error('Failed to update advance amount');
+    }
+  };
+
+  const handleRecordAdvance = async () => {
+    if (!viewOrder) return;
+    try {
+      const paid = Number(advancePaidDraft) || 0;
+      const { data } = await orderApi.updateAdvance(viewOrder._id, {
+        advancePaid: paid,
+        advanceReference: advanceRefDraft,
+      });
+      if (data.success) {
+        setViewOrder({
+          ...viewOrder,
+          advancePaid: paid,
+          advanceReference: advanceRefDraft,
+        });
+        toast.success('Advance payment recorded');
+        fetchOrders();
+      }
+    } catch {
+      toast.error('Failed to record advance payment');
     }
   };
 
@@ -232,16 +339,16 @@ export default function OrdersPage() {
       'Items',
     ];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const rows = filtered.map((o) => {
+    const rows = orders.map((o) => {
       const cust = getCustomer(o);
       return [
-        shortId(o._id),
+        orderNo(o),
         cust?.name || '',
         cust?.email || '',
         formatDate(o.createdAt),
         o.totalAmount,
         o.orderStatus,
-        paymentLabel(o.payment.method),
+        `${paymentLabel(o.payment.method)} (${paymentStatusLabel(o.payment.status)})`,
         formatAddress(o.shippingAddress),
         o.items
           .map(
@@ -262,7 +369,7 @@ export default function OrdersPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filtered.length} orders to CSV`);
+    toast.success(`Exported ${orders.length} orders to CSV`);
   };
 
   const handlePrintInvoice = (order: Order) => {
@@ -294,7 +401,7 @@ export default function OrdersPage() {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Invoice ${shortId(order._id)}</title>
+          <title>Invoice ${orderNo(order)}</title>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; color: #111; padding: 32px; }
             h1 { margin: 0 0 4px; font-size: 24px; }
@@ -309,7 +416,7 @@ export default function OrdersPage() {
         </head>
         <body>
           <h1>Invoice</h1>
-          <div class="muted">Order ${shortId(order._id)} · ${formatDate(order.createdAt)}</div>
+          <div class="muted">Order ${orderNo(order)} · ${formatDate(order.createdAt)}</div>
           <div class="row">
             <div class="box">
               <div class="muted">Billed to</div>
@@ -360,16 +467,28 @@ export default function OrdersPage() {
       color: 'text-foreground',
     },
     {
+      label: 'Pending',
+      value: stats?.pending ?? 0,
+      icon: Clock,
+      color: 'text-amber-600',
+    },
+    {
       label: 'Processing',
       value: stats?.processing ?? 0,
       icon: Loader2,
       color: 'text-blue-600',
     },
     {
-      label: 'Delivered',
-      value: stats?.delivered ?? 0,
+      label: 'Confirmed',
+      value: stats?.confirmed ?? 0,
       icon: CheckCircle2,
-      color: 'text-green-600',
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'Send To Courier',
+      value: stats?.send_courier ?? 0,
+      icon: Truck,
+      color: 'text-violet-600',
     },
     {
       label: 'Cancelled',
@@ -381,10 +500,7 @@ export default function OrdersPage() {
 
   return (
     <div>
-      <SiteHeader
-        title="Orders Management"
-        description="Manage and track all customer orders."
-      />
+      <SiteHeader />
       <div className="px-4 py-8">
         {/* Stats */}
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -427,9 +543,10 @@ export default function OrdersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="send_courier">Send To Courier</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -450,36 +567,38 @@ export default function OrdersPage() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Payment Status</TableHead>
+                <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    Loading...
-                  </TableCell>
-                </TableRow>
-              ) : paged.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No orders found.
-                  </TableCell>
-                </TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : orders.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      No orders found.
+                    </TableCell>
+                  </TableRow>
               ) : (
-                paged.map((order) => {
+                orders.map((order) => {
                   const cust = getCustomer(order);
                   return (
                     <TableRow key={order._id}>
                       <TableCell className="font-medium">
-                        {shortId(order._id)}
+                        {orderNo(order)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -491,6 +610,31 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell>{formatAmount(order.totalAmount)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge
+                            className={
+                              paymentStatusVariant[order.payment.status] || ''
+                            }
+                            variant="secondary"
+                          >
+                            {paymentStatusLabel(order.payment.status)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {paymentLabel(order.payment.method)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {formatAmount(
+                          order.totalAmount - (order.advancePaid || 0)
+                        )}
+                        {order.advancePaid ? (
+                          <span className="block text-xs text-muted-foreground">
+                            adv. {formatAmount(order.advancePaid || 0)}
+                          </span>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           className={statusVariant[order.orderStatus]}
@@ -509,7 +653,14 @@ export default function OrdersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => setViewOrder(order)}
+                              onClick={() => {
+                                setViewOrder(order);
+                                setAdvanceAmountDraft(
+                                  String(order.advanceAmount || 0)
+                                );
+                                setAdvancePaidDraft('');
+                                setAdvanceRefDraft('');
+                              }}
                             >
                               <Eye className="mr-2 h-4 w-4" /> View details
                             </DropdownMenuItem>
@@ -548,8 +699,11 @@ export default function OrdersPage() {
         {/* Pagination */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {paged.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}
-            –{(currentPage - 1) * PAGE_SIZE + paged.length} of {filtered.length}
+            Showing{' '}
+            {orders.length === 0
+              ? 0
+              : (currentPage - 1) * PAGE_SIZE + 1}
+            –{(currentPage - 1) * PAGE_SIZE + orders.length} of {total}
           </p>
           {totalPages > 1 && (
             <Pagination className="mx-0 w-auto justify-end">
@@ -616,7 +770,7 @@ export default function OrdersPage() {
             <div className="w-full max-w-150 rounded-lg bg-white p-6 shadow-lg">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold">
-                  Order {shortId(viewOrder._id)}
+                  Order {orderNo(viewOrder)}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Placed on {formatDate(viewOrder.createdAt)}
@@ -653,6 +807,86 @@ export default function OrdersPage() {
                   <div className="font-medium">Payment</div>
                   <div className="text-muted-foreground">
                     {paymentLabel(viewOrder.payment.method)}
+                  </div>
+                  <Badge
+                    className={
+                      paymentStatusVariant[viewOrder.payment.status] || ''
+                    }
+                    variant="secondary"
+                  >
+                    {paymentStatusLabel(viewOrder.payment.status)}
+                  </Badge>
+                  {viewOrder.payment.tran_id ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      disabled={syncingId === viewOrder._id}
+                      onClick={() => syncPayment(viewOrder)}
+                    >
+                      {syncingId === viewOrder._id
+                        ? 'Syncing…'
+                        : 'Sync from SSLCommerz'}
+                    </Button>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      No gateway transaction (e.g. COD)
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="font-medium">
+                    Advance confirmation (COD verify)
+                  </div>
+                  <div className="text-muted-foreground">
+                    Required:{' '}
+                    {formatAmount(viewOrder.advanceAmount || 0)} · Received:{' '}
+                    {formatAmount(viewOrder.advancePaid || 0)} · Due on
+                    delivery:{' '}
+                    {formatAmount(
+                      viewOrder.totalAmount - (viewOrder.advancePaid || 0)
+                    )}
+                  </div>
+                  {viewOrder.advanceReference ? (
+                    <div className="text-xs text-muted-foreground">
+                      Ref: {viewOrder.advanceReference}
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={advanceAmountDraft}
+                      onChange={(e) => setAdvanceAmountDraft(e.target.value)}
+                      placeholder="Set required amount"
+                      className="w-44"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveAdvanceAmount}
+                    >
+                      Save amount
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={advancePaidDraft}
+                      onChange={(e) => setAdvancePaidDraft(e.target.value)}
+                      placeholder="Mark received"
+                      className="w-36"
+                    />
+                    <Input
+                      value={advanceRefDraft}
+                      onChange={(e) => setAdvanceRefDraft(e.target.value)}
+                      placeholder="bKash ref (trxid)"
+                      className="w-44"
+                    />
+                    <Button size="sm" onClick={handleRecordAdvance}>
+                      Record received
+                    </Button>
                   </div>
                 </div>
                 {viewOrder.note ? (
@@ -742,7 +976,7 @@ export default function OrdersPage() {
             <DialogHeader>
               <DialogTitle>Edit Order Status</DialogTitle>
               <DialogDescription>
-                Update status for {editOrder ? shortId(editOrder._id) : ''}
+                Update status for {editOrder ? orderNo(editOrder) : ''}
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
@@ -754,18 +988,19 @@ export default function OrdersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="shipped">Shipped</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="send_courier">Send To Courier</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-3 flex-col gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setEditOrder(null)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveStatus}>Save</Button>
+              <Button onClick={handleSaveStatus}>Save status</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -779,7 +1014,7 @@ export default function OrdersPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
               <AlertDialogDescription>
-                Order {cancelOrder ? shortId(cancelOrder._id) : ''} will be
+                Order {cancelOrder ? orderNo(cancelOrder) : ''} will be
                 marked as cancelled. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

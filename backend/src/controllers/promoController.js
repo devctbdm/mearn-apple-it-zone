@@ -1,13 +1,15 @@
 // backend/src/controllers/promoController.js
 
 import PromoCode from '../models/PromoCode.js';
+import Product from '../models/Product.js';
+import { expandPromoCategories } from '../utils/categoryTree.js';
 
 // @desc    Validate a promo code and compute the discount
 // @route   POST /api/promo/validate
 // @access  Public
 export const validatePromo = async (req, res) => {
   try {
-    const { code, subtotal = 0 } = req.body;
+    const { code, subtotal = 0, items = [] } = req.body;
 
     if (!code || !code.trim()) {
       return res.status(400).json({ success: false, message: 'Promo code is required' });
@@ -18,13 +20,57 @@ export const validatePromo = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Invalid promo code' });
     }
 
-    const result = promo.computeDiscount(Number(subtotal) || 0);
+    // Resolve categories + price for each cart item from the DB.
+    let promoItems = [];
+    if (Array.isArray(items) && items.length > 0) {
+      const ids = items.map((i) => i.product).filter(Boolean);
+      const products = await Product.find({ _id: { $in: ids } }).populate('category');
+      const byId = new Map(products.map((p) => [String(p._id), p]));
+      promoItems = items.map((i) => {
+        const product = byId.get(String(i.product));
+        if (!product) return { categories: [], price: 0, quantity: i.quantity || 1 };
+        const price = product.discountPrice > 0 ? product.discountPrice : product.price;
+        const cats =
+          Array.isArray(product.categories) && product.categories.length
+            ? product.categories
+            : product.category && typeof product.category === 'object' && product.category.name
+              ? [product.category.name]
+              : [];
+        return {
+          categories: cats,
+          price,
+          quantity: i.quantity || 1,
+        };
+      });
+    }
+
+    const expanded = await expandPromoCategories(promo.categories || []);
+    const result = promo.computeItemDiscount(
+      promoItems,
+      Number(subtotal) || 0,
+      expanded
+    );
 
     if (!result.valid) {
+      const messages = {
+        inactive: 'This promo code is not active',
+        'min-order': 'Order does not meet the minimum amount',
+        'no-category':
+          'This promo code only applies to specific categories in your cart',
+      };
       return res.status(400).json({
         success: false,
-        message: 'This promo code cannot be applied',
+        message:
+          result.reason === 'no-category'
+            ? `This promo code is only valid for: ${(
+                promo.categories || []
+              )
+                .map((c) => String(c).trim())
+                .filter(Boolean)
+                .join(', ') || 'specific categories'}`
+            : messages[result.reason] || 'This promo code cannot be applied',
         reason: result.reason,
+        categories: promo.categories || [],
       });
     }
 
@@ -36,8 +82,10 @@ export const validatePromo = async (req, res) => {
         value: promo.value,
         description: promo.description,
         minOrder: promo.minOrder,
+        categories: promo.categories || [],
       },
       discount: result.discount,
+      matchingSubtotal: result.matchingSubtotal,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -142,6 +190,7 @@ export const createPromo = async (req, res) => {
       startDate,
       endDate,
       status,
+      categories,
     } = req.body;
 
     if (!code || !code.trim()) {
@@ -171,6 +220,7 @@ export const createPromo = async (req, res) => {
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       status: status || 'active',
+      categories: Array.isArray(categories) ? categories : [],
       createdBy: req.user._id,
     });
 
@@ -206,6 +256,7 @@ export const updatePromo = async (req, res) => {
       startDate,
       endDate,
       status,
+      categories,
     } = req.body;
 
     if (code !== undefined && code.trim()) {
@@ -246,6 +297,9 @@ export const updatePromo = async (req, res) => {
     }
     if (status) {
       promo.status = status;
+    }
+    if (categories !== undefined) {
+      promo.categories = Array.isArray(categories) ? categories : [];
     }
 
     await promo.save();

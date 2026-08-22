@@ -1,9 +1,16 @@
 import Category from '../models/Category.js';
 import { cloudinary } from '../middleware/upload.js';
+import { cacheGet, cacheSet, cacheDel } from '../config/redis.js';
 
 export const getAllCategories = async (req, res) => {
   try {
+    const cacheKey = 'categories:all';
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const categories = await Category.find().sort({ sortOrder: 1, name: 1 });
+    await cacheSet(cacheKey, JSON.stringify({ success: true, categories }), 600);
     res.json({ success: true, categories });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -45,6 +52,7 @@ export const createCategory = async (req, res) => {
     });
 
     await category.save();
+    await cacheDel('categories:*');
     res.status(201).json({ success: true, category });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -102,6 +110,7 @@ export const updateCategory = async (req, res) => {
     }
 
     await category.save();
+    await cacheDel('categories:*');
     res.json({ success: true, category });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -133,6 +142,7 @@ export const deleteCategory = async (req, res) => {
 
     await Category.deleteMany({ parentId: category._id });
     await category.deleteOne();
+    await cacheDel('categories:*');
     res.json({ success: true, message: 'Category deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -154,6 +164,7 @@ export const reorderCategories = async (req, res) => {
     }));
 
     await Category.bulkWrite(ops);
+    await cacheDel('categories:*');
     res.json({ success: true, message: 'Categories reordered' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

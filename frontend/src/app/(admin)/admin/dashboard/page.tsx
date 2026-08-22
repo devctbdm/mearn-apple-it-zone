@@ -39,6 +39,7 @@ import {
   ShoppingCart,
   Users,
   Package,
+  MessageSquare,
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
@@ -46,28 +47,37 @@ import Link from 'next/link';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   dashboardApi,
+  smsApi,
   type DashboardStats,
   type Order,
   type OrderStatus,
 } from '@/lib/api';
 
 import { TrendingUp } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
+} from '@/components/ui/chart';
+import { SiteHeader } from '@/components/site-header';
 
-export const description = "A bar chart with a custom label"
+export const description = 'A bar chart with a custom label';
 
 const chartConfig = {
   value: {
-    label: "Sales",
-    color: "var(--chart-2)",
+    label: 'Sales',
+    color: 'var(--chart-2)',
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 // --- Helpers ---
 const formatTaka = (n: number) =>
@@ -107,8 +117,6 @@ function StatCardSkeleton() {
   );
 }
 
-
-
 function TableSkeleton() {
   return (
     <div className="space-y-3">
@@ -131,12 +139,14 @@ function TableSkeleton() {
 
 function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const variants: Record<OrderStatus, string> = {
+    pending:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
     processing:
       'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-    shipped:
-      'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800',
-    delivered:
+    confirmed:
       'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
+    send_courier:
+      'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800',
     cancelled:
       'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
   };
@@ -167,10 +177,7 @@ export function ChartBarLabelCustom({
         <CardDescription>Total sales for {year} (Jan - Dec)</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-100"
-        >
+        <ChartContainer config={chartConfig} className="aspect-auto h-100">
           <BarChart
             accessibilityLayer
             data={data}
@@ -279,6 +286,7 @@ function StatCard({
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [smsBalance, setSmsBalance] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const isMobile = useIsMobile();
@@ -293,6 +301,16 @@ export default function AdminDashboardPage() {
         // leave stats null; UI shows empty states
       } finally {
         if (mounted) setLoading(false);
+      }
+    })();
+    (async () => {
+      try {
+        const { data } = await smsApi.getBalance();
+        if (mounted && data.success) {
+          setSmsBalance(data.balance ?? null);
+        }
+      } catch {
+        // SMS not configured; balance card shows '—'
       }
     })();
     return () => {
@@ -330,7 +348,7 @@ export default function AdminDashboardPage() {
         {
           title: 'Orders',
           value: stats.orders.toLocaleString(),
-          change: `${stats.ordersByStatus.processing} processing · ${stats.ordersByStatus.delivered} delivered`,
+          change: `${stats.ordersByStatus.pending} pending · ${stats.ordersByStatus.processing} processing · ${stats.ordersByStatus.confirmed} confirmed · ${stats.ordersByStatus.send_courier} sent`,
           trend: 'flat' as const,
           icon: <ShoppingCart className="h-4 w-4" />,
           color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',
@@ -351,6 +369,14 @@ export default function AdminDashboardPage() {
           icon: <Package className="h-4 w-4" />,
           color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
         },
+        {
+          title: 'SMS Balance',
+          value: smsBalance != null ? formatTaka(smsBalance) : '—',
+          change: 'bulksmsbd.net credit',
+          trend: 'flat' as const,
+          icon: <MessageSquare className="h-4 w-4" />,
+          color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/30',
+        },
       ]
     : [];
 
@@ -366,7 +392,10 @@ export default function AdminDashboardPage() {
   const recentOrders = stats?.recentOrders || [];
 
   return (
+    <>
+    <SiteHeader />
     <div className="flex-1 space-y-6 p-8 pt-6">
+      
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -378,9 +407,9 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 5 }).map((_, i) => (
               <StatCardSkeleton key={i} />
             ))
           : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
@@ -743,5 +772,6 @@ export default function AdminDashboardPage() {
         </DrawerContent>
       </Drawer>
     </div>
+    </>
   );
 }

@@ -1,17 +1,22 @@
-// src/app/(store)/checkout/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   AlertCircle,
-  Banknote,
+  Check,
   CheckCircle2,
+  Copy,
   CreditCard,
+  FileText,
   MapPin,
+  Package,
   ShieldCheck,
+  ShoppingBag,
   Smartphone,
+  Sparkles,
   Tag,
   Truck,
   Wallet,
@@ -52,6 +57,12 @@ const DELIVERY_METHODS = [
 const GATEWAY_ICONS: Record<string, typeof CreditCard> = {
   sslcommerz: CreditCard,
   bkash: Smartphone,
+};
+
+const listSpring = {
+  type: 'spring' as const,
+  stiffness: 220,
+  damping: 28,
 };
 
 type DeliveryValue = (typeof DELIVERY_METHODS)[number]['value'];
@@ -145,7 +156,11 @@ const CheckoutContent = () => {
     setCouponLoading(true);
     setOrderError('');
     try {
-      const { data } = await promoApi.validate(code, subtotal);
+      const { data } = await promoApi.validate(
+        code,
+        subtotal,
+        items.map((i) => ({ product: i.productId, quantity: i.quantity }))
+      );
       setAppliedCoupon({
         code: data.promo.code || code,
         discount: data.discount,
@@ -167,7 +182,15 @@ const CheckoutContent = () => {
         );
       }
     } catch (e: any) {
-      showToast(e?.response?.data?.message || 'Invalid coupon code', 'error');
+      const data = e?.response?.data;
+      if (data?.reason === 'no-category' && data?.categories?.length) {
+        showToast(
+          `This code is only valid for: ${data.categories.join(', ')}`,
+          'error'
+        );
+      } else {
+        showToast(data?.message || 'Invalid coupon code', 'error');
+      }
     } finally {
       setCouponLoading(false);
     }
@@ -190,22 +213,62 @@ const CheckoutContent = () => {
 
     setPlacing(true);
     try {
-      const { data } = await orderApi.create({
-        items: items.map((i) => ({
-          product: i.productId,
-          quantity: i.quantity,
-        })),
-        shippingAddress: {
-          street: selectedAddress.street,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          postcode: selectedAddress.postcode,
-          country: selectedAddress.country,
-        },
-        paymentMethod,
-        note: notes,
-        couponCode: appliedCoupon?.code,
-      });
+      // For online payments, reuse an order left in "pending/failed" from a
+      // previous attempt instead of creating a duplicate. We track it in
+      // sessionStorage so any re-entry (Try again, Back to cart → checkout)
+      // re-pays the SAME order.
+      const PENDING_KEY = 'aiz_pending_order';
+      let orderId: string | null = null;
+
+      if (paymentMethod === 'sslcommerz') {
+        const pendingId =
+          typeof window !== 'undefined'
+            ? sessionStorage.getItem(PENDING_KEY)
+            : null;
+        if (pendingId) {
+          try {
+            const existing = await orderApi.getById(pendingId);
+            const o = existing.data.order;
+            const retryable =
+              o &&
+              o.payment?.status !== 'paid' &&
+              !['cancelled'].includes(o.orderStatus);
+            if (retryable) {
+              orderId = o._id;
+            } else {
+              sessionStorage.removeItem(PENDING_KEY);
+            }
+          } catch {
+            sessionStorage.removeItem(PENDING_KEY);
+          }
+        }
+      }
+
+      // Create a new order only when we don't already have a reusable one.
+      if (!orderId) {
+        const { data } = await orderApi.create({
+          items: items.map((i) => ({
+            product: i.productId,
+            quantity: i.quantity,
+          })),
+          shippingAddress: {
+            fullName: selectedAddress.fullName || user.name,
+            phone: selectedAddress.phone || user.phone,
+            street: selectedAddress.street,
+            city: selectedAddress.city,
+            state: selectedAddress.state,
+            postcode: selectedAddress.postcode,
+            country: selectedAddress.country,
+          },
+          paymentMethod,
+          note: notes,
+          couponCode: appliedCoupon?.code,
+        });
+        orderId = data.order._id;
+        if (paymentMethod === 'sslcommerz' && typeof window !== 'undefined') {
+          sessionStorage.setItem(PENDING_KEY, orderId);
+        }
+      }
 
       // SSLCommerz online payment: redirect to the payment gateway page.
       if (paymentMethod === 'sslcommerz') {
@@ -220,12 +283,14 @@ const CheckoutContent = () => {
         };
         try {
           const payRes = await paymentApi.initiate({
-            orderId: data.order._id,
+            orderId,
             amount: grandTotal,
             customer,
           });
           if (payRes.data.success && payRes.data.gatewayUrl) {
-            await clearCart();
+            // Do NOT clear the cart here — if the payment fails the customer
+            // needs the items back (the /payment/fail "Try again" flow). The
+            // cart is cleared on the /payment/success page after a real payment.
             setAppliedCoupon(null);
             window.location.href = payRes.data.gatewayUrl;
             return;
@@ -246,7 +311,7 @@ const CheckoutContent = () => {
 
       await clearCart();
       setAppliedCoupon(null);
-      setPlacedOrder(data.order._id);
+      setPlacedOrder(orderId);
       showToast('Order placed successfully!', 'success');
     } catch (e: any) {
       setOrderError(
@@ -258,42 +323,198 @@ const CheckoutContent = () => {
     }
   };
 
-  // ---- Success screen ----
+  const [copied, setCopied] = useState(false);
+
   if (placedOrder) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-          <CheckCircle2 size={56} className="mx-auto text-green-600" />
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">
-            Order Placed Successfully!
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Thank you for shopping with Apple IT Zone. Your order
-            <span className="mx-1 font-semibold text-gray-900">
-              #{placedOrder}
-            </span>
-            has been received and is being processed.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/accounts">
-              <Button fullWidth>View My Orders</Button>
-            </Link>
-            <Link href="/">
-              <Button variant="outline" fullWidth>
-                Continue Shopping
-              </Button>
-            </Link>
-          </div>
+  const copyOrderId = () => {
+    void navigator.clipboard.writeText(String(placedOrder));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+ 
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+      className="mx-auto max-w-7xl px-4 py-10"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={listSpring}
+        className="relative mx-auto max-w-xl overflow-hidden rounded-3xl border border-green-200 bg-white p-8 text-center shadow-xl shadow-green-900/5 sm:p-10"
+      >
+        {/* Decorative background glow */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="absolute top-1/2 left-1/2 aspect-square w-[140%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-green-100/70 blur-3xl"
+          />
         </div>
-      </div>
-    );
-  }
+ 
+        {/* Floating confirmation pill */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05, duration: 0.3 }}
+          className="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold tracking-wide text-green-700 uppercase"
+        >
+          <Sparkles size={12} />
+          Order confirmed
+        </motion.div>
+ 
+        {/* Animated check ring */}
+        <div className="relative mx-auto mb-6 h-24 w-24">
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 160, damping: 14, delay: 0.1 }}
+            className="flex h-24 w-24 items-center justify-center rounded-full bg-green-50"
+          >
+            <svg viewBox="0 0 52 52" className="h-14 w-14 text-green-600" fill="none">
+              <motion.circle
+                cx="26"
+                cy="26"
+                r="24"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
+              />
+              <motion.path
+                d="M16 27 L23 34 L37 19"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ delay: 0.45, duration: 0.5, ease: 'easeOut' }}
+              />
+            </svg>
+          </motion.div>
+ 
+          <motion.div
+            className="absolute inset-0 -m-2 rounded-full border-2 border-green-300"
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: [0, 1, 0], scale: [0.7, 1.15, 1.3] }}
+            transition={{ duration: 1.1, ease: 'easeOut', delay: 0.2 }}
+          />
+        </div>
+ 
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.3 }}
+          className="text-2xl font-bold text-gray-900 sm:text-3xl"
+        >
+          Order Placed Successfully!
+        </motion.h1>
+ 
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32, duration: 0.3 }}
+          className="mx-auto mt-2 max-w-sm text-sm text-gray-600"
+        >
+          Thank you for shopping with Apple IT Zone. Your order has been
+          received and is being processed.
+        </motion.p>
+ 
+        {/* Order number row */}
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.3 }}
+          onClick={copyOrderId}
+          className="group mx-auto mt-5 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm font-medium text-gray-800 transition-colors hover:border-green-300 hover:bg-green-50"
+        >
+          Order #{placedOrder}
+          {copied ? (
+            <Check size={14} className="text-green-600" />
+          ) : (
+            <Copy size={14} className="text-gray-400 transition-colors group-hover:text-green-600" />
+          )}
+        </motion.button>
+ 
+        {/* Info strip */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.46, duration: 0.3 }}
+          className="mt-6 grid grid-cols-2 gap-3"
+        >
+          <div className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-100">
+              <Package size={16} className="text-green-700" />
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-500">Status</div>
+              <div className="text-sm font-semibold text-gray-900">Processing</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+              <Truck size={16} className="text-blue-700" />
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-500">Est. delivery</div>
+              <div className="text-sm font-semibold text-gray-900">2–4 days</div>
+            </div>
+          </div>
+        </motion.div>
+ 
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.52, duration: 0.3 }}
+          className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center"
+        >
+          <Link href="/accounts">
+            <Button fullWidth>
+              <span className="flex items-center justify-center gap-2">
+                <FileText size={16} />
+                View My Orders
+              </span>
+            </Button>
+          </Link>
+          <Link href="/">
+            <Button variant="outline" fullWidth>
+              <span className="flex items-center justify-center gap-2">
+                <ShoppingBag size={16} />
+                Continue Shopping
+              </span>
+            </Button>
+          </Link>
+        </motion.div>
+ 
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.3 }}
+          className="mt-5 text-xs text-gray-400"
+        >
+          A confirmation email with your invoice has been sent to your inbox.
+        </motion.p>
+      </motion.div>
+    </motion.div>
+  );
+}
 
   // ---- Auth still loading ----
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          className="h-10 w-10 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"
+        />
       </div>
     );
   }
@@ -301,15 +522,44 @@ const CheckoutContent = () => {
   // ---- Not logged in ----
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <AlertCircle size={48} className="mx-auto text-amber-500" />
-          <h1 className="mt-4 text-xl font-bold text-gray-900">Checkout</h1>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35 }}
+        className="mx-auto max-w-7xl px-4 py-10"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={listSpring}
+          className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-8 text-center"
+        >
+          <motion.div
+            initial={{ scale: 0.5, rotate: -12 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="inline-block"
+          >
+            <AlertCircle size={48} className="text-amber-500" />
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.3 }}
+            className="mt-4 text-xl font-bold text-gray-900"
+          >
+            Checkout
+          </motion.h1>
           <p className="mt-2 text-sm text-gray-600">
             You need to be signed in to checkout. Your saved address and orders
             will be available in your account.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center"
+          >
             <Link href="/login">
               <Button fullWidth>Login</Button>
             </Link>
@@ -318,30 +568,51 @@ const CheckoutContent = () => {
                 Create Account
               </Button>
             </Link>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">Checkout</h1>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+      className="mx-auto max-w-7xl px-4 py-8"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+      >
+        <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
+          Checkout
+        </h1>
+      </motion.div>
 
       {/* Company notice */}
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.35 }}
+        className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      >
         <ShieldCheck size={20} className="mt-0.5 shrink-0 text-amber-600" />
         <p className="text-sm text-amber-800">
-          <span className="font-semibold">Apple IT Zone</span> — if anything
-          goes wrong with your order, we may cancel it at any time. You will be
-          notified immediately and any payment will be refunded.
+          <span className="font-semibold">Apple IT Zone</span> — কারিগরি ত্রুটির কারণে পণ্যের মূল্য অসঙ্গতিপূর্ণ হলে, কর্তৃপক্ষ অর্ডার বাতিলের অধিকার সংরক্ষণ করে। অনুগ্রহ করে কাস্টমার সাপোর্ট এজেন্টের কনফার্মেশন ব্যতীত কোনো ধরনের পেমেন্ট প্রোসিড না করার অনুরোধ করা হচ্ছে ।
         </p>
-      </div>
+      </motion.div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ---------- Left: Address + Special requirements ---------- */}
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-center gap-2">
               <MapPin size={18} className="text-blue-600" />
               <h2 className="text-lg font-bold text-gray-900">
@@ -355,7 +626,12 @@ const CheckoutContent = () => {
                 <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
               </div>
             ) : addresses.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={listSpring}
+                className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center"
+              >
                 <MapPin size={32} className="mx-auto text-gray-300" />
                 <p className="mt-3 text-sm font-medium text-gray-700">
                   Please update your profile and fill up your address.
@@ -366,14 +642,19 @@ const CheckoutContent = () => {
                 <Link href="/accounts" className="mt-4 inline-block">
                   <Button size="sm">Go to Profile</Button>
                 </Link>
-              </div>
+              </motion.div>
             ) : (
               <>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {addresses.map((a) => (
-                    <button
+                  {addresses.map((a, index) => (
+                    <motion.button
                       key={a._id}
                       type="button"
+                      layout
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...listSpring, delay: 0.1 + index * 0.07 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => setSelectedAddressId(a._id)}
                       className={`rounded-xl border p-4 text-left transition ${
                         selectedAddress?._id === a._id
@@ -402,7 +683,7 @@ const CheckoutContent = () => {
                         </p>
                         <p>{a.country}</p>
                       </div>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
                 <Link
@@ -413,10 +694,15 @@ const CheckoutContent = () => {
                 </Link>
               </>
             )}
-          </div>
+          </motion.div>
 
           {/* Special requirements */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-center gap-2">
               <Tag size={18} className="text-blue-600" />
               <h2 className="text-lg font-bold text-gray-900">
@@ -433,12 +719,17 @@ const CheckoutContent = () => {
               className="mt-3"
               placeholder="e.g. Deliver after 6 PM, gift wrapping, call before delivery..."
             />
-          </div>
+          </motion.div>
         </div>
 
         {/* ---------- Right: Order Summary ---------- */}
         <div className="space-y-6 lg:col-span-1">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-4">
+          <motion.div
+            initial={{ opacity: 0, x: 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.12, ...listSpring }}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-4"
+          >
             <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
 
             {/* Coupon */}
@@ -446,48 +737,68 @@ const CheckoutContent = () => {
               <Label className="text-sm font-medium text-gray-700">
                 Coupon code
               </Label>
-              {appliedCoupon ? (
-                <div className="mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-semibold text-green-700">
-                      {appliedCoupon.code}
-                    </p>
-                    {appliedCoupon.description && (
-                      <p className="text-xs text-green-600">
-                        {appliedCoupon.description}
+              <AnimatePresence initial={false} mode="popLayout">
+                {appliedCoupon ? (
+                  <motion.div
+                    key="applied"
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={listSpring}
+                    className="mt-2 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2.5"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-green-700">
+                        {appliedCoupon.code}
                       </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAppliedCoupon(null);
-                      showToast('Coupon removed', 'info');
-                    }}
-                    className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                      {appliedCoupon.description && (
+                        <p className="text-xs text-green-600">
+                          {appliedCoupon.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        showToast('Coupon removed', 'info');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                    >
+                      <XCircle size={14} /> Remove
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="input"
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={listSpring}
+                    className="mt-2 flex gap-2"
                   >
-                    <XCircle size={14} /> Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={couponInput}
-                    onChange={(e) => setCouponInput(e.target.value)}
-                    placeholder="Enter coupon code"
-                    className="flex-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                  />
-                  <Button
-                    variant="outline"
-                    size="md"
-                    onClick={handleApplyCoupon}
-                    disabled={couponLoading || !couponInput.trim()}
-                  >
-                    {couponLoading ? '...' : 'Apply'}
-                  </Button>
-                </div>
-              )}
+                    <Input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value)}
+                      placeholder="Enter coupon code"
+                      className="flex-1"
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && handleApplyCoupon()
+                      }
+                    />
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Sub-total */}
@@ -500,26 +811,46 @@ const CheckoutContent = () => {
                   ৳{subtotal.toLocaleString()}
                 </span>
               </div>
-              {couponDiscount > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Coupon ({appliedCoupon?.code})
-                  </span>
-                  <span className="font-semibold text-green-600">
-                    -৳{couponDiscount.toLocaleString()}
-                  </span>
-                </div>
-              )}
-              {appliedCoupon?.type === 'free_shipping' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">
-                    Coupon ({appliedCoupon.code})
-                  </span>
-                  <span className="font-semibold text-green-600">
-                    Free shipping
-                  </span>
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {couponDiscount > 0 && (
+                  <motion.div
+                    key="discount"
+                    initial={{ opacity: 0, height: 0, y: -4 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">
+                        Coupon ({appliedCoupon?.code})
+                      </span>
+                      <span className="font-semibold text-green-600">
+                        -৳{couponDiscount.toLocaleString()}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+                {appliedCoupon?.type === 'free_shipping' && (
+                  <motion.div
+                    key="free-shipping"
+                    initial={{ opacity: 0, height: 0, y: -4 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">
+                        Coupon ({appliedCoupon.code})
+                      </span>
+                      <span className="font-semibold text-green-600">
+                        Free shipping
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Delivery fee</span>
                 <span className="font-medium text-gray-900">
@@ -536,12 +867,16 @@ const CheckoutContent = () => {
                 Delivery method
               </Label>
               <div className="mt-2 space-y-2">
-                {DELIVERY_METHODS.map((d) => {
+                {DELIVERY_METHODS.map((d, index) => {
                   const active = deliveryMethod === d.value;
                   return (
-                    <button
+                    <motion.button
                       key={d.value}
                       type="button"
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ ...listSpring, delay: 0.24 + index * 0.06 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setDeliveryMethod(d.value)}
                       className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
                         active
@@ -564,7 +899,7 @@ const CheckoutContent = () => {
                       <span className="text-sm font-semibold text-gray-900">
                         {d.cost === 0 ? 'Free' : `৳${d.cost}`}
                       </span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -573,9 +908,18 @@ const CheckoutContent = () => {
             {/* Total */}
             <div className="mt-5 flex items-center justify-between border-t border-gray-200 pt-4">
               <span className="font-semibold text-gray-900">Total</span>
-              <span className="text-xl font-bold text-gray-900">
-                ৳{grandTotal.toLocaleString()}
-              </span>
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={grandTotal}
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                  transition={listSpring}
+                  className="text-xl font-bold text-gray-900"
+                >
+                  ৳{grandTotal.toLocaleString()}
+                </motion.span>
+              </AnimatePresence>
             </div>
 
             {/* Terms */}
@@ -611,42 +955,61 @@ const CheckoutContent = () => {
               </span>
             </label>
 
-            {orderError && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                {orderError}
-              </p>
-            )}
+            <AnimatePresence>
+              {orderError && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0, y: -4 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  className="mt-3 overflow-hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
+                >
+                  {orderError}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
-            <Button
-              fullWidth
-              size="lg"
-              className="mt-4"
-              loading={placing}
-              onClick={handlePlaceOrder}
-              disabled={items.length === 0}
-            >
-              Confirm Order
-            </Button>
-          </div>
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                fullWidth
+                size="lg"
+                className="mt-4"
+                loading={placing}
+                onClick={handlePlaceOrder}
+                disabled={items.length === 0}
+              >
+                Confirm Order
+              </Button>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
 
       {/* ---------- Bottom: Payment + Delivery ---------- */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, ...listSpring }}
+          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2"
+        >
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-blue-600" />
             <h2 className="text-lg font-bold text-gray-900">Payment Method</h2>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {gateways.map((p) => {
+            {gateways.map((p, index) => {
               const value = p.name.toLowerCase();
               const active = paymentMethod === value;
               const Icon = GATEWAY_ICONS[value] || Wallet;
               return (
-                <button
+                <motion.button
                   key={p.name}
                   type="button"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...listSpring, delay: 0.16 + index * 0.06 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setPaymentMethod(value)}
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                     active
@@ -668,7 +1031,7 @@ const CheckoutContent = () => {
                       </span>
                     )}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
             {gateways.length === 0 && (
@@ -696,10 +1059,15 @@ const CheckoutContent = () => {
                 : `৳${deliveryCost.toLocaleString()}`}
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* ---------- Bottom: Selected products ---------- */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-1">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.16, ...listSpring }}
+          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-1"
+        >
           <h2 className="text-lg font-bold text-gray-900">
             Selected Products ({totalItems})
           </h2>
@@ -715,35 +1083,45 @@ const CheckoutContent = () => {
             </p>
           ) : (
             <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
-              {items.map((item) => (
-                <div key={item.productId} className="flex items-center gap-3">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                    <Image
-                      src={item.image || '/placeholder-image.png'}
-                      alt={item.name}
-                      fill
-                      className="object-contain"
-                      sizes="56px"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-medium text-gray-900">
-                      {item.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      ৳{item.price.toLocaleString()} × {item.quantity}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    ৳{(item.price * item.quantity).toLocaleString()}
-                  </span>
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {items.map((item, index) => (
+                  <motion.div
+                    key={item.productId}
+                    layout
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ ...listSpring, delay: 0.06 * index }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      <Image
+                        src={item.image || '/placeholder-image.png'}
+                        alt={item.name}
+                        fill
+                        className="object-contain"
+                        sizes="56px"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-medium text-gray-900">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ৳{item.price.toLocaleString()} × {item.quantity}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">
+                      ৳{(item.price * item.quantity).toLocaleString()}
+                    </span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

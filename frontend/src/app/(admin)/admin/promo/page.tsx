@@ -70,11 +70,15 @@ import {
 } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
+import { Switch } from "@/components/ui/switch";
+import { CategoryMultiSelect } from "@/components/admin/products/CategoryMultiSelect";
 import {
   promoApi,
+  categoryApi,
   type PromoCode,
   type PromoStats,
   type PromoFormData,
+  type Category,
 } from "@/lib/api";
 
 const statusBadge: Record<string, string> = {
@@ -102,6 +106,8 @@ type PromoFormState = {
   startDate: string;
   endDate: string;
   status: "active" | "inactive";
+  categories: string[];
+  applyToAll: boolean;
 };
 
 const emptyForm: PromoFormState = {
@@ -116,6 +122,8 @@ const emptyForm: PromoFormState = {
   startDate: "",
   endDate: "",
   status: "active",
+  categories: [],
+  applyToAll: true,
 };
 
 function toLocalInput(d: string | null) {
@@ -164,6 +172,7 @@ export default function PromoPage() {
   const [saving, setSaving] = useState(false);
   const [viewPromo, setViewPromo] = useState<PromoCode | null>(null);
   const [deletePromo, setDeletePromo] = useState<PromoCode | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const fetchPromos = useCallback(async () => {
     try {
@@ -204,6 +213,17 @@ export default function PromoPage() {
     fetchStats();
   }, [fetchStats]);
 
+  useEffect(() => {
+    categoryApi
+      .getAll()
+      .then(({ data }) => {
+        if (data.success) {
+          setCategories(data.categories);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
@@ -212,6 +232,7 @@ export default function PromoPage() {
 
   const openEdit = (p: PromoCode) => {
     setEditing(p);
+    const cats = (p.categories || []).map(String);
     setForm({
       code: p.code,
       description: p.description,
@@ -224,6 +245,8 @@ export default function PromoPage() {
       startDate: toLocalInput(p.startDate),
       endDate: toLocalInput(p.endDate),
       status: p.status,
+      categories: cats,
+      applyToAll: cats.length === 0,
     });
     setDialogOpen(true);
   };
@@ -241,6 +264,7 @@ export default function PromoPage() {
       startDate: form.startDate ? new Date(form.startDate).toISOString() : null,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
       status: form.status,
+      categories: form.applyToAll ? [] : form.categories,
     };
 
     if (!payload.code) {
@@ -622,6 +646,38 @@ export default function PromoPage() {
                 rows={2}
               />
             </div>
+
+            {/* Category scope */}
+            <div className="grid gap-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-2">Applies to all categories</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When on, this promo works on every product. Turn off to limit it
+                    to specific categories.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.applyToAll}
+                  onCheckedChange={(v) => setForm({ ...form, applyToAll: v })}
+                />
+              </div>
+
+              {!form.applyToAll && (
+                <div className="space-y-1.5">
+                  <Label>Restrict to categories</Label>
+                  <CategoryMultiSelect
+                    categories={categories}
+                    value={form.categories}
+                    onChange={(cats) => setForm({ ...form, categories: cats })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The discount applies only to items in the selected categories.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label>Discount type</Label>
@@ -767,6 +823,22 @@ export default function PromoPage() {
                 <div className="font-medium">Description</div>
                 <div className="text-muted-foreground">
                   {viewPromo.description || "—"}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium">Applies to</div>
+                <div className="text-muted-foreground">
+                  {(viewPromo.categories || []).length === 0 ? (
+                    "All categories"
+                  ) : (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(viewPromo.categories || []).map((c) => (
+                        <Badge key={c} variant="outline">
+                          {c}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

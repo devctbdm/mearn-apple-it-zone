@@ -36,6 +36,8 @@ const orderSchema = new mongoose.Schema(
     },
     items: [orderItemSchema],
     shippingAddress: {
+      fullName: { type: String, default: '' },
+      phone: { type: String, default: '' },
       street: { type: String, required: true },
       city: { type: String, required: true },
       state: { type: String, required: true },
@@ -70,13 +72,37 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['processing', 'shipped', 'delivered', 'cancelled'],
-      default: 'processing',
+      enum: ['pending', 'processing', 'confirmed', 'send_courier', 'cancelled'],
+      default: 'pending',
     },
     note: {
       type: String,
       trim: true,
       maxlength: [500, 'Note cannot exceed 500 characters'],
+    },
+    // Human-friendly sequential order number, e.g. #1, #2 (auto-generated).
+    orderNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    // Advance confirmation payment collected to verify genuine COD orders.
+    // Operator sets `advanceAmount`; customer pays it online; `advancePaid`
+    // is recorded (via gateway IPN) and deducted from the amount due on delivery.
+    advanceAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Advance amount cannot be negative'],
+    },
+    advancePaid: {
+      type: Number,
+      default: 0,
+      min: [0, 'Advance paid cannot be negative'],
+    },
+    advanceReference: {
+      type: String,
+      default: '',
     },
   },
   {

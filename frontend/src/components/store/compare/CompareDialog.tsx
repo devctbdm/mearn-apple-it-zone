@@ -3,6 +3,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Scale, X } from 'lucide-react';
 import { useCompare } from '@/store';
 import {
@@ -20,6 +21,12 @@ interface CompareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const listSpring = {
+  type: 'spring' as const,
+  stiffness: 260,
+  damping: 26,
+};
 
 export const CompareDialog = ({
   open,
@@ -42,26 +49,53 @@ export const CompareDialog = ({
 
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {compareItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <Scale size={44} className="text-muted-foreground/40" />
-              <p className="mt-4 text-sm font-medium text-foreground">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={listSpring}
+              className="flex flex-col items-center justify-center py-10 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.5, rotate: -10 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              >
+                <Scale size={44} className="text-muted-foreground/40" />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+                className="mt-4 text-sm font-medium text-foreground"
+              >
                 No products to compare yet
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.16, duration: 0.3 }}
+                className="mt-1 text-sm text-muted-foreground"
+              >
                 Use the Compare button on any product card to add items here.
-              </p>
-            </div>
+              </motion.p>
+            </motion.div>
           ) : (
-            compareItems.map((item) => {
-              const price =
-                item.discountPrice > 0 && item.discountPrice < item.price
-                  ? item.discountPrice
-                  : item.price;
-              return (
-                <div
-                  key={item._id}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
-                >
+            <AnimatePresence mode="popLayout">
+              {compareItems.map((item, index) => {
+                const price =
+                  item.discountPrice > 0 && item.discountPrice < item.price
+                    ? item.discountPrice
+                    : item.price;
+                return (
+                  <motion.div
+                    key={item._id}
+                    layout
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 40, scale: 0.95 }}
+                    transition={{ ...listSpring, delay: index * 0.05 }}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
+                  >
                   <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
                     <Image
                       src={item.image || '/placeholder-image.png'}
@@ -83,41 +117,51 @@ export const CompareDialog = ({
                       ৳{price.toLocaleString()}
                     </p>
                   </div>
-                  <button
+                  <motion.button
                     type="button"
+                    whileTap={{ scale: 0.8, rotate: -12 }}
                     onClick={() => removeFromCompare(item._id)}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-red-50 hover:text-red-600"
                     aria-label={`Remove ${item.name} from comparison`}
                   >
                     <X size={16} />
-                  </button>
-                </div>
+                  </motion.button>
+                </motion.div>
               );
-            })
+              })}
+            </AnimatePresence>
           )}
         </div>
 
         <DialogFooter>
           {compareItems.length > 0 && (
             <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={clearCompare}
-                className="text-muted-foreground"
-              >
-                Clear all
-              </Button>
-              <Link
-                href="/product/compare"
-                onClick={() => onOpenChange(false)}
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={clearCompare}
+                  className="text-muted-foreground"
+                >
+                  Clear all
+                </Button>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 className="sm:flex-1"
               >
-                <Button className="w-full" size="lg">
-                  View Comparison
-                  <ArrowRight className="ml-2" size={16} />
-                </Button>
-              </Link>
+                <Link
+                  href="/product/compare"
+                  onClick={() => onOpenChange(false)}
+                  className="w-full"
+                >
+                  <Button className="w-full" size="lg">
+                    View Comparison
+                    <ArrowRight className="ml-2" size={16} />
+                  </Button>
+                </Link>
+              </motion.div>
             </>
           )}
         </DialogFooter>

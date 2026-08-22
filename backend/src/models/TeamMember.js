@@ -13,6 +13,12 @@ const teamMemberSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
     lastLogin: { type: Date },
     password: { type: String, select: false },
+    phone: { type: String, trim: true },
+    twoFactorOtp: String,
+    twoFactorOtpExpire: Date,
+    twoFactorAttempts: { type: Number, default: 0 },
+    loginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
   },
   { timestamps: true }
 );

@@ -1,14 +1,133 @@
 // backend/src/controllers/authController.js
 
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import TeamMember from '../models/TeamMember.js';
 import Session from '../models/Session.js';
 import { parseUserAgent } from '../utils/parseUA.js';
+import { getSmsSetting } from '../models/SmsSetting.js';
+import { sendPasswordResetOtp, sendLoginOtp } from '../services/smsService.js';
 
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Record a login session, safe to call even if it fails
+const recordSession = async (userId, req) => {
+  try {
+    await Session.updateMany({ user: userId }, { isCurrent: false });
+    const ua = parseUserAgent(req.headers['user-agent'] || '');
+    await Session.create({
+      user: userId,
+      device: ua.device,
+      browser: ua.browser,
+      os: ua.os,
+      ip: req.ip || req.connection?.remoteAddress || '',
+      lastActive: new Date(),
+      isCurrent: true,
+    });
+  } catch {
+    // non-blocking
+  }
+};
+
+// Shape the user object returned to the client
+const publicUser = (u, isTeam = false) => ({
+  id: u._id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  phone: isTeam ? '' : u.phone,
+  address: isTeam ? {} : u.address,
+  isTeam,
+  active: u.active,
+});
+
+const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
+
+const phoneRegex = (phone) => {
+  const digits = String(phone).replace(/[^\d]/g, '');
+  return new RegExp(`${digits.slice(-10)}$`);
+};
+
+// ---- Brute-force protection: per-account lockout ----
+const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
+const LOCK_MINUTES = Number(process.env.LOCK_TIME_MINUTES) || 15;
+
+const isLocked = (account) =>
+  !!account.lockUntil && account.lockUntil > new Date();
+
+const lockMinutesRemaining = (account) =>
+  Math.max(1, Math.ceil((account.lockUntil - Date.now()) / 60000));
+
+// Count a wrong password; lock the account after MAX_LOGIN_ATTEMPTS failures
+const registerFailedLogin = async (account) => {
+  account.loginAttempts = (account.loginAttempts || 0) + 1;
+  if (account.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+    account.lockUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
+    account.loginAttempts = 0;
+  }
+  await account.save();
+};
+
+// A correct password resets the failure counters
+const clearLoginAttempts = async (account) => {
+  if (!account.loginAttempts && !account.lockUntil) return;
+  account.loginAttempts = 0;
+  account.lockUntil = undefined;
+  await account.save();
+};
+
+// Issue an SMS OTP challenge for a staff account and answer with pendingToken.
+// Works for both User and TeamMember accounts (`source` marks which collection).
+const startTwoFactorChallenge = async (req, res, account, source) => {
+  const smsSetting = await getSmsSetting();
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiry = Math.max(15, smsSetting.otpExpirySeconds || 60);
+  account.twoFactorOtp = hashOtp(otp);
+  account.twoFactorOtpExpire = Date.now() + expiry * 1000;
+  account.twoFactorAttempts = 0;
+  await account.save();
+
+  const result = await sendLoginOtp({
+    phone: account.phone,
+    otp,
+    expirySeconds: expiry,
+  });
+  if (result.skipped || !result.success) {
+    console.error(
+      'Login 2FA SMS failed:',
+      result.reason || result.log?.providerMessage
+    );
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(500).json({
+        success: false,
+        message:
+          'Could not send the verification code. SMS service is not configured or is unavailable.',
+      });
+    }
+    // Dev fallback: surface the OTP in the server console so the second
+    // factor can still be completed without a delivered SMS.
+    console.warn(
+      `[DEV 2FA] Verification code for ${account.phone || account.email}: ${otp}`
+    );
+  }
+
+  const pendingToken = jwt.sign(
+    { id: account._id.toString(), purpose: '2fa-login', source },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' }
+  );
+  return res.json({
+    success: false,
+    twoFactorRequired: true,
+    pendingToken,
+    expiresIn: expiry,
+    message: 'Enter the code sent to your phone',
+  });
 };
 
 // @desc    Register a new user
@@ -75,43 +194,40 @@ export const login = async (req, res) => {
     }).select('+password');
 
     if (user) {
+      // Brute-force guard: temporary lock after repeated failures
+      if (isLocked(user)) {
+        return res.status(429).json({
+          success: false,
+          message: `Account temporarily locked after too many failed attempts. Try again in ${lockMinutesRemaining(user)} minute(s).`,
+        });
+      }
+
       const isMatch = await user.comparePassword(password);
       if (!isMatch) {
+        await registerFailedLogin(user);
         return res.status(401).json({
           success: false,
           message: 'Invalid email/phone or password',
         });
       }
-      // Generate token
-      const token = generateToken(user._id);
-      // Record session
-      try {
-        await Session.updateMany({ user: user._id }, { isCurrent: false });
-        const ua = parseUserAgent(req.headers['user-agent'] || '');
-        await Session.create({
-          user: user._id,
-          device: ua.device,
-          browser: ua.browser,
-          os: ua.os,
-          ip: req.ip || req.connection?.remoteAddress || '',
-          lastActive: new Date(),
-          isCurrent: true,
-        });
-      } catch (e) {
-        // non-blocking
+      await clearLoginAttempts(user);
+
+      // Two-factor authentication for staff (admin/manager/super_admin)
+      const smsSetting = await getSmsSetting();
+      const isStaff =
+        user.role === 'admin' ||
+        user.role === 'super_admin' ||
+        user.role === 'manager';
+      if (isStaff && smsSetting.twoFactorEnabled) {
+        return startTwoFactorChallenge(req, res, user, 'user');
       }
+
+      const token = generateToken(user._id);
+      await recordSession(user._id, req);
       return res.json({
         success: true,
         token,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          phone: user.phone,
-          address: user.address,
-          isTeam: false,
-        },
+        user: publicUser(user, false),
       });
     }
 
@@ -129,12 +245,29 @@ export const login = async (req, res) => {
         message: 'This account is inactive. Contact an administrator.',
       });
     }
+
+    // Brute-force guard: temporary lock after repeated failures
+    if (isLocked(member)) {
+      return res.status(429).json({
+        success: false,
+        message: `Account temporarily locked after too many failed attempts. Try again in ${lockMinutesRemaining(member)} minute(s).`,
+      });
+    }
+
     const isMatch = await member.comparePassword(password);
     if (!isMatch) {
+      await registerFailedLogin(member);
       return res.status(401).json({
         success: false,
         message: 'Invalid email/phone or password',
       });
+    }
+    await clearLoginAttempts(member);
+
+    // Two-factor authentication for team members (same policy as staff Users)
+    const smsSetting = await getSmsSetting();
+    if (smsSetting.twoFactorEnabled) {
+      return startTwoFactorChallenge(req, res, member, 'team');
     }
 
     // Generate token
@@ -159,6 +292,121 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify the 2FA OTP and complete login (staff only)
+// @route   POST /api/auth/verify-otp
+// @access  Public
+export const verifyOtp = async (req, res) => {
+  try {
+    const { pendingToken, otp } = req.body;
+    if (!pendingToken || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token and OTP are required',
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(pendingToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        message: 'Verification session expired. Please log in again.',
+      });
+    }
+    if (decoded.purpose !== '2fa-login') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid verification token',
+      });
+    }
+
+    // The pending token records which collection authenticated (User vs TeamMember)
+    const isTeamAccount = decoded.source === 'team';
+    const account = isTeamAccount
+      ? await TeamMember.findById(decoded.id).select('+password')
+      : await User.findById(decoded.id).select('+password');
+    if (!account) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found. Please log in again.',
+      });
+    }
+
+    if (!account.twoFactorOtp || !account.twoFactorOtpExpire) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code was requested. Please log in again.',
+      });
+    }
+    if (account.twoFactorOtpExpire < Date.now()) {
+      account.twoFactorOtp = undefined;
+      account.twoFactorOtpExpire = undefined;
+      account.twoFactorAttempts = 0;
+      await account.save();
+      return res.status(400).json({
+        success: false,
+        message: 'Code has expired. Please log in again.',
+      });
+    }
+    if ((account.twoFactorAttempts || 0) >= 5) {
+      account.twoFactorOtp = undefined;
+      account.twoFactorOtpExpire = undefined;
+      account.twoFactorAttempts = 0;
+      await account.save();
+      return res.status(429).json({
+        success: false,
+        message: 'Too many attempts. Please log in again.',
+      });
+    }
+    if (account.twoFactorOtp !== hashOtp(otp)) {
+      account.twoFactorAttempts = (account.twoFactorAttempts || 0) + 1;
+      await account.save();
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid code. Please try again.',
+      });
+    }
+
+    // Success — clear OTP and complete login
+    account.twoFactorOtp = undefined;
+    account.twoFactorOtpExpire = undefined;
+    account.twoFactorAttempts = 0;
+
+    const token = generateToken(account._id);
+
+    if (isTeamAccount) {
+      account.lastLogin = new Date();
+      await account.save();
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: account._id,
+          name: account.name,
+          email: account.email,
+          role: account.role,
+          phone: '',
+          address: {},
+          isTeam: true,
+          active: account.active,
+        },
+      });
+    }
+
+    await account.save();
+    await recordSession(account._id, req);
+    return res.json({
+      success: true,
+      token,
+      user: publicUser(account, false),
+    });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -286,6 +534,93 @@ export const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Request a password reset OTP via SMS
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const user = await User.findOne({ phone: phoneRegex(phone) });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this phone number',
+      });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.resetPasswordToken = hashOtp(otp);
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    const result = await sendPasswordResetOtp({ phone: user.phone, otp });
+    if (result.skipped || !result.success) {
+      console.error('Forgot password SMS failed:', result.reason || result.log?.providerMessage);
+      return res.status(500).json({
+        success: false,
+        message: 'Could not send the code. SMS service is not configured or is unavailable.',
+      });
+    }
+
+    res.json({ success: true, message: 'OTP sent to your phone' });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reset password with the SMS OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  try {
+    const { phone, otp, newPassword } = req.body;
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'phone, otp and newPassword are required',
+      });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+    }
+
+    const user = await User.findOne({ phone: phoneRegex(phone) }).select('+password');
+    if (!user || !user.resetPasswordToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'No password reset was requested for this phone',
+      });
+    }
+    if (!user.resetPasswordExpire || user.resetPasswordExpire < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Request a new code.',
+      });
+    }
+    if (user.resetPasswordToken !== hashOtp(otp)) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get all saved addresses of logged-in user
 // @route   GET /api/auth/me/addresses
 // @access  Private
@@ -306,7 +641,17 @@ export const getAddresses = async (req, res) => {
 // @access  Private
 export const addAddress = async (req, res) => {
   try {
-    const { label, fullName, phone, street, city, state, postcode, country } = req.body;
+    const {
+      label,
+      fullName,
+      phone,
+      street,
+      city,
+      state,
+      postcode,
+      country,
+      deliveryArea,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -323,6 +668,7 @@ export const addAddress = async (req, res) => {
       state: state || '',
       postcode: postcode || '',
       country: country || 'Bangladesh',
+      deliveryArea: deliveryArea || '',
       isDefault: isFirst,
     });
 
@@ -339,7 +685,17 @@ export const addAddress = async (req, res) => {
 export const updateAddress = async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, fullName, phone, street, city, state, postcode, country } = req.body;
+    const {
+      label,
+      fullName,
+      phone,
+      street,
+      city,
+      state,
+      postcode,
+      country,
+      deliveryArea,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -359,6 +715,7 @@ export const updateAddress = async (req, res) => {
     if (state !== undefined) address.state = state;
     if (postcode !== undefined) address.postcode = postcode;
     if (country !== undefined) address.country = country;
+    if (deliveryArea !== undefined) address.deliveryArea = deliveryArea;
 
     await user.save();
     res.json({ success: true, addresses: user.addresses });
