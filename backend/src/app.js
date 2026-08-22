@@ -41,6 +41,30 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+// ------- Trust proxy (correct req.ip behind Nginx/Cloudflare/load balancer) -------
+// Without this, every visitor shares the proxy's IP -> rate limiters would lock
+// everyone out together and session logs would record the wrong IP.
+// TRUST_PROXY accepts:
+//   'false'            -> app is exposed directly (no proxy)
+//   '1' | number       -> number of trusted proxy hops (Nginx on same host = 1)
+//   'true'             -> trust all hops (only ok if the proxy overwrites XFF)
+//   'ip1,ip2'          -> explicit proxy IPs/CIDRs (e.g. your load balancer)
+// Default when unset: 1 (the typical single-Nginx setup).
+const trustProxyEnv = process.env.TRUST_PROXY;
+let trustProxySetting;
+if (trustProxyEnv === undefined || trustProxyEnv === '') {
+  trustProxySetting = 1;
+} else if (trustProxyEnv === 'true') {
+  trustProxySetting = true;
+} else if (trustProxyEnv === 'false') {
+  trustProxySetting = false;
+} else if (!Number.isNaN(Number(trustProxyEnv))) {
+  trustProxySetting = Number(trustProxyEnv);
+} else {
+  trustProxySetting = trustProxyEnv.split(',').map((s) => s.trim());
+}
+app.set('trust proxy', trustProxySetting);
+
 // Disable ETag so cached API responses don't come back as 304 (breaks axios validateStatus)
 app.set('etag', false);
 

@@ -123,3 +123,27 @@ export const getCustomerById = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Delete a customer (Super admin only)
+// @route   DELETE /api/customers/:id
+export const deleteCustomer = async (req, res) => {
+  try {
+    const customer = await User.findOne({ _id: req.params.id, role: 'customer' });
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    if (req.user._id.toString() === customer._id.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+    }
+
+    await customer.deleteOne();
+
+    res.json({
+      success: true,
+      message: `Customer "${customer.name}" deleted successfully`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

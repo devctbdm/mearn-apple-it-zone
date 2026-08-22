@@ -32,17 +32,6 @@ export const updateSettings = async (req, res) => {
   try {
     const { apiKey, senderId, signature, enabled, twoFactorEnabled, otpExpirySeconds } = req.body;
 
-    // Defense in depth: only a super admin may change 2FA settings.
-    const wantsTwoFactorChange =
-      typeof twoFactorEnabled === 'boolean' ||
-      typeof otpExpirySeconds === 'number';
-    if (wantsTwoFactorChange && req.user?.role !== 'super_admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Super admin access required to change two-factor settings',
-      });
-    }
-
     const setting = await getSmsSetting();
     const before = {
       twoFactorEnabled: !!setting.twoFactorEnabled,

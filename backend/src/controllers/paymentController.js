@@ -87,7 +87,7 @@ export const initiatePayment = async (req, res) => {
       success_url: `${process.env.FRONTEND_URL}/payment/success?tran_id=${tran_id}`,
       fail_url: `${process.env.FRONTEND_URL}/payment/fail?tran_id=${tran_id}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?tran_id=${tran_id}`,
-      ipn_url: `${process.env.BACKEND_URL || "http://localhost:5000"}/api/payment/ipn?tran_id=${tran_id}`,
+      ipn_url: `${process.env.BACKEND_URL}/api/payment/ipn?tran_id=${tran_id}`,
       productcategory: "General",
       product_name: isAdvance
         ? "Apple IT Zone Order (Advance)"

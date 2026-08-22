@@ -9,6 +9,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { offerApi, type Offer } from '@/lib/api';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { SiteHeader } from '@/components/site-header';
 
@@ -28,6 +38,7 @@ export default function AdminOffersPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Offer | null>(null);
 
   useEffect(() => {
     offerApi
@@ -39,17 +50,15 @@ export default function AdminOffersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleDelete(offer: Offer) {
-    if (
-      !window.confirm(`Delete offer "${offer.title}"? This cannot be undone.`)
-    )
-      return;
-    setDeletingId(offer._id);
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget._id);
     try {
-      const { data } = await offerApi.delete(offer._id);
+      const { data } = await offerApi.delete(deleteTarget._id);
       if (data.success) {
         toast.success('Offer deleted');
-        setOffers((prev) => prev.filter((o) => o._id !== offer._id));
+        setOffers((prev) => prev.filter((o) => o._id !== deleteTarget._id));
+        setDeleteTarget(null);
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to delete offer');
@@ -158,7 +167,7 @@ export default function AdminOffersPage() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDelete(offer)}
+                              onClick={() => setDeleteTarget(offer)}
                               disabled={deletingId === offer._id}
                             >
                               {deletingId === offer._id ? (
@@ -178,6 +187,36 @@ export default function AdminOffersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deletingId) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure to delete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete offer &quot;{deleteTarget?.title}&quot;? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!deletingId}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deletingId ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

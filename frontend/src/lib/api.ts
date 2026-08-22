@@ -226,6 +226,9 @@ export const customerApi = {
 
   getById: (id: string) =>
     api.get<{ success: boolean; customer: Customer }>(`/customers/${id}`),
+
+  remove: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/customers/${id}`),
 };
 
 export type TeamMember = {

@@ -53,6 +53,83 @@ const phoneRegex = (phone) => {
   return new RegExp(`${digits.slice(-10)}$`);
 };
 
+// ---- Brute-force protection: per-account lockout ----
+const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
+const LOCK_MINUTES = Number(process.env.LOCK_TIME_MINUTES) || 15;
+
+const isLocked = (account) =>
+  !!account.lockUntil && account.lockUntil > new Date();
+
+const lockMinutesRemaining = (account) =>
+  Math.max(1, Math.ceil((account.lockUntil - Date.now()) / 60000));
+
+// Count a wrong password; lock the account after MAX_LOGIN_ATTEMPTS failures
+const registerFailedLogin = async (account) => {
+  account.loginAttempts = (account.loginAttempts || 0) + 1;
+  if (account.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+    account.lockUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
+    account.loginAttempts = 0;
+  }
+  await account.save();
+};
+
+// A correct password resets the failure counters
+const clearLoginAttempts = async (account) => {
+  if (!account.loginAttempts && !account.lockUntil) return;
+  account.loginAttempts = 0;
+  account.lockUntil = undefined;
+  await account.save();
+};
+
+// Issue an SMS OTP challenge for a staff account and answer with pendingToken.
+// Works for both User and TeamMember accounts (`source` marks which collection).
+const startTwoFactorChallenge = async (req, res, account, source) => {
+  const smsSetting = await getSmsSetting();
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiry = Math.max(15, smsSetting.otpExpirySeconds || 60);
+  account.twoFactorOtp = hashOtp(otp);
+  account.twoFactorOtpExpire = Date.now() + expiry * 1000;
+  account.twoFactorAttempts = 0;
+  await account.save();
+
+  const result = await sendLoginOtp({
+    phone: account.phone,
+    otp,
+    expirySeconds: expiry,
+  });
+  if (result.skipped || !result.success) {
+    console.error(
+      'Login 2FA SMS failed:',
+      result.reason || result.log?.providerMessage
+    );
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(500).json({
+        success: false,
+        message:
+          'Could not send the verification code. SMS service is not configured or is unavailable.',
+      });
+    }
+    // Dev fallback: surface the OTP in the server console so the second
+    // factor can still be completed without a delivered SMS.
+    console.warn(
+      `[DEV 2FA] Verification code for ${account.phone || account.email}: ${otp}`
+    );
+  }
+
+  const pendingToken = jwt.sign(
+    { id: account._id.toString(), purpose: '2fa-login', source },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' }
+  );
+  return res.json({
+    success: false,
+    twoFactorRequired: true,
+    pendingToken,
+    expiresIn: expiry,
+    message: 'Enter the code sent to your phone',
+  });
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -117,13 +194,23 @@ export const login = async (req, res) => {
     }).select('+password');
 
     if (user) {
+      // Brute-force guard: temporary lock after repeated failures
+      if (isLocked(user)) {
+        return res.status(429).json({
+          success: false,
+          message: `Account temporarily locked after too many failed attempts. Try again in ${lockMinutesRemaining(user)} minute(s).`,
+        });
+      }
+
       const isMatch = await user.comparePassword(password);
       if (!isMatch) {
+        await registerFailedLogin(user);
         return res.status(401).json({
           success: false,
           message: 'Invalid email/phone or password',
         });
       }
+      await clearLoginAttempts(user);
 
       // Two-factor authentication for staff (admin/manager/super_admin)
       const smsSetting = await getSmsSetting();
@@ -132,49 +219,7 @@ export const login = async (req, res) => {
         user.role === 'super_admin' ||
         user.role === 'manager';
       if (isStaff && smsSetting.twoFactorEnabled) {
-        const otp = String(Math.floor(100000 + Math.random() * 900000));
-        const expiry = Math.max(15, smsSetting.otpExpirySeconds || 60);
-        user.twoFactorOtp = hashOtp(otp);
-        user.twoFactorOtpExpire = Date.now() + expiry * 1000;
-        user.twoFactorAttempts = 0;
-        await user.save();
-
-        const result = await sendLoginOtp({
-          phone: user.phone,
-          otp,
-          expirySeconds: expiry,
-        });
-        if (result.skipped || !result.success) {
-          console.error(
-            'Login 2FA SMS failed:',
-            result.reason || result.log?.providerMessage
-          );
-          if (process.env.NODE_ENV === 'production') {
-            return res.status(500).json({
-              success: false,
-              message:
-                'Could not send the verification code. SMS service is not configured or is unavailable.',
-            });
-          }
-          // Dev fallback: surface the OTP in the server console so the second
-          // factor can still be completed without a delivered SMS.
-          console.warn(
-            `[DEV 2FA] Verification code for ${user.phone || user.email}: ${otp}`
-          );
-        }
-
-        const pendingToken = jwt.sign(
-          { id: user._id.toString(), purpose: '2fa-login' },
-          process.env.JWT_SECRET,
-          { expiresIn: '5m' }
-        );
-        return res.json({
-          success: false,
-          twoFactorRequired: true,
-          pendingToken,
-          expiresIn: expiry,
-          message: 'Enter the code sent to your phone',
-        });
+        return startTwoFactorChallenge(req, res, user, 'user');
       }
 
       const token = generateToken(user._id);
@@ -200,12 +245,29 @@ export const login = async (req, res) => {
         message: 'This account is inactive. Contact an administrator.',
       });
     }
+
+    // Brute-force guard: temporary lock after repeated failures
+    if (isLocked(member)) {
+      return res.status(429).json({
+        success: false,
+        message: `Account temporarily locked after too many failed attempts. Try again in ${lockMinutesRemaining(member)} minute(s).`,
+      });
+    }
+
     const isMatch = await member.comparePassword(password);
     if (!isMatch) {
+      await registerFailedLogin(member);
       return res.status(401).json({
         success: false,
         message: 'Invalid email/phone or password',
       });
+    }
+    await clearLoginAttempts(member);
+
+    // Two-factor authentication for team members (same policy as staff Users)
+    const smsSetting = await getSmsSetting();
+    if (smsSetting.twoFactorEnabled) {
+      return startTwoFactorChallenge(req, res, member, 'team');
     }
 
     // Generate token
@@ -263,43 +325,47 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    const user = await User.findById(decoded.id).select('+password');
-    if (!user) {
+    // The pending token records which collection authenticated (User vs TeamMember)
+    const isTeamAccount = decoded.source === 'team';
+    const account = isTeamAccount
+      ? await TeamMember.findById(decoded.id).select('+password')
+      : await User.findById(decoded.id).select('+password');
+    if (!account) {
       return res.status(401).json({
         success: false,
         message: 'User not found. Please log in again.',
       });
     }
 
-    if (!user.twoFactorOtp || !user.twoFactorOtpExpire) {
+    if (!account.twoFactorOtp || !account.twoFactorOtpExpire) {
       return res.status(400).json({
         success: false,
         message: 'No verification code was requested. Please log in again.',
       });
     }
-    if (user.twoFactorOtpExpire < Date.now()) {
-      user.twoFactorOtp = undefined;
-      user.twoFactorOtpExpire = undefined;
-      user.twoFactorAttempts = 0;
-      await user.save();
+    if (account.twoFactorOtpExpire < Date.now()) {
+      account.twoFactorOtp = undefined;
+      account.twoFactorOtpExpire = undefined;
+      account.twoFactorAttempts = 0;
+      await account.save();
       return res.status(400).json({
         success: false,
         message: 'Code has expired. Please log in again.',
       });
     }
-    if ((user.twoFactorAttempts || 0) >= 5) {
-      user.twoFactorOtp = undefined;
-      user.twoFactorOtpExpire = undefined;
-      user.twoFactorAttempts = 0;
-      await user.save();
+    if ((account.twoFactorAttempts || 0) >= 5) {
+      account.twoFactorOtp = undefined;
+      account.twoFactorOtpExpire = undefined;
+      account.twoFactorAttempts = 0;
+      await account.save();
       return res.status(429).json({
         success: false,
         message: 'Too many attempts. Please log in again.',
       });
     }
-    if (user.twoFactorOtp !== hashOtp(otp)) {
-      user.twoFactorAttempts = (user.twoFactorAttempts || 0) + 1;
-      await user.save();
+    if (account.twoFactorOtp !== hashOtp(otp)) {
+      account.twoFactorAttempts = (account.twoFactorAttempts || 0) + 1;
+      await account.save();
       return res.status(400).json({
         success: false,
         message: 'Invalid code. Please try again.',
@@ -307,17 +373,37 @@ export const verifyOtp = async (req, res) => {
     }
 
     // Success — clear OTP and complete login
-    user.twoFactorOtp = undefined;
-    user.twoFactorOtpExpire = undefined;
-    user.twoFactorAttempts = 0;
-    await user.save();
+    account.twoFactorOtp = undefined;
+    account.twoFactorOtpExpire = undefined;
+    account.twoFactorAttempts = 0;
 
-    const token = generateToken(user._id);
-    await recordSession(user._id, req);
+    const token = generateToken(account._id);
+
+    if (isTeamAccount) {
+      account.lastLogin = new Date();
+      await account.save();
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: account._id,
+          name: account.name,
+          email: account.email,
+          role: account.role,
+          phone: '',
+          address: {},
+          isTeam: true,
+          active: account.active,
+        },
+      });
+    }
+
+    await account.save();
+    await recordSession(account._id, req);
     return res.json({
       success: true,
       token,
-      user: publicUser(user, false),
+      user: publicUser(account, false),
     });
   } catch (error) {
     console.error('Verify OTP Error:', error);

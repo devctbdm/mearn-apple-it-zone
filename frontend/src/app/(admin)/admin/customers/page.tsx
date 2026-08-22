@@ -10,7 +10,7 @@ import {
   Users,
   UserCheck,
   UserX,
-  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,17 @@ import {
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { customerApi, userApi, type Customer } from "@/lib/api";
+import { useAuth } from "@/store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusVariant: Record<string, string> = {
   active: "bg-green-100 text-green-800 hover:bg-green-100",
@@ -69,6 +80,8 @@ const statusVariant: Record<string, string> = {
 const PAGE_SIZE = 8;
 
 export default function CustomersPage() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -79,6 +92,8 @@ export default function CustomersPage() {
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -133,6 +148,21 @@ export default function CustomersPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await customerApi.remove(deleteTarget._id);
+      toast.success(`Customer ${deleteTarget.name} deleted`);
+      setDeleteTarget(null);
+      fetchCustomers();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to delete customer");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const statCards = [
     { label: "Total Customers", value: total, icon: Users, color: "text-foreground" },
     { label: "Active", value: customers.filter((c) => c.status === "active").length, icon: UserCheck, color: "text-green-600" },
@@ -147,7 +177,11 @@ export default function CustomersPage() {
 
   return (
     <div className="px-4 space-y-6">
-      <SiteHeader title="Customers" description="Manage customer accounts and information." />
+      <SiteHeader/>
+      <div>
+        <h2 className="text-2xl font-bold">Customers</h2>
+        <p className="text-muted-foreground">Manage customer accounts and information.</p>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {statCards.map((s) => (
@@ -175,7 +209,7 @@ export default function CustomersPage() {
         </div>
         <Select
           value={statusFilter}
-          onValueChange={(v) => { setStatusFilter(v); setPage(1); }}
+          onValueChange={(v) => { setStatusFilter(v ?? "all"); setPage(1); }}
         >
           <SelectTrigger className="sm:w-48">
             <SelectValue placeholder="Filter by status" />
@@ -259,9 +293,14 @@ export default function CustomersPage() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled className="text-muted-foreground" title="Only super admin can delete customers">
-                          <ShieldCheck className="mr-2 h-4 w-4" /> Delete (Super Admin only)
-                        </DropdownMenuItem>
+                        {isSuperAdmin && (
+                          <DropdownMenuItem
+                            onClick={() => setDeleteTarget(customer)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete customer
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -385,7 +424,7 @@ export default function CustomersPage() {
               </div>
               <div className="grid gap-1.5">
                 <Label>Status</Label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v ?? "active" })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -406,6 +445,36 @@ export default function CustomersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure to delete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete customer &quot;{deleteTarget?.name}&quot;? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
