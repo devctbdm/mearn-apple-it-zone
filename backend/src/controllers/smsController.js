@@ -37,6 +37,9 @@ export const updateSettings = async (req, res) => {
       twoFactorEnabled: !!setting.twoFactorEnabled,
       otpExpirySeconds: setting.otpExpirySeconds || 60,
     };
+    const wantsTwoFactorChange =
+      typeof twoFactorEnabled === 'boolean' ||
+      typeof otpExpirySeconds === 'number';
 
     if (typeof apiKey === 'string') setting.apiKey = apiKey.trim();
     if (typeof senderId === 'string') setting.senderId = senderId.trim();
