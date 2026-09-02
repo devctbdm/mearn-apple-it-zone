@@ -5,6 +5,139 @@ import { cloudinary } from '../middleware/upload.js';
 import slugify from 'slugify';
 import { cacheGet, cacheSet, cacheDel } from '../config/redis.js';
 
+// Normalize the optional PC-part metadata. Accepts an object or a JSON string
+// (admin forms may send either). Returns null-ish when the product isn't a PC part.
+const parsePcPart = (pcPart) => {
+  let data = pcPart;
+  if (typeof pcPart === 'string') {
+    try {
+      data = JSON.parse(pcPart);
+    } catch {
+      data = undefined;
+    }
+  }
+  if (!data || typeof data !== 'object') return undefined;
+  const enabled = data.enabled === true || data.enabled === 'true';
+  if (!enabled) {
+    return { enabled: false, type: '', socket: '', platform: '', formFactor: '', wattage: 0, specs: {} };
+  }
+  return {
+    enabled: true,
+    type: data.type || '',
+    socket: data.socket || '',
+    platform: data.platform || '',
+    formFactor: data.formFactor || '',
+    wattage: Number(data.wattage) || 0,
+    specs: data.specs && typeof data.specs === 'object' ? data.specs : {},
+  };
+};
+
+// @desc    Get PC-builder parts (products marked as pcPart.enabled)
+// @route   GET /api/products/pc-parts
+// @access  Public
+export const getPcParts = async (req, res) => {
+  try {
+    const {
+      type, socket, platform, formFactor,
+      search, sort, page = 1, limit = 200,
+      minPrice, maxPrice,
+      minCores, maxCores,
+      minVram, maxVram,
+      series, generation, storageType, coolerType,
+      ramType, efficiency, brand, panelType,
+      minRefreshRate, maxRefreshRate,
+      minCapacity, maxCapacity,
+    } = req.query;
+
+    const query = { 'pcPart.enabled': true, status: 'active' };
+    if (type) query['pcPart.type'] = type;
+    if (socket) query['pcPart.socket'] = socket;
+    if (platform) query['pcPart.platform'] = platform;
+    if (formFactor) query['pcPart.formFactor'] = formFactor;
+    if (search) query.name = { $regex: search, $options: 'i' };
+
+    // Price range (use discountPrice when available, else price)
+    if (minPrice || maxPrice) {
+      const priceFilter = {};
+      if (minPrice) priceFilter.$gte = Number(minPrice);
+      if (maxPrice) priceFilter.$lte = Number(maxPrice);
+      query.$or = [
+        { discountPrice: { ...priceFilter, $gt: 0 } },
+        { price: priceFilter },
+      ];
+    }
+
+    // CPU filters
+    if (minCores || maxCores) {
+      const f = {};
+      if (minCores) f.$gte = Number(minCores);
+      if (maxCores) f.$lte = Number(maxCores);
+      query['pcPart.specs.cores'] = f;
+    }
+    if (series) query['pcPart.specs.series'] = series;
+    if (generation) query['pcPart.specs.generation'] = generation;
+
+    // GPU filters
+    if (minVram || maxVram) {
+      const f = {};
+      if (minVram) f.$gte = Number(minVram);
+      if (maxVram) f.$lte = Number(maxVram);
+      query['pcPart.specs.vram'] = f;
+    }
+    if (brand) query['pcPart.specs.brand'] = brand;
+
+    // Storage filters
+    if (storageType) query['pcPart.specs.storageType'] = storageType;
+    if (minCapacity || maxCapacity) {
+      const f = {};
+      if (minCapacity) f.$gte = Number(minCapacity);
+      if (maxCapacity) f.$lte = Number(maxCapacity);
+      query['pcPart.specs.capacity'] = f;
+    }
+
+    // RAM filters
+    if (ramType) query['pcPart.specs.ramType'] = ramType;
+
+    // Cooler filters
+    if (coolerType) query['pcPart.specs.coolerType'] = coolerType;
+
+    // PSU filters
+    if (efficiency) query['pcPart.specs.efficiency'] = efficiency;
+
+    // Monitor filters
+    if (panelType) query['pcPart.specs.panelType'] = panelType;
+    if (minRefreshRate || maxRefreshRate) {
+      const f = {};
+      if (minRefreshRate) f.$gte = Number(minRefreshRate);
+      if (maxRefreshRate) f.$lte = Number(maxRefreshRate);
+      query['pcPart.specs.refreshRate'] = f;
+    }
+
+    const sortOption = {};
+    if (sort === 'price-asc') sortOption.price = 1;
+    else if (sort === 'price-desc') sortOption.price = -1;
+    else sortOption.name = 1;
+
+    const total = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .select('name price discountPrice images stock brand pcPart slug')
+      .sort(sortOption)
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
+
+    res.json({
+      success: true,
+      count: products.length,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get all products (with filters)
 // @route   GET /api/products
 // @access  Public
@@ -139,7 +272,7 @@ export const getProductsByCategory = async (req, res) => {
 // @access  Private/Admin
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical, pcPart } = req.body;
 
     // Handle uploaded images
     const imageUrls = req.files ? req.files.map((file) => file.path) : [];
@@ -201,6 +334,7 @@ export const createProduct = async (req, res) => {
         ? (typeof content === 'string' ? JSON.parse(content) : content)
         : [],
       seo,
+      pcPart: parsePcPart(pcPart),
       images: imageUrls,
       createdBy: req.user._id,
     });
@@ -227,7 +361,7 @@ export const updateProduct = async (req, res) => {
     }
 
     // Update fields
-    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical } = req.body;
+    const { name, description, price, discountPrice, costPrice, category, stock, status, featured, holiday, specifications, sku, productCode, content, categories, slug, brand, imageAlts, metaTitle, metaDescription, focusKeyword, canonical, pcPart } = req.body;
 
     const parseArray = (val) => {
       if (!val) return [];
@@ -293,6 +427,9 @@ export const updateProduct = async (req, res) => {
     }
     if (holiday !== undefined) {
       product.holiday = holiday === 'true' || holiday === true;
+    }
+    if (pcPart !== undefined) {
+      product.pcPart = parsePcPart(pcPart) || product.pcPart;
     }
     if (specifications) {
       try {

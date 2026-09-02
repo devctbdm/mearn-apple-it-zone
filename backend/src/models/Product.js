@@ -92,6 +92,37 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    pcPart: {
+      enabled: { type: Boolean, default: false },
+      type: {
+        type: String,
+        enum: [
+          'cpu',
+          'cpu_cooler',
+          'motherboard',
+          'ram',
+          'storage',
+          'gpu',
+          'psu',
+          'casing',
+          'monitor',
+          'casing_cooler',
+          'keyboard',
+          'mouse',
+          'speaker',
+          'headphone',
+          'wifi_adapter',
+          'antivirus',
+          'ups',
+        ],
+        default: '',
+      },
+      socket: { type: String, trim: true, default: '' }, // e.g. AM5, AM4, LGA1700
+      platform: { type: String, trim: true, default: '' }, // amd | intel
+      formFactor: { type: String, trim: true, default: '' }, // ATX, microATX, Mini-ITX
+      wattage: { type: Number, default: 0 }, // estimated power draw in watts
+      specs: { type: mongoose.Schema.Types.Mixed, default: {} }, // component-specific fields (CPU cores, GPU VRAM, etc.)
+    },
     specifications: {
       type: mongoose.Schema.Types.Mixed, // Flexible for any spec (e.g., RAM, CPU, Brand)
       default: {},

@@ -9,11 +9,15 @@ const StoreLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <MaintenanceGuard>
       <div>
-        <TopNav />
-        <CategoryNav />
-        {children}
-        <StoreQuickActions />
-        <Footer />
+        <div className="print:hidden">
+          <TopNav />
+          <CategoryNav />
+          <StoreQuickActions />
+        </div>
+        <div className="pt-32 lg:pt-40">{children}</div>
+        <div className="print:hidden">
+          <Footer />
+        </div>
       </div>
     </MaintenanceGuard>
   );

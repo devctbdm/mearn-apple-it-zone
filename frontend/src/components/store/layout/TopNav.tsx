@@ -32,7 +32,7 @@ const TopNav = () => {
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full border-b border-white/10 bg-slate-900/95 backdrop-blur transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 w-full border-b border-white/10 bg-slate-900/95 backdrop-blur transition-all duration-300 ${
         scrolled ? 'shadow-lg shadow-black/20' : ''
       }`}
     >
@@ -161,6 +161,12 @@ const TopNav = () => {
                 </div>
               </div>
             )}
+            <Button
+              size={'lg'}
+              nativeButton={false}
+              className="mr-4 bg-linear-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 transition-colors duration-300"
+              render={<Link href="/pc-builders">Pc Builders</Link>}
+            />
           </div>
         </div>
       </div>

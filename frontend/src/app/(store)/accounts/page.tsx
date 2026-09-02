@@ -542,7 +542,7 @@ function AccountContent() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gray-50/30">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Profile summary */}
         <Card className="mb-6">
@@ -553,8 +553,8 @@ function AccountContent() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold">{profile.name}</h1>
-                <p className="text-sm text-muted-foreground">{profile.email}</p>
-                <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                <p className="text-sm text-gray-600">{profile.email}</p>
+                <p className="text-sm text-gray-600">{profile.phone}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -677,13 +677,13 @@ function AccountContent() {
                             </Button>
                           </div>
                         </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-gray-600">
                         {new Date(o.date).toLocaleDateString()} · {o.items.length}{' '}
                         item{o.items.length > 1 ? 's' : ''}
                       </p>
                       {o.coupon && o.coupon.discount > 0 && (
                         <div className="mt-1 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
+                          <span className="text-gray-600">
                             Coupon ({o.coupon.code})
                           </span>
                           <span className="font-medium text-green-600">
@@ -704,15 +704,15 @@ function AccountContent() {
                                 className="h-14 w-14 shrink-0 rounded-md border object-cover"
                               />
                             ) : (
-                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
-                                <Package className="h-5 w-5 text-muted-foreground" />
+                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-gray-100">
+                                <Package className="h-5 w-5 text-gray-600" />
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">
                                 {it.name}
                               </p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-gray-600">
                                 {it.quantity} × ৳{it.price.toLocaleString()}
                               </p>
                             </div>
@@ -724,7 +724,7 @@ function AccountContent() {
                         ))}
                       </div>
                       {o.advanceAmount ? (
-                        <div className="mt-3 rounded-md border border-dashed bg-muted/40 p-3">
+                        <div className="mt-3 rounded-md border border-dashed bg-gray-50 p-3">
                           {o.advancePaid &&
                           o.advancePaid >= o.advanceAmount ? (
                             <p className="text-xs text-green-600">
@@ -737,7 +737,7 @@ function AccountContent() {
                             </p>
                           ) : (
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-gray-600">
                                 Confirm this order with a ৳
                                 {o.advanceAmount.toLocaleString()} advance
                                 (deducted from delivery total).
@@ -838,7 +838,7 @@ function AccountContent() {
                         key={w.id}
                         className="overflow-hidden rounded-lg border bg-card"
                       >
-                        <div className="aspect-square w-full overflow-hidden bg-muted">
+                        <div className="aspect-square w-full overflow-hidden bg-gray-100">
                           <img
                             src={w.image}
                             alt={w.name}
@@ -854,7 +854,7 @@ function AccountContent() {
                               {w.inStock ? 'In stock' : 'Out'}
                             </Badge>
                           </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
+                          <p className="mt-1 text-sm text-gray-600">
                             ৳{w.price.toLocaleString()}
                           </p>
                           <div className="mt-3 flex gap-2">
@@ -949,7 +949,7 @@ function AccountContent() {
                           </div>
                         </div>
                         <Separator className="my-3" />
-                        <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="space-y-1 text-sm text-gray-600">
                           <p className="font-medium text-foreground">
                             {a.fullName}
                           </p>
@@ -1100,7 +1100,7 @@ function StatCard({
     <Card>
       <CardContent className="flex items-center justify-between p-5">
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-xs text-gray-600">{label}</p>
           <p className="mt-1 text-2xl font-semibold">{value}</p>
         </div>
         <div
@@ -1116,7 +1116,7 @@ function StatCard({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between border-b py-2 last:border-b-0">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="text-gray-600">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
   );
@@ -1133,9 +1133,9 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-      <Icon className="h-10 w-10 text-muted-foreground" />
+      <Icon className="h-10 w-10 text-gray-600" />
       <p className="mt-3 font-medium">{title}</p>
-      <p className="text-sm text-muted-foreground">{hint}</p>
+      <p className="text-sm text-gray-600">{hint}</p>
     </div>
   );
 }
@@ -1354,7 +1354,7 @@ function ChangePasswordDialog({
                 <button
                   type="button"
                   onClick={() => setShow((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
                   aria-label={show ? 'Hide' : 'Show'}
                 >
                   {show ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1571,13 +1571,13 @@ function OrderViewDialog({
           <div className="space-y-4 md:col-span-2">
             {/* Section 1: order info */}
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs uppercase tracking-wide text-gray-600">
                 Order information
               </p>
               <p className="mt-1 font-medium">
                 {order.orderNumber || `#${order.id.slice(-6).toUpperCase()}`}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">
                 <span>Status: {meta.label}</span>
                 <span>·</span>
                 <span>
@@ -1592,14 +1592,14 @@ function OrderViewDialog({
             {/* Section 2: shipping + summary */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs uppercase tracking-wide text-gray-600">
                   Shipping address
                 </p>
                 <div className="mt-2 space-y-0.5 text-sm">
                   <p className="font-medium">
                     {order.shippingAddress?.street || '—'}
                   </p>
-                  <p className="text-muted-foreground">
+                  <p className="text-gray-600">
                     {[
                       order.shippingAddress?.city,
                       order.shippingAddress?.state,
@@ -1608,24 +1608,24 @@ function OrderViewDialog({
                       .filter(Boolean)
                       .join(', ')}
                   </p>
-                  <p className="text-muted-foreground">
+                  <p className="text-gray-600">
                     {order.shippingAddress?.country}
                   </p>
                 </div>
               </div>
 
               <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs uppercase tracking-wide text-gray-600">
                   Order summary
                 </p>
                 <div className="mt-2 space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-gray-600">Subtotal</span>
                     <span>৳{subtotal.toLocaleString()}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">
+                      <span className="text-gray-600">
                         Coupon ({order.coupon?.code})
                       </span>
                       <span className="text-green-600">
@@ -1635,7 +1635,7 @@ function OrderViewDialog({
                   )}
                   {advancePaid > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Advance paid</span>
+                      <span className="text-gray-600">Advance paid</span>
                       <span>৳{advancePaid.toLocaleString()}</span>
                     </div>
                   )}
@@ -1645,7 +1645,7 @@ function OrderViewDialog({
                   </div>
                   {advancePaid > 0 && due > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">
+                      <span className="text-gray-600">
                         Due on delivery
                       </span>
                       <span>৳{due.toLocaleString()}</span>
@@ -1657,7 +1657,7 @@ function OrderViewDialog({
 
             {/* Section 3: products */}
             <div className="rounded-lg border bg-card p-4">
-              <p className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">
+              <p className="mb-3 text-xs uppercase tracking-wide text-gray-600">
                 Products
               </p>
               <div className="space-y-2">
@@ -1673,13 +1673,13 @@ function OrderViewDialog({
                         className="h-12 w-12 shrink-0 rounded-md border object-cover"
                       />
                     ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
-                        <Package className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gray-100">
+                        <Package className="h-5 w-5 text-gray-600" />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{it.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-gray-600">
                         ৳{it.price.toLocaleString()} × {it.quantity}
                       </p>
                     </div>
@@ -1703,7 +1703,7 @@ function OrderViewDialog({
                     ? 'border-green-500 bg-green-500 text-white'
                     : s.state === 'current'
                     ? 'border-blue-500 bg-blue-500 text-white'
-                    : 'border-muted-foreground/30 bg-background text-muted-foreground';
+                    : 'border-muted-foreground/30 bg-background text-gray-600';
                 return (
                   <li key={i} className="flex gap-3">
                     <div className="flex flex-col items-center">
@@ -1725,12 +1725,12 @@ function OrderViewDialog({
                     <div className={last ? 'pb-0' : 'pb-4'}>
                       <p className="text-sm font-medium">{s.title}</p>
                       {s.description && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-gray-600">
                           {s.description}
                         </p>
                       )}
                       {s.date && (
-                        <p className="mt-0.5 text-xs text-muted-foreground/70">
+                        <p className="mt-0.5 text-xs text-gray-600/70">
                           {s.date}
                         </p>
                       )}

@@ -12,6 +12,32 @@ export const getStoreSettings = async (req, res) => {
   }
 };
 
+// Public store info for storefront footer/header (no auth required)
+export const getPublicStoreSettings = async (req, res) => {
+  try {
+    let settings = await StoreSetting.findOne();
+    if (!settings) {
+      settings = await StoreSetting.create({});
+    }
+    res.json({
+      success: true,
+      settings: {
+        storeName: settings.storeName,
+        storeUrl: settings.storeUrl,
+        email: settings.email,
+        phone: settings.phone,
+        description: settings.description,
+        logoUrl: settings.logoUrl,
+        currency: settings.currency,
+        timezone: settings.timezone,
+        address: settings.address,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const updateStoreSettings = async (req, res) => {
   try {
     const { storeName, storeUrl, email, phone, description, logoUrl, currency, timezone, address } = req.body;

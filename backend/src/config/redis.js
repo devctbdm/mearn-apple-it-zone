@@ -24,6 +24,11 @@ export const createRedisClient = () => {
     return null;
   }
 
+  // Fail fast if Redis is unreachable so it can never wedge cached endpoints.
+  // Upstash / redis.io TLS endpoints require tls: {} — enable via REDIS_TLS=true
+  const CONNECT_TIMEOUT = Number(process.env.REDIS_CONNECT_TIMEOUT_MS) || 3000;
+  const COMMAND_TIMEOUT = Number(process.env.REDIS_COMMAND_TIMEOUT_MS) || 2000;
+
   client = createClient({
     username: process.env.REDIS_USERNAME || 'default',
     password: process.env.REDIS_PASSWORD,
@@ -32,6 +37,8 @@ export const createRedisClient = () => {
       port: Number(process.env.REDIS_PORT) || 19809,
       // Upstash / redis.io TLS endpoints require tls: {} — enable via REDIS_TLS=true
       tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+      connectTimeout: CONNECT_TIMEOUT,
+      timeout: COMMAND_TIMEOUT,
     },
   });
 
@@ -58,25 +65,50 @@ export const createRedisClient = () => {
 export const connectRedis = async () => {
   const c = createRedisClient();
   if (!c) return null;
+  // Never let a broken Redis stall server startup. The socket connectTimeout
+  // makes the underlying connect() reject, but we guard anyway.
+  let timer;
+  const connectRace = Promise.race([
+    c.connect(),
+    new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('Redis connect timed out')),
+        Number(process.env.REDIS_CONNECT_TIMEOUT_MS) || 3000
+      );
+    }),
+  ]);
   try {
-    await c.connect();
+    await connectRace;
     return c;
   } catch (err) {
+    clearTimeout(timer);
     console.error('❌ Redis connection failed (continuing without cache):', err.message);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 };
 
 /** Returns the connected client, or null if not ready. */
 export const getRedis = () => (isReady ? client : null);
 
+// Wrap a redis command with a timeout so a wedged connection can never hang a request.
+const withTimeout = (promise, ms = 2000) => {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Redis command timed out')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+};
+
 /** Get a cached string value (null on miss / error). */
 export const cacheGet = async (key) => {
   const c = getRedis();
   if (!c) return null;
   try {
-    return await c.get(key);
-  } catch {
+    return await withTimeout(c.get(key), Number(process.env.REDIS_COMMAND_TIMEOUT_MS) || 2000);
+  } catch (e) {
+    if (e?.message === 'Redis command timed out') console.warn('⚠️  Redis get timeout');
     return null;
   }
 };
@@ -86,7 +118,7 @@ export const cacheSet = async (key, value, ttlSeconds = 300) => {
   const c = getRedis();
   if (!c) return;
   try {
-    await c.set(key, value, { EX: ttlSeconds });
+    await withTimeout(c.set(key, value, { EX: ttlSeconds }), Number(process.env.REDIS_COMMAND_TIMEOUT_MS) || 2000);
   } catch {
     /* ignore cache write failures */
   }
@@ -100,11 +132,12 @@ export const cacheDel = async (keyOrPattern) => {
   const c = getRedis();
   if (!c) return;
   try {
+    const ms = Number(process.env.REDIS_COMMAND_TIMEOUT_MS) || 2000;
     if (typeof keyOrPattern === 'string' && keyOrPattern.includes('*')) {
-      const keys = await c.keys(keyOrPattern);
-      if (keys.length) await c.del(keys);
+      const keys = await withTimeout(c.keys(keyOrPattern), ms);
+      if (keys.length) await withTimeout(c.del(keys), ms);
     } else {
-      await c.del(keyOrPattern);
+      await withTimeout(c.del(keyOrPattern), ms);
     }
   } catch {
     /* ignore */

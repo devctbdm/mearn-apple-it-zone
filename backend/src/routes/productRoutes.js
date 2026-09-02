@@ -8,6 +8,7 @@ import {
   deleteProduct,
   getProductsByCategory,
   addRating,
+  getPcParts,
 } from '../controllers/productController.js';
 import { protect, adminOnly } from '../middleware/auth.js';
 import { uploadMultiple } from '../middleware/upload.js';
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get('/', getAllProducts);
 router.get('/category/:category', getProductsByCategory);
 router.get('/slug/:slug', getProductBySlug);
+router.get('/pc-parts', getPcParts);
 router.get('/:id', getProductById);
 
 // ---- Authenticated user routes ----

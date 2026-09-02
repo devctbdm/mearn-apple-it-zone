@@ -79,7 +79,8 @@ three staff roles; `superAdminOnly` is super_admin only.
 | User | name, email (unique), password (bcrypt, `select:false`), phone, role, status, `twoFactor*`, `loginAttempts`, `lockUntil` |
 | TeamMember | staff accounts; phone + 2FA + lockout fields added recently |
 | Order | `user`, `items[]` (snapshots), `shippingAddress`, `totalAmount`, `coupon`, `payment{ method,status,tran_id,val_id }`, `orderStatus`, `advanceAmount/advancePaid` |
-| Product | slug (unique), price/discountPrice, `categories[]`, `images[]`, `imageAlts[]`, `seo{}`, `ratings[]` (reviews live here), `status` |
+| Product | slug (unique), price/discountPrice, `categories[]`, `images[]`, `imageAlts[]`, `seo{}`, `ratings[]` (reviews live here), `status`, `pcPart{}` (see §2.10 PC Builder) |
+| SavedBuild | saved PC-builder configs: `user`, `name`, `components{}` (slot → {product}), `totalAmount`, `totalWattage` |
 | Category | name, slug, `parentId`, `sortOrder`, `featured` |
 | PromoCode | code, type %, fixed/free_shipping, `computeItemDiscount()` |
 | Invoice | generated from orders; `INV-<orderId8>` |
@@ -140,6 +141,38 @@ and **never throws**, so order/auth flows never break if email/SMS fails.
   category writes → `cacheDel('categories:*')`.
 - All helpers degrade gracefully when Redis is disabled/unavailable.
 
+### 2.9 PC Builder — backend
+**`Product.pcPart` subdocument** (`enabled`, `type`, `socket`, `platform`, `formFactor`, `wattage`):
+- `type` enum: `cpu`, `cpu_cooler`, `motherboard`, `ram`, `storage`, `gpu`, `psu`, `casing`, `monitor`, `casing_cooler`, `keyboard`, `mouse`, `speaker`, `headphone`, `wifi_adapter`, `antivirus`, `ups`.
+- `socket`/`platform`: used for client-side CPU↔motherboard/cooler compatibility matching (`LGA*` → intel, `AM*` → amd).
+- `parsePcPart()` helper in `productController.js` normalizes the value (accepts JSON string or object).
+- Admin product create/update routes handle `pcPart` via `FormData.append('pcPart', JSON.stringify(...))`.
+
+**`GET /api/products/pc-parts`** (`productController.getPcParts`):
+- Returns active products that have `pcPart.enabled = true`, filtered by optional `?type=`, `?socket=`, `?platform=`, `?formFactor=`.
+- Light projection (only fields needed by the builder UI).
+- Registered **before** `/:id` in `productRoutes.js` (must not be shadowed).
+
+**`SavedBuild`** model + `pcBuildController` (`/api/pc-builder`):
+- `protect` middleware required; `getMyBuilds` is `GET`, `saveBuild` is `POST`, `deleteBuild` is `DELETE`.
+- Server recomputes `totalAmount`/`totalWattage` from the live Product collection (client cannot forge prices).
+
+### 2.10 Render deployment
+Both apps deploy as **Render Web Services** from the monorepo:
+
+| Service | Root | Build | Start |
+|---|---|---|---|
+| Backend | `backend/` | `pnpm install` | `pnpm start` |
+| Frontend | `frontend/` | `pnpm install && pnpm build` | `pnpm start` |
+
+**Render auto-detects pnpm** from `pnpm-lock.yaml`. Pin `PNPM_VERSION` in the Render env to match your local version (`pnpm -v`).
+
+**Pre-deploy env checklist (per service):**
+- Backend: `NODE_ENV=production`, strong `JWT_SECRET`, `FRONTEND_URL`/`BACKEND_URL` pointing at prod, `CORS_ORIGINS` = prod origin only, `TRUST_PROXY=1`, SSL live credentials (`SSL_IS_LIVE=true`), verified Resend domain + real `RESEND_FROM`.
+- Frontend: `NEXT_PUBLIC_API_URL` (must include `/api`), `API_BASE_URL` (server-only), `NEXT_PUBLIC_SITE_URL`.
+- ⚠️ `NEXT_PUBLIC_*` vars are **inlined at build time** — set them in Render **before** running the first build.
+- Free Render instances spin down after ~15 min idle; use a paid instance for production.
+
 ### 2.9 Environment variables (backend `.env`)
 | Variable | Purpose |
 |---|---|
@@ -175,6 +208,14 @@ Tailwind v4, Zustand (state), Axios (API), `socket.io-client`, zod, sonner.
   `/admin/slider`, `/admin/invoice` ["Billing"], `/admin/sms`, `/admin/maintenance`, …).
 - **`admin/login`** is a separate full-screen login (outside the `(admin)` layout).
 - **`(store)/(auth)`** holds customer login/register/forgot/reset under the store chrome.
+- **`pc-builders`** — PC Builder page under `(store)`, requiring `useAuth` (Zustand store shape). Users build a PC config by selecting parts with socket-based CPU compatibility filtering, add to cart, or save builds (login required, persisted server-side).
+
+### 3.3a Admin product form components
+All admin product form logic lives in a shared **`components/admin/products/ProductForm.tsx`**:
+- Exports `ProductForm`, `EMPTY_FORM_VALUE`, `parseSpecifications`, and the `ProductFormValue` / `PcPartFormValue` types.
+- Imported by both `admin/products/new/page.tsx` and `admin/products/edits/page.tsx` (each page handles only its data-fetching + `handleSubmit`).
+- Sub-editors (`KeySpecsEditor`, `KeyFeaturesEditor`, `SpecsEditor`, `ContentEditor`, `ProfitSummary`) are internal to this file.
+- The SEO section's Brand input was removed — brand is entered once in the main info grid and automatically written to both `brand` and `specifications._keySpecs.Brand`.
 
 ### 3.3 State management
 - **Zustand** (`src/store`): root persisted store `useAppStore`. Slices: `auth`, `cart`,
@@ -192,7 +233,9 @@ Tailwind v4, Zustand (state), Axios (API), `socket.io-client`, zod, sonner.
 - `axios.ts` — `api` instance. `baseURL = NEXT_PUBLIC_API_URL`. Interceptor injects
   `Authorization: Bearer <localStorage.mobile_token>`.
 - `api.ts` — typed namespaces (`productApi`, `orderApi`, `authApi`, `customerApi`,
-  `paymentApi`, `smsApi`, …) + DTO types.
+  `paymentApi`, `smsApi`, `pcPartsApi`, `pcBuilderApi`, …) + DTO types.
+- `pcPartsApi.list(filters)` — `GET /api/products/pc-parts` (public, no auth).
+- `pcBuilderApi.getMyBuilds()` / `.save(name, components)` / `.remove(id)` — `GET/POST/DELETE /api/pc-builder` (auth required).
 - `serverApi.ts` — **server-only** `fetch` + React `cache`, `no-store`, base `API_BASE_URL`.
   Used by SSR `generateMetadata` (product page, sitemap, robots). Do **not** use `api`
   inside server components.

@@ -128,7 +128,7 @@ export const CategoryNav = () => {
 
   return (
     <div
-      className={`hidden lg:block sticky top-16 z-40 border-b border-gray-200 bg-background/95 py-2 backdrop-blur transition-all duration-300 lg:top-20 ${
+      className={`hidden lg:block fixed top-16 left-0 right-0 z-40 border-b border-gray-200 bg-background/95 py-2 backdrop-blur transition-all duration-300 lg:top-20 ${
         scrolled ? 'shadow-xl' : 'shadow-lg'
       }`}
     >

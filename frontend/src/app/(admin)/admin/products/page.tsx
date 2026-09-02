@@ -14,12 +14,16 @@ import {
   AlertTriangle,
   XCircle,
   Star,
-  StarOff,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  FilterX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -118,6 +122,8 @@ const PAGE_SIZE = 8;
 
 type StatusFilter = Status | "all";
 
+type SortKey = "name" | "price" | "stock" | "createdAt";
+
 const statusLabels: Record<Status, string> = {
   active: "Active",
   draft: "Draft",
@@ -144,6 +150,8 @@ export default function AdminProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [featuredFilter, setFeaturedFilter] = useState<"all" | "featured" | "not_featured">("all");
   const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const router = useRouter();
 
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
@@ -203,23 +211,94 @@ export default function AdminProductsPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return products.filter((p) => {
+    const list = products.filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (categoryFilter !== "all" && !(p.categories || [p.category]).includes(categoryFilter)) return false;
       if (featuredFilter === "featured" && !p.featured) return false;
       if (featuredFilter === "not_featured" && p.featured) return false;
       if (!q) return true;
       return (
-        p._id.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
         (p.categories || [p.category]).some((c) => c.toLowerCase().includes(q))
       );
     });
-  }, [products, query, statusFilter, categoryFilter, featuredFilter]);
+    return list.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "name") cmp = a.name.localeCompare(b.name);
+      else if (sortKey === "price") cmp = a.price - b.price;
+      else if (sortKey === "stock") cmp = a.stock - b.stock;
+      else cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [products, query, statusFilter, categoryFilter, featuredFilter, sortKey, sortDir]);
+
+  const hasFilters =
+    query.trim() !== "" || statusFilter !== "all" || categoryFilter !== "all" || featuredFilter !== "all";
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setFeaturedFilter("all");
+    setPage(1);
+  }
+
+  function SortHeader({
+    label,
+    column,
+    className,
+  }: {
+    label: string;
+    column: SortKey;
+    className?: string;
+  }) {
+    const active = sortKey === column;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(column)}
+        className={`inline-flex items-center gap-1 font-medium ${className || ""}`}
+      >
+        {label}
+        {active ? (
+          sortDir === "asc" ? (
+            <ArrowUp className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+        )}
+      </button>
+    );
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const pageItems: (number | "ellipsis")[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pageItems.push(i);
+  } else {
+    pageItems.push(1);
+    if (currentPage > 3) pageItems.push("ellipsis");
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      pageItems.push(i);
+    }
+    if (currentPage < totalPages - 2) pageItems.push("ellipsis");
+    pageItems.push(totalPages);
+  }
 
   async function confirmDelete() {
     if (!deleteProduct) return;
@@ -254,9 +333,43 @@ export default function AdminProductsPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Loading products...</p>
+      <>
+      <SiteHeader />
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="mt-2 h-4 w-52" />
+          </div>
+          <Skeleton className="h-9 w-32" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-3.5 w-20" />
+                <Skeleton className="mt-3 h-7 w-10" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="flex gap-3">
+              <Skeleton className="h-9 flex-1" />
+              <Skeleton className="h-9 w-44" />
+              <Skeleton className="h-9 w-44" />
+              <Skeleton className="h-9 w-44" />
+            </div>
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+      </>
     );
   }
 
@@ -343,59 +456,70 @@ export default function AdminProductsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10" />
-                  <TableHead>Product</TableHead>
+                  <TableHead><SortHeader label="Product" column="name" /></TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right"><SortHeader label="Price" column="price" className="justify-end" /></TableHead>
                   <TableHead className="text-right">Profit</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right"><SortHeader label="Stock" column="stock" className="justify-end" /></TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-center">Featured</TableHead>
-                  <TableHead className="w-15" />
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paged.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                      No products found.
+                    <TableCell colSpan={8} className="h-40">
+                      <div className="flex flex-col items-center justify-center gap-3 text-center">
+                        <div className="rounded-full bg-muted p-3">
+                          <Package className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium">No products found</p>
+                          <p className="text-sm text-muted-foreground">
+                            {hasFilters
+                              ? "Try adjusting your search or filters."
+                              : "Add your first product to start selling."}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasFilters ? (
+                            <Button variant="outline" onClick={clearFilters}>
+                              <FilterX /> Clear filters
+                            </Button>
+                          ) : (
+                            <Link href="/admin/products/new">
+                              <Button>
+                                <Plus /> Add product
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   paged.map((p) => (
                     <TableRow key={p._id}>
                       <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => toggleFeatured(p)}
-                          aria-label={p.featured ? "Unmark featured" : "Mark as featured"}
-                          className="text-amber-500 hover:text-amber-600"
-                        >
-                          {p.featured ? (
-                            <Star className="h-4 w-4 fill-current" />
-                          ) : (
-                            <Star className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </TableCell>
-                      <TableCell>
                         <div className="flex items-center gap-2">
-                          {p.images?.[0] && (
+                          {p.images?.[0] ? (
                             <img
                               src={p.images[0]}
                               alt={p.name}
                               className="h-8 w-8 rounded-md object-cover border"
                             />
+                          ) : (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-muted">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                            </div>
                           )}
-                          <div>
-                            <span className="font-medium">{p.name}</span>
-                            {p.featured && (
-                              <Badge variant="secondary" className="ml-2 gap-1">
-                                <Star className="h-3 w-3 fill-amber-500 text-amber-500" /> Featured
-                              </Badge>
-                            )}
-                            <div className="text-xs text-muted-foreground">{p._id}</div>
-                          </div>
+                          <span className="font-medium">{p.name}</span>
+                          {p.featured && (
+                            <Badge variant="secondary" className="ml-1 gap-1">
+                              <Star className="h-3 w-3 fill-amber-500 text-amber-500" /> Featured
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>{(p.categories || [p.category]).join(", ")}</TableCell>
@@ -438,9 +562,6 @@ export default function AdminProductsPage() {
                             <DropdownMenuItem onClick={() => router.push(`/admin/products/edits?id=${p._id}`)}>
                               <Pencil /> Edit product
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleFeatured(p)}>
-                              {p.featured ? <><StarOff /> Unmark featured</> : <><Star /> Mark as featured</>}
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
@@ -467,23 +588,33 @@ export default function AdminProductsPage() {
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
+                    aria-disabled={currentPage <= 1}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
                     onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
                   />
                 </PaginationItem>
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      href="#"
-                      isActive={i + 1 === currentPage}
-                      onClick={(e) => { e.preventDefault(); setPage(i + 1); }}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
+                {pageItems.map((item, i) =>
+                  item === "ellipsis" ? (
+                    <PaginationItem key={`e${i}`}>
+                      <span className="px-1 text-muted-foreground">…</span>
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={item}>
+                      <PaginationLink
+                        href="#"
+                        isActive={item === currentPage}
+                        onClick={(e) => { e.preventDefault(); setPage(item); }}
+                      >
+                        {item}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
                 <PaginationItem>
                   <PaginationNext
                     href="#"
+                    aria-disabled={currentPage >= totalPages}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
                     onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(totalPages, p + 1)); }}
                   />
                 </PaginationItem>

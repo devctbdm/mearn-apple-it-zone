@@ -69,6 +69,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { SiteHeader } from '@/components/site-header';
+import { LiquidBlob } from '@/components/LiquidBlob';
 
 export const description = 'A bar chart with a custom label';
 
@@ -410,10 +411,17 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
-              <StatCardSkeleton key={i} />
+              <Skeleton key={i} className="h-32 rounded-xl" />
             ))
           : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
       </div>
+
+      {/* Loading animation overlay */}
+      {loading && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+          <LiquidBlob size={64} />
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL =
-  process.env.API_BASE_URL || 'https://api.appleitzone.com.bd/api';
+  process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.appleitzone.com.bd/api';
 
 export async function GET(
   request: NextRequest,

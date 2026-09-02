@@ -290,6 +290,8 @@ export type StoreSettings = {
 
 export const storeApi = {
   get: () => api.get<{ success: boolean; settings: StoreSettings }>('/store'),
+  getPublic: () =>
+    api.get<{ success: boolean; settings: StoreSettings }>('/store/public'),
   update: (data: Partial<StoreSettings>) =>
     api.put<{ success: boolean; settings: StoreSettings }>('/store', data),
 };
@@ -756,6 +758,89 @@ export const productApi = {
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/products/${id}`),
+
+  getPcParts: (params?: Record<string, string>) =>
+    api.get<PcPartsResponse>('/products/pc-parts', { params }),
+};
+
+export type PcPartType =
+  | 'cpu'
+  | 'cpu_cooler'
+  | 'motherboard'
+  | 'ram'
+  | 'storage'
+  | 'gpu'
+  | 'psu'
+  | 'casing'
+  | 'monitor'
+  | 'casing_cooler'
+  | 'keyboard'
+  | 'mouse'
+  | 'speaker'
+  | 'headphone'
+  | 'wifi_adapter'
+  | 'antivirus'
+  | 'ups';
+
+export type PcPartInfo = {
+  enabled: boolean;
+  type: PcPartType | '';
+  socket?: string;
+  platform?: string;
+  formFactor?: string;
+  wattage?: number;
+};
+
+export type PcPart = {
+  _id: string;
+  name: string;
+  slug: string;
+  price: number;
+  discountPrice?: number;
+  images?: string[];
+  image?: string;
+  brand?: string;
+  stock?: number;
+  pcPart: PcPartInfo;
+};
+
+export type PcPartsResponse = {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  products: PcPart[];
+};
+
+export const pcPartsApi = {
+  list: (params?: Record<string, string>) =>
+    api.get<PcPartsResponse>('/products/pc-parts', { params }),
+};
+
+export type SavedComponent = {
+  product: string; // product _id
+  name: string;
+  image: string;
+  price: number;
+  wattage: number;
+};
+
+export type SavedBuild = {
+  _id: string;
+  name: string;
+  components: Record<string, SavedComponent>;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const pcBuilderApi = {
+  getMyBuilds: () =>
+    api.get<{ success: boolean; builds: SavedBuild[] }>('/pc-builder/builds'),
+  save: (data: { name?: string; components: Record<string, { product: string }> }) =>
+    api.post<{ success: boolean; build: SavedBuild }>('/pc-builder/builds', data),
+  remove: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/pc-builder/builds/${id}`),
 };
 
 export type Review = {

@@ -3,7 +3,6 @@
 
 import { ReactNode, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { AnimatePresence } from 'motion/react';
 import { useAuth } from '@/store';
 
 export function ClientLayout({ children }: { children: ReactNode }) {
@@ -17,11 +16,5 @@ export function ClientLayout({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  return (
-    <AnimatePresence mode="wait">
-      <div key={pathname} className="min-h-screen">
-        {children}
-      </div>
-    </AnimatePresence>
-  );
+  return <div key={pathname} className="min-h-screen">{children}</div>;
 }
