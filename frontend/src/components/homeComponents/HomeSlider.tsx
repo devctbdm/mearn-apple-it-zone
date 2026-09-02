@@ -1,34 +1,34 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import Image from 'next/image'
-import Link from 'next/link'
-import type { StaticImageData } from 'next/image'
-import { sliderApi, type Slider } from '@/lib/api'
+import { sliderApi, type Slider } from '@/lib/api';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import type { StaticImageData } from 'next/image';
+import Image from 'next/image';
+import Link from 'next/link';
+import React, { useCallback, useEffect, useState } from 'react';
 
 // Backend-ready data interfaces
 export interface SlideData {
-  id: string
-  image: string | StaticImageData
-  title: string
-  description?: string
-  link?: string
+  id: string;
+  image: string | StaticImageData;
+  title: string;
+  description?: string;
+  link?: string;
 }
 
 export interface AdBoxData {
-  id: string
-  image: string | StaticImageData
-  title: string
-  description?: string
-  link?: string
-  position: 'top' | 'bottom'
+  id: string;
+  image: string | StaticImageData;
+  title: string;
+  description?: string;
+  link?: string;
+  position: 'top' | 'bottom';
 }
 
 export interface HomeSliderData {
-  slides: SlideData[]
-  adBoxes: AdBoxData[]
+  slides: SlideData[];
+  adBoxes: AdBoxData[];
 }
 
 // Default placeholder data (shown only while loading or on error)
@@ -36,48 +36,48 @@ const defaultData: HomeSliderData = {
   slides: [
     {
       id: '1',
-      image: "/1.webp",
+      image: '/1.webp',
       title: '',
       description: '',
-      link: '#'
+      link: '#',
     },
     {
       id: '2',
-      image: "/2.webp",
+      image: '/2.webp',
       title: '',
       description: '',
-      link: '#'
+      link: '#',
     },
     {
       id: '3',
-      image: "/3.webp",
+      image: '/3.webp',
       title: '',
       description: '',
-      link: '#'
-    }
+      link: '#',
+    },
   ],
   adBoxes: [
     {
       id: 'ad1',
-      image: "/ad1.webp",
+      image: '/ad1.webp',
       title: '',
       description: '',
       link: '#',
-      position: 'top'
+      position: 'top',
     },
     {
       id: 'ad2',
-      image: "/ad2.webp",
+      image: '/ad2.webp',
       title: '',
       description: '',
       link: '#',
-      position: 'bottom'
-    }
-  ]
-}
+      position: 'bottom',
+    },
+  ],
+};
 
 interface HomeSliderProps {
-  data?: HomeSliderData
+  data?: HomeSliderData;
 }
 
 const mapSliders = (sliders: Slider[]): HomeSliderData => {
@@ -117,116 +117,114 @@ const mapSliders = (sliders: Slider[]): HomeSliderData => {
 };
 
 const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
-  const [fetchedData, setFetchedData] = useState<HomeSliderData | null>(null)
-  const [loading, setLoading] = useState(!data)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [fetchedData, setFetchedData] = useState<HomeSliderData | null>(null);
+  const [loading, setLoading] = useState(!data);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const sliderData = data || fetchedData || defaultData
-  const slideCount = sliderData.slides.length
+  const sliderData = data || fetchedData || defaultData;
+  const slideCount = sliderData.slides.length;
 
   // Fetch live slides from the backend unless a `data` prop was provided
   useEffect(() => {
-    if (data) return
-    let mounted = true
+    if (data) return;
+    let mounted = true;
     sliderApi
       .getAll({ active: true })
       .then(({ data: res }) => {
-        if (mounted) setFetchedData(mapSliders(res.sliders || []))
+        if (mounted) setFetchedData(mapSliders(res.sliders || []));
       })
       .catch(() => {})
       .finally(() => {
-        if (mounted) setLoading(false)
-      })
+        if (mounted) setLoading(false);
+      });
     return () => {
-      mounted = false
-    }
-  }, [data])
+      mounted = false;
+    };
+  }, [data]);
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (slideCount > 0 ? (prev + 1) % slideCount : 0))
-  }, [slideCount])
+    setCurrentIndex((prev) => (slideCount > 0 ? (prev + 1) % slideCount : 0));
+  }, [slideCount]);
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prev) =>
       slideCount > 0 ? (prev - 1 + slideCount) % slideCount : 0
-    )
-  }, [slideCount])
+    );
+  }, [slideCount]);
 
   // Auto-advance slider
   useEffect(() => {
-    if (slideCount <= 1) return
+    if (slideCount <= 1) return;
     const timer = setInterval(() => {
-      nextSlide()
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [nextSlide, slideCount])
+      nextSlide();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [nextSlide, slideCount]);
 
   // Keep currentIndex in bounds if slides change
   useEffect(() => {
-    if (currentIndex >= slideCount) setCurrentIndex(0)
-  }, [slideCount, currentIndex])
+    if (currentIndex >= slideCount) setCurrentIndex(0);
+  }, [slideCount, currentIndex]);
 
   const slideVariants = {
     enter: {
-      opacity: 0
+      opacity: 0,
     },
     center: {
-      opacity: 1
+      opacity: 1,
     },
     exit: {
-      opacity: 0
-    }
-  }
+      opacity: 0,
+    },
+  };
 
   // Loading skeleton
   if (loading) {
     return (
-      <div className="w-ful">
+      <div className="w-full">
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6" style={{ height: '500px' }}>
-            <div className="lg:col-span-7 h-full">
-              <div className="relative overflow-hidden rounded-xl h-full bg-gray-200 animate-pulse" />
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:h-[clamp(360px,35vw,500px)] lg:grid-cols-10">
+            <div className="aspect-video lg:col-span-7 lg:aspect-auto lg:h-full">
+              <div className="relative h-full overflow-hidden rounded-xl bg-gray-200 animate-pulse" />
             </div>
-            <div className="lg:col-span-3 flex flex-row lg:flex-col gap-4 lg:gap-6 h-full">
-              <div className="flex-1 rounded-xl bg-gray-200 animate-pulse" />
-              <div className="flex-1 rounded-xl bg-gray-200 animate-pulse" />
+            <div className="flex h-auto flex-row gap-4 lg:col-span-3 lg:h-full lg:flex-col lg:gap-6">
+              <div className="aspect-4/3 min-w-0 flex-1 rounded-xl bg-gray-200 animate-pulse lg:aspect-auto" />
+              <div className="aspect-4/3 min-w-0 flex-1 rounded-xl bg-gray-200 animate-pulse lg:aspect-auto" />
             </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Empty state (no active slides)
   if (slideCount === 0) {
     return (
-      <div className="w-ful">
+      <div className="w-full">
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6" style={{ height: '500px' }}>
-            <div className="lg:col-span-7 rounded-xl bg-gray-100" />
-            <div className="lg:col-span-3 flex flex-col gap-6 h-full">
-              <div className="flex-1 rounded-xl bg-gray-100" />
-              <div className="flex-1 rounded-xl bg-gray-100" />
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:h-[clamp(360px,35vw,500px)] lg:grid-cols-10">
+            <div className="aspect-video rounded-xl bg-gray-100 lg:col-span-7 lg:aspect-auto" />
+            <div className="flex h-auto flex-row gap-4 lg:col-span-3 lg:h-full lg:flex-col lg:gap-6">
+              <div className="aspect-4/3 min-w-0 flex-1 rounded-xl bg-gray-100 lg:aspect-auto" />
+              <div className="aspect-4/3 min-w-0 flex-1 rounded-xl bg-gray-100 lg:aspect-auto" />
             </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  const currentSlide = sliderData.slides[currentIndex]
+  const currentSlide = sliderData.slides[currentIndex];
   const currentLink =
-    currentSlide.link && currentSlide.link !== '#'
-      ? currentSlide.link
-      : null
+    currentSlide.link && currentSlide.link !== '#' ? currentSlide.link : null;
 
   return (
-    <div className="w-ful">
+    <div className="w-full">
       <div className="mx-auto max-w-7xl px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-10 gap-6" style={{ height: '500px' }}>
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:h-[clamp(360px,35vw,500px)] lg:grid-cols-10">
           {/* Left Side - Main Slider (70% width on desktop) */}
-          <div className="lg:col-span-7 relative h-full xxl:h-[500px]">
-            <div className="relative overflow-hidden rounded-xl h-full bg-gray-100">
+          <div className="relative aspect-video lg:col-span-7 lg:aspect-auto lg:h-full">
+            <div className="relative h-full overflow-hidden rounded-xl bg-gray-100">
               <AnimatePresence initial={false} mode="wait">
                 <motion.div
                   key={currentIndex}
@@ -235,7 +233,7 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
                   animate="center"
                   exit="exit"
                   transition={{
-                    opacity: { duration: 0.8, ease: 'easeInOut' }
+                    opacity: { duration: 0.8, ease: 'easeInOut' },
                   }}
                   className="absolute inset-0"
                 >
@@ -245,8 +243,8 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
                         src={currentSlide.image}
                         alt={currentSlide.title}
                         fill
-                        className="object-center"
-                        sizes="(max-width: 768px) 100vw, 66vw"
+                        className="object-cover object-center"
+                        sizes="(max-width: 1024px) 100vw, 70vw"
                         loading="eager"
                       />
                       {currentSlide.title && (
@@ -281,8 +279,8 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
                         src={currentSlide.image}
                         alt={currentSlide.title}
                         fill
-                        className="object-center"
-                        sizes="(max-width: 768px) 100vw, 66vw"
+                        className="object-cover object-center"
+                        sizes="(max-width: 1024px) 100vw, 70vw"
                         loading="eager"
                       />
                       {currentSlide.title && (
@@ -348,16 +346,17 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
           </div>
 
           {/* Right Side - Two Ad Boxes (30% width on desktop, horizontal on mobile) */}
-          <div className="lg:col-span-3 flex flex-row lg:flex-col gap-4 lg:gap-6 h-full">
+          <div className="flex h-auto flex-row gap-4 lg:col-span-3 lg:h-full lg:flex-col lg:gap-6">
             {sliderData.adBoxes.map((adBox) => {
-              const adLink = adBox.link && adBox.link !== '#' ? adBox.link : null
+              const adLink =
+                adBox.link && adBox.link !== '#' ? adBox.link : null;
               const adContent = (
                 <>
                   <Image
                     src={adBox.image}
                     alt={adBox.title}
                     fill
-                    className="object-center transition-transform duration-300 group-hover:scale-105"
+                    className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
                     sizes="(max-width: 1024px) 100vw, 30vw"
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
@@ -372,14 +371,14 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
                     )}
                   </div>
                 </>
-              )
+              );
               return (
                 <motion.div
                   key={adBox.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: adBox.position === 'top' ? 0.4 : 0.5 }}
-                  className="relative overflow-hidden rounded-xl bg-gray-100 group cursor-pointer flex-1 min-h-0"
+                  className="relative aspect-4/3 min-w-0 flex-1 overflow-hidden rounded-xl bg-gray-100 group cursor-pointer lg:aspect-auto lg:min-h-0"
                 >
                   {adLink ? (
                     <Link href={adLink} className="absolute inset-0">
@@ -389,13 +388,13 @@ const HomeSlider: React.FC<HomeSliderProps> = ({ data }) => {
                     adContent
                   )}
                 </motion.div>
-              )
+              );
             })}
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default HomeSlider
+export default HomeSlider;
