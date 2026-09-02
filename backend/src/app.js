@@ -7,6 +7,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 // Import route files (with .js extension)
 import analyticsRoutes from "./routes/analyticsRoutes.js";
+import auditRoutes from "./routes/auditRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
@@ -33,6 +34,9 @@ import smsRoutes from "./routes/smsRoutes.js";
 import storeRoutes from "./routes/storeRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import visitorRoutes from "./routes/visitorRoutes.js";
+import { healthCheck } from "./config/database.js";
+import { getRedis } from "./config/redis.js";
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from "node:dns/promises";
@@ -156,11 +160,13 @@ app.use("/api/promo", promoRoutes);
 app.use("/api/sliders", sliderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/audit", auditRoutes);
 app.use("/api/payment-settings", paymentSettingsRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/sms", smsRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/meta", metaRoutes);
+app.use("/api/visitors", visitorRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/holiday", holidayRoutes);
 app.use("/api/home-slider-texts", homeSliderTextRoutes);
@@ -173,6 +179,47 @@ app.get("/", (req, res) => {
   res
     .status(200)
     .json({ status: "OK", message: "Apple IT Zone backend is running" });
+});
+
+app.get("/api/health", async (req, res) => {
+  const database = await healthCheck();
+  const redisEnabled = process.env.REDIS_ENABLED !== "false";
+  const redisReady = Boolean(getRedis());
+  const services = {
+    api: { status: "healthy", message: "API is responding" },
+    database: {
+      status: database.readyState === 1 ? "healthy" : "unhealthy",
+      message: database.status,
+      host: database.host,
+      name: database.name,
+    },
+    redis: {
+      status: !redisEnabled ? "disabled" : redisReady ? "healthy" : "unhealthy",
+      message: !redisEnabled
+        ? "Redis is disabled"
+        : redisReady
+          ? "Redis is connected"
+          : "Redis is not ready",
+    },
+  };
+  const overall = Object.values(services).some(
+    (service) => service.status === "unhealthy",
+  )
+    ? "unhealthy"
+    : "healthy";
+
+  res.status(overall === "healthy" ? 200 : 503).json({
+    success: overall === "healthy",
+    status: overall,
+    checkedAt: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    memory: {
+      usedMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heapUsedMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    },
+    nodeVersion: process.version,
+    services,
+  });
 });
 
 // ------- Error Handling Middleware -------

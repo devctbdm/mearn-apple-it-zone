@@ -1,5 +1,32 @@
 import api from './axios';
 
+export type AuditLog = {
+  _id: string;
+  actor?: { id?: string; name?: string; role?: string };
+  action: string;
+  target?: string;
+  changes?: { request?: Record<string, unknown>; statusCode?: number } | null;
+  ip?: string;
+  userAgent?: string;
+  createdAt: string;
+};
+
+export const auditApi = {
+  getAll: (params: {
+    page: number;
+    limit: number;
+    search?: string;
+    role?: string;
+    status?: string;
+  }) =>
+    api.get<{
+      success: boolean;
+      logs: AuditLog[];
+      total: number;
+      pages: number;
+    }>('/audit', { params }),
+};
+
 export type Category = {
   _id: string;
   name: string;
@@ -836,6 +863,32 @@ export const analyticsApi = {
     api.get<{ success: boolean; data: AnalyticsStats }>('/analytics'),
 };
 
+export type VisitorOverview = {
+  days: number;
+  summary: {
+    activeUsers: number;
+    newUsers: number;
+    sessions: number;
+    pageViews: number;
+    engagementRate: number;
+  };
+  daily: { date: string; activeUsers: number; sessions: number }[];
+  devices: { device: string; activeUsers: number; sessions: number }[];
+  topPages: {
+    title: string;
+    path: string;
+    pageViews: number;
+    activeUsers: number;
+  }[];
+};
+
+export const visitorApi = {
+  getOverview: (days: 7 | 30 | 90 = 30) =>
+    api.get<{ success: boolean; data: VisitorOverview }>('/visitors/overview', {
+      params: { days },
+    }),
+};
+
 export type ProductFormData = {
   name: string;
   description: string;
@@ -1195,7 +1248,12 @@ export const maintenanceApi = {
 };
 
 export type SmsSettings = {
+  provider?: 'bulksmsbd' | 'rtcom';
   apiKey: string;
+  gatewayUrl?: string;
+  gatewayApiKey?: string;
+  gatewayApiKeyVariable?: string;
+  gatewaySmsType?: 'url';
   senderId: string;
   signature: string;
   enabled: boolean;
@@ -1263,6 +1321,27 @@ export type MetaCatalogStatus = {
 
 export const metaApi = {
   getStatus: () => api.get<MetaCatalogStatus>('/meta/status'),
+};
+
+export type HealthService = {
+  status: 'healthy' | 'unhealthy' | 'disabled';
+  message: string;
+  host?: string;
+  name?: string;
+};
+
+export type HealthStatus = {
+  success: boolean;
+  status: 'healthy' | 'unhealthy';
+  checkedAt: string;
+  uptimeSeconds: number;
+  memory: { usedMb: number; heapUsedMb: number };
+  nodeVersion: string;
+  services: Record<'api' | 'database' | 'redis', HealthService>;
+};
+
+export const healthApi = {
+  getStatus: () => api.get<HealthStatus>('/health'),
 };
 
 // ---------------- Offers ----------------

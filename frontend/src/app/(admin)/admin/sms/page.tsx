@@ -1,46 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  MessageSquare,
-  Send,
-  Settings as SettingsIcon,
-  History,
-  Wallet,
-  RefreshCw,
-  Phone,
-  Loader2,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  KeyRound,
-  Megaphone,
-  PenLine,
-  Power,
-  BadgeDollarSign,
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Pagination,
   PaginationContent,
@@ -49,14 +19,54 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { smsApi, type SmsLog, type SmsSettings } from '@/lib/api';
+import {
+  AlertTriangle,
+  BadgeDollarSign,
+  CheckCircle2,
+  History,
+  KeyRound,
+  Loader2,
+  Megaphone,
+  MessageSquare,
+  PenLine,
+  Phone,
+  Power,
+  RefreshCw,
+  Send,
+  Settings as SettingsIcon,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 const EST_COST_PER_SMS = 0.25;
 
 const formatTaka = (n: number | string) => {
   const num = Number(n);
-  return Number.isFinite(num) ? `৳${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—';
+  return Number.isFinite(num)
+    ? `৳${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    : '—';
 };
 
 function statusColor(status: 'sent' | 'failed') {
@@ -68,7 +78,12 @@ function statusColor(status: 'sent' | 'failed') {
 export default function SmsPage() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<SmsSettings>({
+    provider: 'bulksmsbd',
     apiKey: '',
+    gatewayUrl: '',
+    gatewayApiKey: '',
+    gatewayApiKeyVariable: 'api_key',
+    gatewaySmsType: 'url',
     senderId: '',
     signature: '',
     enabled: false,
@@ -83,11 +98,14 @@ export default function SmsPage() {
   // Send tab state
   const [numbers, setNumbers] = useState('');
   const [message, setMessage] = useState('');
-  const [senderOverride, setSenderOverride] = useState('');
   const [sending, setSending] = useState(false);
 
   // Settings tab state
   const [apiKey, setApiKey] = useState('');
+  const [provider, setProvider] = useState<'bulksmsbd' | 'rtcom'>('bulksmsbd');
+  const [gatewayUrl, setGatewayUrl] = useState('');
+  const [gatewayApiKey, setGatewayApiKey] = useState('');
+  const [gatewayApiKeyVariable, setGatewayApiKeyVariable] = useState('api_key');
   const [senderId, setSenderId] = useState('');
   const [signature, setSignature] = useState('');
   const [enabled, setEnabled] = useState(false);
@@ -99,7 +117,13 @@ export default function SmsPage() {
         const { data } = await smsApi.getSettings();
         if (data.success) {
           setSettings(data.settings);
+          setProvider(data.settings.provider || 'bulksmsbd');
           setApiKey(data.settings.apiKey);
+          setGatewayUrl(data.settings.gatewayUrl || '');
+          setGatewayApiKey(data.settings.gatewayApiKey || '');
+          setGatewayApiKeyVariable(
+            data.settings.gatewayApiKeyVariable || 'api_key'
+          );
           setSenderId(data.settings.senderId);
           setSignature(data.settings.signature);
           setEnabled(data.settings.enabled);
@@ -127,6 +151,11 @@ export default function SmsPage() {
   };
 
   const refreshBalance = async (showError = true) => {
+    if (provider === 'rtcom') {
+      if (showError)
+        toast.info('Balance lookup is only available for Bulk SMS.');
+      return;
+    }
     setBalanceLoading(true);
     try {
       const { data } = await smsApi.getBalance();
@@ -137,14 +166,16 @@ export default function SmsPage() {
         setBalance(null);
       }
     } catch {
-      if (showError) toast.error('Could not fetch balance. Check your API key.');
+      if (showError)
+        toast.error('Could not fetch balance. Check your API key.');
       setBalance(null);
     } finally {
       setBalanceLoading(false);
     }
   };
 
-  const messageLength = message.length + (settings.signature ? settings.signature.length + 1 : 0);
+  const messageLength =
+    message.length + (settings.signature ? settings.signature.length + 1 : 0);
   const segments = Math.max(1, Math.ceil(messageLength / 160));
 
   const handleSend = async () => {
@@ -162,17 +193,19 @@ export default function SmsPage() {
       const { data } = await smsApi.send({
         numbers,
         message: message.trim(),
-        senderId: senderOverride.trim() || undefined,
       });
       if (data.success) {
-        toast.success(`SMS sent to ${data.numbers.length} number${data.numbers.length > 1 ? 's' : ''}`);
+        toast.success(
+          `SMS sent to ${data.numbers.length} number${data.numbers.length > 1 ? 's' : ''}`
+        );
         setNumbers('');
         setMessage('');
-        setSenderOverride('');
         fetchLogs(1);
         refreshBalance(false);
       } else {
-        toast.error(data.providerMessage || 'SMS provider rejected the message');
+        toast.error(
+          data.providerMessage || 'SMS provider rejected the message'
+        );
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to send SMS');
@@ -184,7 +217,17 @@ export default function SmsPage() {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      const { data } = await smsApi.updateSettings({ apiKey, senderId, signature, enabled });
+      const { data } = await smsApi.updateSettings({
+        provider,
+        apiKey,
+        gatewayUrl,
+        gatewayApiKey,
+        gatewayApiKeyVariable,
+        gatewaySmsType: 'url',
+        senderId,
+        signature,
+        enabled,
+      });
       if (data.success) {
         setSettings(data.settings);
         toast.success('SMS settings saved');
@@ -205,13 +248,22 @@ export default function SmsPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">SMS Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            SMS Dashboard
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Send messages and manage your bulksmsbd.net account.
+            Send messages through your configured SMS gateway.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refreshBalance()} disabled={balanceLoading}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${balanceLoading ? 'animate-spin' : ''}`} />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refreshBalance()}
+          disabled={balanceLoading || provider === 'rtcom'}
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-1 ${balanceLoading ? 'animate-spin' : ''}`}
+          />
           Check balance
         </Button>
       </div>
@@ -220,7 +272,9 @@ export default function SmsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Balance</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Balance
+            </CardTitle>
             <div className="p-2 rounded-lg text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
               <Wallet className="h-4 w-4" />
             </div>
@@ -229,29 +283,49 @@ export default function SmsPage() {
             {loading || balanceLoading ? (
               <Skeleton className="h-7 w-28" />
             ) : (
-              <div className="text-2xl font-bold">{balance !== null ? formatTaka(balance) : '—'}</div>
+              <div className="text-2xl font-bold">
+                {balance !== null ? formatTaka(balance) : '—'}
+              </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">bulksmsbd.net account balance</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {provider === 'rtcom'
+                ? 'Balance unavailable for RTCom'
+                : 'bulksmsbd.net account balance'}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Messages Sent
+            </CardTitle>
             <div className="p-2 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-950/30">
               <MessageSquare className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-7 w-16" /> : totalLogs.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total SMS in history</p>
+            <div className="text-2xl font-bold">
+              {loading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : (
+                totalLogs.toLocaleString()
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Total SMS in history
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
-            <div className={`p-2 rounded-lg ${settings.enabled ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' : 'text-red-600 bg-red-50 dark:bg-red-950/30'}`}>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Status
+            </CardTitle>
+            <div
+              className={`p-2 rounded-lg ${settings.enabled ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' : 'text-red-600 bg-red-50 dark:bg-red-950/30'}`}
+            >
               <Power className="h-4 w-4" />
             </div>
           </CardHeader>
@@ -259,7 +333,9 @@ export default function SmsPage() {
             {loading ? (
               <Skeleton className="h-7 w-28" />
             ) : (
-              <div className={`text-2xl font-bold ${settings.enabled ? 'text-emerald-600' : 'text-red-600'}`}>
+              <div
+                className={`text-2xl font-bold ${settings.enabled ? 'text-emerald-600' : 'text-red-600'}`}
+              >
                 {settings.enabled ? 'Active' : 'Disabled'}
               </div>
             )}
@@ -272,9 +348,15 @@ export default function SmsPage() {
 
       <Tabs defaultValue="send" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="send"><Send className="h-4 w-4 mr-1" /> Send SMS</TabsTrigger>
-          <TabsTrigger value="settings"><SettingsIcon className="h-4 w-4 mr-1" /> Settings</TabsTrigger>
-          <TabsTrigger value="history"><History className="h-4 w-4 mr-1" /> History</TabsTrigger>
+          <TabsTrigger value="send">
+            <Send className="h-4 w-4 mr-1" /> Send SMS
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <SettingsIcon className="h-4 w-4 mr-1" /> Settings
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="h-4 w-4 mr-1" /> History
+          </TabsTrigger>
         </TabsList>
 
         {/* ---------------- Send SMS ---------------- */}
@@ -283,7 +365,8 @@ export default function SmsPage() {
             <CardHeader>
               <CardTitle>Compose Message</CardTitle>
               <CardDescription>
-                One number per line or comma separated (e.g. 017xxxxxxxx, 88017xxxxxxxx).
+                One number per line or comma separated (e.g. 017xxxxxxxx,
+                88017xxxxxxxx).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -300,7 +383,8 @@ export default function SmsPage() {
                     className="min-h-24 resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {numbers.split(/[\s,;]+/).filter(Boolean).length} number(s) detected
+                    {numbers.split(/[\s,;]+/).filter(Boolean).length} number(s)
+                    detected
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -316,41 +400,46 @@ export default function SmsPage() {
                   />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>
-                      {messageLength} chars · {segments} SMS segment{segments > 1 ? 's' : ''}
+                      {messageLength} chars · {segments} SMS segment
+                      {segments > 1 ? 's' : ''}
                     </span>
                     <span className="flex items-center gap-1">
                       <BadgeDollarSign className="h-3.5 w-3.5" />
-                      Est. {formatTaka(segments * EST_COST_PER_SMS)} (৳{EST_COST_PER_SMS}/sms)
+                      Est. {formatTaka(segments * EST_COST_PER_SMS)} (৳
+                      {EST_COST_PER_SMS}/sms)
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5" /> Sender ID
-                </Label>
-                <Input
-                  value={senderOverride}
-                  onChange={(e) => setSenderOverride(e.target.value)}
-                  placeholder={settings.senderId || 'Defaults to sender from settings'}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {settings.signature && (
-                    <>
-                      Signature <span className="font-medium">"{settings.signature}"</span> will be appended
-                      automatically.
-                    </>
-                  )}
-                  {!settings.signature && 'Leave empty to use the sender ID saved in settings.'}
-                </p>
-              </div>
+              {provider === 'bulksmsbd' && (
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5">
+                    <KeyRound className="h-3.5 w-3.5" /> Sender ID
+                  </Label>
+                  <Input
+                    value={settings.senderId || 'Not configured'}
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sender ID is loaded from SMS Gateway Settings and cannot be
+                    changed here.
+                    {settings.signature &&
+                      ` Signature "${settings.signature}" will be appended automatically.`}
+                  </p>
+                </div>
+              )}
 
               <div className="flex justify-end">
-                <Button onClick={handleSend} disabled={sending || !settings.enabled}>
+                <Button
+                  onClick={handleSend}
+                  disabled={sending || !settings.enabled}
+                >
                   {sending ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sending...
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />{' '}
+                      Sending...
                     </>
                   ) : (
                     <>
@@ -373,36 +462,107 @@ export default function SmsPage() {
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>bulksmsbd.net Settings</CardTitle>
+              <CardTitle>SMS Gateway Settings</CardTitle>
               <CardDescription>
-                Your API key and sender ID from{' '}
-                <a href="https://bulksmsbd.net" target="_blank" rel="noreferrer" className="underline">
-                  bulksmsbd.net
-                </a>
-                .
+                Choose the provider used by order updates, login OTPs, and
+                manual messages.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>API Key</Label>
-                <Input
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Your bulksmsbd.net API key"
-                />
+                <Label>Active SMS provider</Label>
+                <Select
+                  value={provider}
+                  onValueChange={(value) =>
+                    setProvider((value || 'bulksmsbd') as 'bulksmsbd' | 'rtcom')
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bulksmsbd">Bulk SMS BD</SelectItem>
+                    <SelectItem value="rtcom">RTCom Gateway</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  Found under API settings in your bulksmsbd.net account.
+                  Only the selected provider will send SMS. Save after switching
+                  providers.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Sender ID</Label>
-                  <Input
-                    value={senderId}
-                    onChange={(e) => setSenderId(e.target.value)}
-                    placeholder="e.g. 8809612345678 or your mask"
-                  />
+
+              {provider === 'rtcom' && (
+                <div className="space-y-4 rounded-md border bg-muted/20 p-4">
+                  <div className="space-y-1.5">
+                    <Label>Enter SMS gateway URL</Label>
+                    <Input
+                      value={gatewayUrl}
+                      onChange={(e) => setGatewayUrl(e.target.value)}
+                      placeholder="https://api.rtcom.xyz/..."
+                      type="url"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use the RTCom send endpoint. The request will use GET
+                      (URL) parameters.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Enter API key</Label>
+                      <Input
+                        value={gatewayApiKey}
+                        onChange={(e) => setGatewayApiKey(e.target.value)}
+                        placeholder="Your RTCom API key"
+                        type="password"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>API-key variable (optional)</Label>
+                      <Input
+                        value={gatewayApiKeyVariable}
+                        onChange={(e) =>
+                          setGatewayApiKeyVariable(e.target.value)
+                        }
+                        placeholder="api_key"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Defaults to <span className="font-mono">api_key</span>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border bg-background p-3 text-sm">
+                    <span className="text-muted-foreground">SMS type</span>
+                    <Badge variant="secondary">URL (GET)</Badge>
+                  </div>
                 </div>
+              )}
+
+              {provider === 'bulksmsbd' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>API Key</Label>
+                    <Input
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Your bulksmsbd.net API key"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Found under API settings in your bulksmsbd.net account.
+                    </p>
+                  </div>
+                </>
+              )}
+              <div className="grid gap-4 md:grid-cols-2">
+                {provider === 'bulksmsbd' && (
+                  <div className="space-y-1.5">
+                    <Label>Sender ID</Label>
+                    <Input
+                      value={senderId}
+                      onChange={(e) => setSenderId(e.target.value)}
+                      placeholder="e.g. 8809612345678 or your mask"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>Signature</Label>
                   <Input
@@ -410,7 +570,9 @@ export default function SmsPage() {
                     onChange={(e) => setSignature(e.target.value)}
                     placeholder="e.g. Apple IT Zone, Dhaka"
                   />
-                  <p className="text-xs text-muted-foreground">Appended to every message automatically.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Appended to every message automatically.
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-md border p-3">
@@ -425,13 +587,18 @@ export default function SmsPage() {
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
               </div>
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => refreshBalance()} disabled={balanceLoading}>
+                <Button
+                  variant="outline"
+                  onClick={() => refreshBalance()}
+                  disabled={balanceLoading || provider === 'rtcom'}
+                >
                   <Wallet className="h-4 w-4 mr-1" /> Check balance
                 </Button>
                 <Button onClick={handleSaveSettings} disabled={savingSettings}>
                   {savingSettings ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving...
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />{' '}
+                      Saving...
                     </>
                   ) : (
                     <>
@@ -450,9 +617,15 @@ export default function SmsPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Send History</CardTitle>
-                <CardDescription>Recent SMS messages ({totalLogs} total)</CardDescription>
+                <CardDescription>
+                  Recent SMS messages ({totalLogs} total)
+                </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => fetchLogs(page)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchLogs(page)}
+              >
                 <RefreshCw className="h-4 w-4" /> Refresh
               </Button>
             </CardHeader>
@@ -476,7 +649,9 @@ export default function SmsPage() {
                           <TableHead>Date</TableHead>
                           <TableHead>To</TableHead>
                           <TableHead>Message</TableHead>
-                          <TableHead className="text-center">Segments</TableHead>
+                          <TableHead className="text-center">
+                            Segments
+                          </TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -495,20 +670,31 @@ export default function SmsPage() {
                               {log.to.map((n) => `0${n.slice(-10)}`).join(', ')}
                             </TableCell>
                             <TableCell className="max-w-64">
-                              <p className="truncate" title={log.message}>{log.message}</p>
-                              {log.providerMessage && log.status === 'failed' && (
-                                <p className="text-xs text-destructive truncate">{log.providerMessage}</p>
-                              )}
+                              <p className="truncate" title={log.message}>
+                                {log.message}
+                              </p>
+                              {log.providerMessage &&
+                                log.status === 'failed' && (
+                                  <p className="text-xs text-destructive truncate">
+                                    {log.providerMessage}
+                                  </p>
+                                )}
                             </TableCell>
-                            <TableCell className="text-center">{log.segments}</TableCell>
+                            <TableCell className="text-center">
+                              {log.segments}
+                            </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={statusColor(log.status)}>
+                              <Badge
+                                variant="outline"
+                                className={statusColor(log.status)}
+                              >
                                 {log.status === 'sent' ? (
                                   <CheckCircle2 className="h-3 w-3 mr-1" />
                                 ) : (
                                   <XCircle className="h-3 w-3 mr-1" />
                                 )}
-                                {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
+                                {log.status.charAt(0).toUpperCase() +
+                                  log.status.slice(1)}
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -527,7 +713,10 @@ export default function SmsPage() {
                           <PaginationItem>
                             <PaginationPrevious
                               href="#"
-                              onClick={(e) => { e.preventDefault(); if (page > 1) goToPage(page - 1); }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (page > 1) goToPage(page - 1);
+                              }}
                             />
                           </PaginationItem>
                           {Array.from({ length: pages }).map((_, i) => (
@@ -535,7 +724,10 @@ export default function SmsPage() {
                               <PaginationLink
                                 href="#"
                                 isActive={i + 1 === page}
-                                onClick={(e) => { e.preventDefault(); goToPage(i + 1); }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  goToPage(i + 1);
+                                }}
                               >
                                 {i + 1}
                               </PaginationLink>
@@ -544,7 +736,10 @@ export default function SmsPage() {
                           <PaginationItem>
                             <PaginationNext
                               href="#"
-                              onClick={(e) => { e.preventDefault(); if (page < pages) goToPage(page + 1); }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (page < pages) goToPage(page + 1);
+                              }}
                             />
                           </PaginationItem>
                         </PaginationContent>

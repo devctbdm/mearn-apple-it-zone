@@ -6,6 +6,13 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { ClientLayout } from './ClientLayout';
 import './globals.css';
 import { Providers } from './providers';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 const appTitle = 'Apple IT Zone';
 const appMainDescription =
@@ -45,6 +52,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen flex flex-col">
         <Providers>
+          <GoogleAnalytics />
           <TooltipProvider>
             <ClientLayout>{children}</ClientLayout>
           </TooltipProvider>

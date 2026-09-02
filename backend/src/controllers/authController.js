@@ -2,13 +2,13 @@
 
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
-import User from '../models/User.js';
-import TeamMember from '../models/TeamMember.js';
+import { recordLogin } from '../middleware/audit.js';
 import Session from '../models/Session.js';
-import { parseUserAgent } from '../utils/parseUA.js';
 import { getSmsSetting } from '../models/SmsSetting.js';
-import { sendPasswordResetOtp, sendLoginOtp } from '../services/smsService.js';
+import TeamMember from '../models/TeamMember.js';
+import User from '../models/User.js';
+import { sendLoginOtp, sendPasswordResetOtp } from '../services/smsService.js';
+import { parseUserAgent } from '../utils/parseUA.js';
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -224,6 +224,7 @@ export const login = async (req, res) => {
 
       const token = generateToken(user._id);
       await recordSession(user._id, req);
+      if (isStaff) recordLogin(req, user);
       return res.json({
         success: true,
         token,
@@ -275,6 +276,7 @@ export const login = async (req, res) => {
     // Update last login time
     member.lastLogin = new Date();
     await member.save();
+    recordLogin(req, member);
 
     res.json({
       success: true,
@@ -382,6 +384,7 @@ export const verifyOtp = async (req, res) => {
     if (isTeamAccount) {
       account.lastLogin = new Date();
       await account.save();
+      recordLogin(req, account);
       return res.json({
         success: true,
         token,
@@ -400,6 +403,7 @@ export const verifyOtp = async (req, res) => {
 
     await account.save();
     await recordSession(account._id, req);
+    recordLogin(req, account);
     return res.json({
       success: true,
       token,

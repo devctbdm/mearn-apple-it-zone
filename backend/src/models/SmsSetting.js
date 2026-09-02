@@ -2,7 +2,12 @@ import mongoose from 'mongoose';
 
 const smsSettingSchema = new mongoose.Schema(
   {
+    provider: { type: String, enum: ['bulksmsbd', 'rtcom'], default: 'bulksmsbd' },
     apiKey: { type: String, default: '' },
+    gatewayUrl: { type: String, default: '' },
+    gatewayApiKey: { type: String, default: '' },
+    gatewayApiKeyVariable: { type: String, default: 'api_key' },
+    gatewaySmsType: { type: String, enum: ['url'], default: 'url' },
     senderId: { type: String, default: '' },
     signature: { type: String, default: '' },
     enabled: { type: Boolean, default: false },

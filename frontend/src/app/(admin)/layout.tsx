@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { LiquidBlob } from '@/components/LiquidBlob';
-import { useAuth } from '@/store';
-import { useMaintenance } from '@/hooks/use-maintenance';
-import { canAccessRoute, ADMIN_ROUTE_DENIED_MESSAGE } from '@/lib/adminPermissions';
 import { AccessDenied } from '@/components/AccessDenied';
+import { AppSidebar } from '@/components/app-sidebar';
+import { LiquidBlob } from '@/components/LiquidBlob';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { useMaintenance } from '@/hooks/use-maintenance';
+import {
+  ADMIN_ROUTE_DENIED_MESSAGE,
+  canAccessRoute,
+} from '@/lib/adminPermissions';
+import { useAuth } from '@/store';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 const ADMIN_ROLES = ['admin', 'super_admin'];
 
@@ -48,7 +51,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
   if (isLoading || !user || !ADMIN_ROLES.includes(user.role)) {
     return (
-      <div className="fixed inset-0 z-[9999] flex h-screen w-full flex-col items-center justify-center gap-6 bg-background">
+      <div className="fixed inset-0 z-9999 flex h-screen w-full flex-col items-center justify-center gap-6 bg-background">
         <LiquidBlob size={72} />
         <p className="text-sm font-medium tracking-wide text-muted-foreground">
           Apple IT Zone
@@ -84,7 +87,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Route-transition loader */}
       <div
-        className={`pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center bg-background/60 backdrop-blur-sm transition-opacity duration-200 ${
+        className={`pointer-events-none fixed inset-0 z-9999 flex items-center justify-center bg-background/60 backdrop-blur-sm transition-opacity duration-200 ${
           navigating ? 'opacity-100' : 'opacity-0'
         }`}
         aria-hidden="true"

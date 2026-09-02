@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import { notificationApi } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
+import { useAuth } from '@/store';
 import {
   BellCheck,
   ChartLine,
@@ -23,12 +24,11 @@ import {
   LayoutDashboard,
   ListSortAscending,
   Settings2Icon,
+  ShieldAlert,
   ShoppingCart,
   UsersRound,
   UserStar,
 } from 'lucide-react';
-
-import { useAuth } from '@/hooks/useAuth';
 
 // This is sample data.
 const data = {
@@ -84,6 +84,14 @@ const data = {
         {
           title: 'Overview',
           url: '/admin/analytics',
+        },
+        {
+          title: 'Visitors',
+          url: '/admin/visitors',
+        },
+        {
+          title: 'admin history',
+          url: '/admin/history',
         },
         {
           title: 'Health Check',
@@ -186,6 +194,11 @@ const data = {
         {
           title: 'Maintenance',
           url: '/admin/maintenance',
+        },
+        {
+          title: 'Admin History',
+          url: '/admin/history',
+          icon: <ShieldAlert />,
         },
       ],
     },

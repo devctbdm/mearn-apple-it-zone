@@ -1,6 +1,6 @@
-import { getSmsSetting } from '../models/SmsSetting.js';
-import SmsLog from '../models/SmsLog.js';
 import AuditLog from '../models/AuditLog.js';
+import SmsLog from '../models/SmsLog.js';
+import { getSmsSetting } from '../models/SmsSetting.js';
 import { sendSms as sendSmsService } from '../services/smsService.js';
 
 const BULKSMS_BASE = 'https://bulksmsbd.net/api';
@@ -13,7 +13,12 @@ export const getSettings = async (req, res) => {
     res.json({
       success: true,
       settings: {
+        provider: setting.provider || 'bulksmsbd',
         apiKey: setting.apiKey || '',
+        gatewayUrl: setting.gatewayUrl || '',
+        gatewayApiKey: setting.gatewayApiKey || '',
+        gatewayApiKeyVariable: setting.gatewayApiKeyVariable || 'api_key',
+        gatewaySmsType: setting.gatewaySmsType || 'url',
         senderId: setting.senderId || '',
         signature: setting.signature || '',
         enabled: !!setting.enabled,
@@ -30,7 +35,10 @@ export const getSettings = async (req, res) => {
 // @route   PUT /api/sms/settings
 export const updateSettings = async (req, res) => {
   try {
-    const { apiKey, senderId, signature, enabled, twoFactorEnabled, otpExpirySeconds } = req.body;
+    const {
+      provider, apiKey, senderId, signature, enabled, twoFactorEnabled,
+      otpExpirySeconds, gatewayUrl, gatewayApiKey, gatewayApiKeyVariable, gatewaySmsType,
+    } = req.body;
 
     const setting = await getSmsSetting();
     const before = {
@@ -41,7 +49,14 @@ export const updateSettings = async (req, res) => {
       typeof twoFactorEnabled === 'boolean' ||
       typeof otpExpirySeconds === 'number';
 
+    if (provider === 'bulksmsbd' || provider === 'rtcom') setting.provider = provider;
     if (typeof apiKey === 'string') setting.apiKey = apiKey.trim();
+    if (typeof gatewayUrl === 'string') setting.gatewayUrl = gatewayUrl.trim();
+    if (typeof gatewayApiKey === 'string') setting.gatewayApiKey = gatewayApiKey.trim();
+    if (typeof gatewayApiKeyVariable === 'string') {
+      setting.gatewayApiKeyVariable = gatewayApiKeyVariable.trim() || 'api_key';
+    }
+    if (gatewaySmsType === 'url') setting.gatewaySmsType = gatewaySmsType;
     if (typeof senderId === 'string') setting.senderId = senderId.trim();
     if (typeof signature === 'string') setting.signature = signature.trim();
     if (typeof enabled === 'boolean') setting.enabled = enabled;
@@ -73,7 +88,12 @@ export const updateSettings = async (req, res) => {
     res.json({
       success: true,
       settings: {
+        provider: setting.provider || 'bulksmsbd',
         apiKey: setting.apiKey || '',
+        gatewayUrl: setting.gatewayUrl || '',
+        gatewayApiKey: setting.gatewayApiKey || '',
+        gatewayApiKeyVariable: setting.gatewayApiKeyVariable || 'api_key',
+        gatewaySmsType: setting.gatewaySmsType || 'url',
         senderId: setting.senderId || '',
         signature: setting.signature || '',
         enabled: !!setting.enabled,

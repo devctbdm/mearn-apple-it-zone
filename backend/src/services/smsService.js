@@ -1,8 +1,17 @@
-import { getSmsSetting } from '../models/SmsSetting.js';
 import SmsLog from '../models/SmsLog.js';
+import { getSmsSetting } from '../models/SmsSetting.js';
 import StoreSetting from '../models/StoreSetting.js';
 
 const BULKSMS_BASE = 'https://bulksmsbd.net/api';
+
+function getRtcomUrl(setting, toList, message) {
+  const url = new URL(setting.gatewayUrl);
+  const keyVariable = setting.gatewayApiKeyVariable || 'api_key';
+  url.searchParams.set(keyVariable, setting.gatewayApiKey);
+  url.searchParams.set('number', toList.join(','));
+  url.searchParams.set('message', message);
+  return url.toString();
+}
 
 // Normalize a BD number: 01712345678 -> 8801712345678, keeps 8801xxxxxxxxx as-is
 function normalizeNumber(num) {
@@ -40,9 +49,16 @@ export async function sendSms({ numbers, message, senderId, skipSignature }) {
   };
 
   const setting = await getSmsSetting();
-  if (!setting.apiKey) {
+  const isRtcom = setting.provider === 'rtcom';
+  const configuredApiKey = isRtcom ? setting.gatewayApiKey : setting.apiKey;
+  if (!configuredApiKey) {
     result.skipped = true;
     result.reason = 'SMS API key is not configured';
+    return result;
+  }
+  if (isRtcom && !setting.gatewayUrl) {
+    result.skipped = true;
+    result.reason = 'SMS gateway URL is not configured';
     return result;
   }
   if (!setting.enabled) {
@@ -63,18 +79,21 @@ export async function sendSms({ numbers, message, senderId, skipSignature }) {
       ? `${String(message).trim()}\n${setting.signature}`
       : String(message).trim();
 
-  const body = new URLSearchParams();
-  body.append('api_key', setting.apiKey);
-  if (useSender) body.append('senderid', useSender);
-  body.append('number', toList.join(','));
-  body.append('message', fullMessage);
-
   try {
-    const resp = await fetch(`${BULKSMS_BASE}/smsapi`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
+    const request = isRtcom
+      ? { url: getRtcomUrl(setting, toList, fullMessage), options: { method: 'GET' } }
+      : (() => {
+          const body = new URLSearchParams();
+          body.append('api_key', setting.apiKey);
+          if (useSender) body.append('senderid', useSender);
+          body.append('number', toList.join(','));
+          body.append('message', fullMessage);
+          return {
+            url: `${BULKSMS_BASE}/smsapi`,
+            options: { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() },
+          };
+        })();
+    const resp = await fetch(request.url, request.options);
     const data = await resp.json();
 
     const responseCode = data?.response_code ?? data?.status_code ?? null;

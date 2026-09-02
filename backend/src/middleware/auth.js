@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import TeamMember from '../models/TeamMember.js';
 import User from '../models/User.js';
+import { auditAdminRequest } from './audit.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -43,7 +44,7 @@ export const adminOnly = (req, res, next) => {
     req.user &&
     (req.user.role === 'admin' || req.user.role === 'super_admin' || req.user.role === 'manager')
   ) {
-    next();
+    auditAdminRequest(req, res, next);
   } else {
     res.status(403).json({ success: false, message: 'Admin access required' });
   }
