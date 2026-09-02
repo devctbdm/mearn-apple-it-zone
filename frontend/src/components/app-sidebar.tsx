@@ -3,9 +3,8 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 
+import AppleLogo from '@/Apple.png';
 import { NavMain } from '@/components/nav-main';
-import { notificationApi } from '@/lib/api';
-import { getSocket } from '@/lib/socket';
 import { NavUser } from '@/components/nav-user';
 import { TeamSwitcher } from '@/components/team-switcher';
 import {
@@ -15,18 +14,19 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { notificationApi } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import {
-  Settings2Icon,
-  LayoutDashboard,
-  ShoppingCart,
+  BellCheck,
   ChartLine,
+  HandCoins,
+  LayoutDashboard,
+  ListSortAscending,
+  Settings2Icon,
+  ShoppingCart,
   UsersRound,
   UserStar,
-  ListSortAscending,
-  BellCheck,
-  HandCoins,
 } from 'lucide-react';
-import AppleLogo from '@/Apple.png';
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -178,6 +178,10 @@ const data = {
         {
           title: 'SMS',
           url: '/admin/sms',
+        },
+        {
+          title: 'Meta Catalog',
+          url: '/admin/meta',
         },
         {
           title: 'Maintenance',

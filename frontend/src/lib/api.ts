@@ -1249,6 +1249,22 @@ export const smsApi = {
     }>('/sms/logs', { params }),
 };
 
+export type MetaCatalogStatus = {
+  success: boolean;
+  connected: boolean;
+  enabled: boolean;
+  message: string;
+  catalog?: {
+    id: string;
+    name: string;
+    productCount: number | null;
+  };
+};
+
+export const metaApi = {
+  getStatus: () => api.get<MetaCatalogStatus>('/meta/status'),
+};
+
 // ---------------- Offers ----------------
 export type Offer = {
   _id: string;
