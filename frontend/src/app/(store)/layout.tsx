@@ -3,6 +3,7 @@ import { CategoryNav } from '@/components/store/layout/CategoryNav';
 import Footer from '@/components/store/layout/Footer';
 import TopNav from '@/components/store/layout/TopNav';
 import StoreQuickActions from '@/components/store/layout/StoreQuickActions';
+import MobileBottomNav from '@/components/store/layout/MobileBottomNav';
 import { MaintenanceGuard } from '@/components/MaintenanceGuard';
 
 const StoreLayout = ({ children }: { children: React.ReactNode }) => {
@@ -17,6 +18,9 @@ const StoreLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="pt-32 lg:pt-40">{children}</div>
         <div className="print:hidden">
           <Footer />
+        </div>
+        <div className="print:hidden">
+          <MobileBottomNav />
         </div>
       </div>
     </MaintenanceGuard>

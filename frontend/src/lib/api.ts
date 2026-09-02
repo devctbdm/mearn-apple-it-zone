@@ -30,7 +30,10 @@ export type CategoryForm = {
   color: string;
 };
 
-function toFormData(data: Record<string, any>, files?: { image?: File | null; banner?: File | null }): FormData {
+function toFormData(
+  data: Record<string, any>,
+  files?: { image?: File | null; banner?: File | null }
+): FormData {
   const fd = new FormData();
   for (const [key, val] of Object.entries(data)) {
     if (val !== null && val !== undefined) {
@@ -43,28 +46,38 @@ function toFormData(data: Record<string, any>, files?: { image?: File | null; ba
 }
 
 export const categoryApi = {
-  getAll: () => api.get<{ success: boolean; categories: Category[] }>('/categories'),
+  getAll: () =>
+    api.get<{ success: boolean; categories: Category[] }>('/categories'),
 
   getById: (id: string) =>
     api.get<{ success: boolean; category: Category }>(`/categories/${id}`),
 
-  create: (data: CategoryForm, files?: { image?: File | null; banner?: File | null }) =>
+  create: (
+    data: CategoryForm,
+    files?: { image?: File | null; banner?: File | null }
+  ) =>
     api.post<{ success: boolean; category: Category }>(
       '/categories',
-      toFormData(data as any, files),
+      toFormData(data as any, files)
     ),
 
-  update: (id: string, data: Partial<CategoryForm>, files?: { image?: File | null; banner?: File | null }) =>
+  update: (
+    id: string,
+    data: Partial<CategoryForm>,
+    files?: { image?: File | null; banner?: File | null }
+  ) =>
     api.put<{ success: boolean; category: Category }>(
       `/categories/${id}`,
-      toFormData(data as any, files),
+      toFormData(data as any, files)
     ),
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/categories/${id}`),
 
   reorder: (orders: { id: string; sortOrder: number }[]) =>
-    api.put<{ success: boolean; message: string }>('/categories/reorder', { orders }),
+    api.put<{ success: boolean; message: string }>('/categories/reorder', {
+      orders,
+    }),
 };
 
 export type SliderType = 'hero' | 'ad_top' | 'ad_bottom';
@@ -110,36 +123,48 @@ export type SliderForm = {
 export const sliderApi = {
   getAll: (params?: { active?: boolean }) =>
     api.get<{ success: boolean; sliders: Slider[] }>('/sliders', {
-      params: params ? { active: params.active ? 'true' : undefined } : undefined,
+      params: params
+        ? { active: params.active ? 'true' : undefined }
+        : undefined,
     }),
 
   create: (data: SliderForm, image?: File | null) =>
     api.post<{ success: boolean; slider: Slider }>(
       '/sliders',
-      toFormData(data as any, { image }),
+      toFormData(data as any, { image })
     ),
 
   update: (id: string, data: Partial<SliderForm>, image?: File | null) =>
     api.put<{ success: boolean; slider: Slider }>(
       `/sliders/${id}`,
-      toFormData(data as any, { image }),
+      toFormData(data as any, { image })
     ),
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/sliders/${id}`),
 
   reorder: (orders: { id: string; sortOrder: number }[]) =>
-    api.put<{ success: boolean; message: string }>('/sliders/reorder', { orders }),
+    api.put<{ success: boolean; message: string }>('/sliders/reorder', {
+      orders,
+    }),
 };
 
 export const homeSliderTextApi = {
   getAll: (params?: { active?: boolean }) =>
-    api.get<{ success: boolean; texts: HomeSliderText[] }>('/home-slider-texts', {
-      params: params ? { active: params.active ? 'true' : undefined } : undefined,
-    }),
+    api.get<{ success: boolean; texts: HomeSliderText[] }>(
+      '/home-slider-texts',
+      {
+        params: params
+          ? { active: params.active ? 'true' : undefined }
+          : undefined,
+      }
+    ),
 
   create: (data: HomeSliderTextForm) =>
-    api.post<{ success: boolean; text: HomeSliderText }>('/home-slider-texts', data),
+    api.post<{ success: boolean; text: HomeSliderText }>(
+      '/home-slider-texts',
+      data
+    ),
 
   update: (id: string, data: Partial<HomeSliderTextForm>) =>
     api.put<{ success: boolean; text: HomeSliderText }>(
@@ -148,12 +173,39 @@ export const homeSliderTextApi = {
     ),
 
   delete: (id: string) =>
-    api.delete<{ success: boolean; message: string }>(`/home-slider-texts/${id}`),
+    api.delete<{ success: boolean; message: string }>(
+      `/home-slider-texts/${id}`
+    ),
 
   reorder: (orders: { id: string; sortOrder: number }[]) =>
-    api.put<{ success: boolean; message: string }>('/home-slider-texts/reorder', {
-      orders,
-    }),
+    api.put<{ success: boolean; message: string }>(
+      '/home-slider-texts/reorder',
+      {
+        orders,
+      }
+    ),
+};
+
+export type HomeContent = {
+  _id: string | null;
+  content: string;
+  enabled: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export const homeContentApi = {
+  get: () =>
+    api.get<{ success: boolean; homeContent: HomeContent }>('/home-content'),
+
+  update: (data: { content: string; enabled: boolean }) =>
+    api.put<{ success: boolean; homeContent: HomeContent }>(
+      '/home-content',
+      data
+    ),
+
+  delete: () =>
+    api.delete<{ success: boolean; message: string }>('/home-content'),
 };
 
 export type AdminUser = {
@@ -177,17 +229,37 @@ export type PaginatedResponse<T> = {
 };
 
 export const userApi = {
-  getAll: (params?: { page?: number; limit?: number; search?: string; role?: string; status?: string }) =>
-    api.get<PaginatedResponse<AdminUser>>('/users', { params }),
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+    status?: string;
+  }) => api.get<PaginatedResponse<AdminUser>>('/users', { params }),
 
   getById: (id: string) =>
     api.get<{ success: boolean; user: AdminUser }>(`/users/${id}`),
 
-  create: (data: { name: string; email: string; password: string; phone?: string; role?: string; status?: string }) =>
-    api.post<{ success: boolean; user: AdminUser }>('/users', data),
+  create: (data: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    role?: string;
+    status?: string;
+  }) => api.post<{ success: boolean; user: AdminUser }>('/users', data),
 
-  update: (id: string, data: Partial<{ name: string; email: string; phone: string; role: string; status: string; password: string }>) =>
-    api.put<{ success: boolean; user: AdminUser }>(`/users/${id}`, data),
+  update: (
+    id: string,
+    data: Partial<{
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      status: string;
+      password: string;
+    }>
+  ) => api.put<{ success: boolean; user: AdminUser }>(`/users/${id}`, data),
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/users/${id}`),
@@ -221,8 +293,12 @@ export type CustomerPaginatedResponse = {
 };
 
 export const customerApi = {
-  getAll: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
-    api.get<CustomerPaginatedResponse>('/customers', { params }),
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) => api.get<CustomerPaginatedResponse>('/customers', { params }),
 
   getById: (id: string) =>
     api.get<{ success: boolean; customer: Customer }>(`/customers/${id}`),
@@ -254,8 +330,13 @@ export type TeamMemberPayload = {
 export const teamApi = {
   getAll: () => api.get<{ success: boolean; members: TeamMember[] }>('/team'),
 
-  create: (data: { name: string; email: string; role: string; password?: string; active?: boolean }) =>
-    api.post<{ success: boolean; member: TeamMember }>('/team', data),
+  create: (data: {
+    name: string;
+    email: string;
+    role: string;
+    password?: string;
+    active?: boolean;
+  }) => api.post<{ success: boolean; member: TeamMember }>('/team', data),
 
   update: (id: string, data: TeamMemberPayload) =>
     api.put<{ success: boolean; member: TeamMember }>(`/team/${id}`, data),
@@ -304,11 +385,22 @@ export type PaymentGateway = {
 };
 
 export const paymentSettingsApi = {
-  getAll: () => api.get<{ success: boolean; gateways: PaymentGateway[] }>('/payment-settings'),
+  getAll: () =>
+    api.get<{ success: boolean; gateways: PaymentGateway[] }>(
+      '/payment-settings'
+    ),
   getActive: () =>
-    api.get<{ success: boolean; gateways: ActivePaymentGateway[] }>('/payment-settings/active'),
-  update: (id: string, data: { enabled?: boolean; config?: Record<string, any> }) =>
-    api.put<{ success: boolean; gateway: PaymentGateway }>(`/payment-settings/${id}`, data),
+    api.get<{ success: boolean; gateways: ActivePaymentGateway[] }>(
+      '/payment-settings/active'
+    ),
+  update: (
+    id: string,
+    data: { enabled?: boolean; config?: Record<string, any> }
+  ) =>
+    api.put<{ success: boolean; gateway: PaymentGateway }>(
+      `/payment-settings/${id}`,
+      data
+    ),
 };
 
 export type ActivePaymentGateway = {
@@ -332,14 +424,27 @@ export const paymentApi = {
       postcode?: string;
     };
     advance?: boolean;
-  }) => api.post<{ success: boolean; gatewayUrl: string; tran_id: string; advance?: boolean; message?: string }>('/payment/initiate', data),
+  }) =>
+    api.post<{
+      success: boolean;
+      gatewayUrl: string;
+      tran_id: string;
+      advance?: boolean;
+      message?: string;
+    }>('/payment/initiate', data),
   validate: (data: {
     tran_id: string;
     val_id?: string;
     status?: string;
     amount?: number;
     card_type?: string;
-  }) => api.post<{ success: boolean; valid: boolean; advance?: boolean; order?: string }>('/payment/validate', data),
+  }) =>
+    api.post<{
+      success: boolean;
+      valid: boolean;
+      advance?: boolean;
+      order?: string;
+    }>('/payment/validate', data),
   queryTransaction: (tran_id: string) =>
     api.get<{
       success: boolean;
@@ -406,22 +511,36 @@ export const authApi = {
     api.get<{ success: boolean; sessions: Session[] }>('/auth/me/sessions'),
 
   revokeSession: (id: string) =>
-    api.delete<{ success: boolean; message: string }>(`/auth/me/sessions/${id}`),
+    api.delete<{ success: boolean; message: string }>(
+      `/auth/me/sessions/${id}`
+    ),
 
   getAddresses: () =>
-    api.get<{ success: boolean; addresses: SavedAddress[] }>('/auth/me/addresses'),
+    api.get<{ success: boolean; addresses: SavedAddress[] }>(
+      '/auth/me/addresses'
+    ),
 
   addAddress: (data: Partial<SavedAddress>) =>
-    api.post<{ success: boolean; addresses: SavedAddress[] }>('/auth/me/addresses', data),
+    api.post<{ success: boolean; addresses: SavedAddress[] }>(
+      '/auth/me/addresses',
+      data
+    ),
 
   updateAddress: (id: string, data: Partial<SavedAddress>) =>
-    api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}`, data),
+    api.put<{ success: boolean; addresses: SavedAddress[] }>(
+      `/auth/me/addresses/${id}`,
+      data
+    ),
 
   deleteAddress: (id: string) =>
-    api.delete<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}`),
+    api.delete<{ success: boolean; addresses: SavedAddress[] }>(
+      `/auth/me/addresses/${id}`
+    ),
 
   setDefaultAddress: (id: string) =>
-    api.put<{ success: boolean; addresses: SavedAddress[] }>(`/auth/me/addresses/${id}/default`),
+    api.put<{ success: boolean; addresses: SavedAddress[] }>(
+      `/auth/me/addresses/${id}/default`
+    ),
 
   verifyOtp: (data: { pendingToken: string; otp: string }) =>
     api.post<{
@@ -443,11 +562,7 @@ export type LoginResponse = {
 };
 
 export type OrderStatus =
-  | 'pending'
-  | 'processing'
-  | 'confirmed'
-  | 'send_courier'
-  | 'cancelled';
+  'pending' | 'processing' | 'confirmed' | 'send_courier' | 'cancelled';
 
 export type OrderItem = {
   product: string | { _id: string; name: string };
@@ -460,9 +575,7 @@ export type OrderItem = {
 export type Order = {
   _id: string;
   orderNumber?: string;
-  user:
-    | string
-    | { _id: string; name: string; email: string; phone?: string };
+  user: string | { _id: string; name: string; email: string; phone?: string };
   items: OrderItem[];
   shippingAddress: {
     fullName?: string;
@@ -751,7 +864,10 @@ export const productApi = {
     api.get<{ success: boolean; product: any }>(`/products/slug/${slug}`),
 
   addRating: (id: string, data: { rating: number; comment?: string }) =>
-    api.post<{ success: boolean; product: any }>(`/products/${id}/ratings`, data),
+    api.post<{ success: boolean; product: any }>(
+      `/products/${id}/ratings`,
+      data
+    ),
 
   update: (id: string, data: FormData) =>
     api.put<{ success: boolean; product: any }>(`/products/${id}`, data),
@@ -837,10 +953,18 @@ export type SavedBuild = {
 export const pcBuilderApi = {
   getMyBuilds: () =>
     api.get<{ success: boolean; builds: SavedBuild[] }>('/pc-builder/builds'),
-  save: (data: { name?: string; components: Record<string, { product: string }> }) =>
-    api.post<{ success: boolean; build: SavedBuild }>('/pc-builder/builds', data),
+  save: (data: {
+    name?: string;
+    components: Record<string, { product: string }>;
+  }) =>
+    api.post<{ success: boolean; build: SavedBuild }>(
+      '/pc-builder/builds',
+      data
+    ),
   remove: (id: string) =>
-    api.delete<{ success: boolean; message: string }>(`/pc-builder/builds/${id}`),
+    api.delete<{ success: boolean; message: string }>(
+      `/pc-builder/builds/${id}`
+    ),
 };
 
 export type Review = {
@@ -883,7 +1007,8 @@ export const reviewApi = {
     featured?: string;
   }) => api.get<ReviewPaginatedResponse>('/reviews', { params }),
 
-  getStats: () => api.get<{ success: boolean; stats: ReviewStats }>('/reviews/stats'),
+  getStats: () =>
+    api.get<{ success: boolean; stats: ReviewStats }>('/reviews/stats'),
 
   update: (id: string, data: { status?: string; featured?: boolean }) =>
     api.patch<{ success: boolean; review: Review }>(`/reviews/${id}`, data),
@@ -932,7 +1057,8 @@ export const questionApi = {
     productId?: string;
   }) => api.get<QuestionPaginatedResponse>('/questions', { params }),
 
-  getStats: () => api.get<{ success: boolean; stats: QuestionStats }>('/questions/stats'),
+  getStats: () =>
+    api.get<{ success: boolean; stats: QuestionStats }>('/questions/stats'),
 
   getByProduct: (productId: string) =>
     api.get<{ success: boolean; count: number; questions: Question[] }>(
@@ -945,8 +1071,14 @@ export const questionApi = {
       question,
     }),
 
-  update: (id: string, data: { answer?: string; status?: string; featured?: boolean }) =>
-    api.patch<{ success: boolean; question: Question }>(`/questions/${id}`, data),
+  update: (
+    id: string,
+    data: { answer?: string; status?: string; featured?: boolean }
+  ) =>
+    api.patch<{ success: boolean; question: Question }>(
+      `/questions/${id}`,
+      data
+    ),
 
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/questions/${id}`),
@@ -1012,7 +1144,8 @@ export const promoApi = {
     type?: string;
   }) => api.get<PromoPaginatedResponse>('/promo', { params }),
 
-  getStats: () => api.get<{ success: boolean; stats: PromoStats }>('/promo/stats'),
+  getStats: () =>
+    api.get<{ success: boolean; stats: PromoStats }>('/promo/stats'),
 
   create: (data: PromoFormData) =>
     api.post<{ success: boolean; promo: PromoCode }>('/promo', data),
@@ -1023,7 +1156,11 @@ export const promoApi = {
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/promo/${id}`),
 
-  validate: (code: string, subtotal: number, items?: { product: string; quantity: number }[]) =>
+  validate: (
+    code: string,
+    subtotal: number,
+    items?: { product: string; quantity: number }[]
+  ) =>
     api.post<{
       success: boolean;
       promo: Partial<PromoCode>;
@@ -1085,7 +1222,8 @@ export type SmsLog = {
 };
 
 export const smsApi = {
-  getSettings: () => api.get<{ success: boolean; settings: SmsSettings }>('/sms/settings'),
+  getSettings: () =>
+    api.get<{ success: boolean; settings: SmsSettings }>('/sms/settings'),
 
   updateSettings: (data: Partial<SmsSettings>) =>
     api.put<{ success: boolean; settings: SmsSettings }>('/sms/settings', data),
@@ -1169,11 +1307,7 @@ export const holidayApi = {
 };
 
 export type AdminNotificationCategory =
-  | 'order'
-  | 'delivery'
-  | 'rider'
-  | 'payment'
-  | 'system';
+  'order' | 'delivery' | 'rider' | 'payment' | 'system';
 
 export type AdminNotification = {
   _id: string;
@@ -1215,8 +1349,5 @@ export const notificationApi = {
     ),
 
   markAllRead: () =>
-    api.post<{ success: boolean; message: string }>(
-      '/notifications/read-all'
-    ),
+    api.post<{ success: boolean; message: string }>('/notifications/read-all'),
 };
-

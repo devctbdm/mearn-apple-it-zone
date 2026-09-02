@@ -91,6 +91,10 @@
 }
 
 :root {
+  --font-sans:
+    'Trebuchet MS', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji';
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -168,6 +172,14 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+
+  /* Respect users who prefer reduced motion — instant scroll, no animation */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }
 
@@ -175,6 +187,7 @@
 .rich-text {
   line-height: 1.7;
   color: inherit;
+  white-space: pre-wrap;
 }
 .rich-text > *:first-child {
   margin-top: 0;
@@ -184,6 +197,14 @@
 }
 .rich-text p {
   margin: 0 0 0.75rem;
+}
+.rich-text p:empty {
+  min-height: 1.7em;
+}
+.rich-text br {
+  display: block;
+  content: '';
+  margin-top: 0.75rem;
 }
 .rich-text strong {
   font-weight: 600;

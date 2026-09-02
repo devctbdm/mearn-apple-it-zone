@@ -26,7 +26,7 @@ import {
   BellCheck,
   HandCoins,
 } from 'lucide-react';
-import AppleLogo from "@/Apple.png"
+import AppleLogo from '@/Apple.png';
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -158,7 +158,7 @@ const data = {
           title: 'Payments',
           url: '/admin/payments',
         },
-        
+
         {
           title: 'Coupons',
           url: '/admin/promo',
@@ -166,6 +166,10 @@ const data = {
         {
           title: 'Slider',
           url: '/admin/slider',
+        },
+        {
+          title: 'Home Text',
+          url: '/admin/hometext',
         },
         {
           title: 'Home Slide Text',

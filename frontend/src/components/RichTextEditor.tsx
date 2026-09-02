@@ -4,6 +4,11 @@ import { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
+import FontFamily from '@tiptap/extension-font-family';
 import {
   Bold,
   Italic,
@@ -13,6 +18,10 @@ import {
   Unlink,
   Undo,
   Redo,
+  Underline as UnderlineIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -24,11 +33,53 @@ interface RichTextEditorProps {
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false, autolink: true }),
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3, 4, 5, 6],
+        },
+        hardBreak: {
+          keepMarks: false,
+          HTMLAttributes: {
+            class: 'hard-break',
+          },
+        },
+      }).configure({
+        link: false,
+        underline: false,
+      }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: {
+          class: 'text-blue-600 underline cursor-pointer',
+        },
+      }),
+      Underline,
+      TextStyle,
+      Color,
+      FontFamily.configure({
+        types: ['textStyle'],
+      }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right'],
+        defaultAlignment: 'left',
+      }),
     ],
     content: value || '',
     immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class:
+          'prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none min-h-[200px] px-3 py-2',
+      },
+      handlePaste: (view, event, slice) => {
+        // Let TipTap handle paste with its built-in HTML parsing
+        // The extensions we added (TextStyle, Color, FontFamily, TextAlign, Underline)
+        // will preserve most formatting from pasted content
+        return false;
+      },
+    },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -60,12 +111,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange('link')
-      .setLink({ href: url })
-      .run();
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
   const btn = (active: boolean) =>
@@ -94,6 +140,48 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         >
           <Italic className="h-4 w-4" />
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={btn(editor.isActive('underline'))}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          aria-label="Underline"
+        >
+          <UnderlineIcon className="h-4 w-4" />
+        </Button>
+        <div className="mx-1 h-5 w-px bg-border" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={btn(editor.isActive({ textAlign: 'left' }))}
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          aria-label="Align left"
+        >
+          <AlignLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={btn(editor.isActive({ textAlign: 'center' }))}
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          aria-label="Align center"
+        >
+          <AlignCenter className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={btn(editor.isActive({ textAlign: 'right' }))}
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          aria-label="Align right"
+        >
+          <AlignRight className="h-4 w-4" />
+        </Button>
+        <div className="mx-1 h-5 w-px bg-border" />
         <Button
           type="button"
           variant="ghost"
@@ -164,10 +252,11 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
       <EditorContent
         editor={editor}
-        className="min-h-50 rounded-md border bg-white p-3 text-sm focus-within:ring-1 focus-within:ring-ring"
+        className="min-h-50 rounded-md border bg-white p-3 text-sm focus-within:ring-1 focus-within:ring-ring [&_.ProseMirror]:min-h-50 [&_.ProseMirror]:outline-none [&_.ProseMirror]:p-2 [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_strong]:font-bold [&_em]:italic [&_u]:underline"
       />
       <p className="text-xs text-muted-foreground">
-        Use the toolbar to make text bold, italic, add lists, or insert links.
+        Use the toolbar to format text. Paste content from other sources to
+        preserve formatting.
       </p>
     </div>
   );

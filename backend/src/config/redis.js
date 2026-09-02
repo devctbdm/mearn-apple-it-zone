@@ -25,20 +25,39 @@ export const createRedisClient = () => {
   }
 
   // Fail fast if Redis is unreachable so it can never wedge cached endpoints.
-  // Upstash / redis.io TLS endpoints require tls: {} — enable via REDIS_TLS=true
+  // Note: redis.io / Redis Cloud managed endpoints often accept plain TCP with
+  // the credentials embedded in the URL (the separate username/password options
+  // trip the RESP3 HELLO AUTH handshake on those servers). Use REDIS_URL when
+  // provided, otherwise build redis:// or rediss:// from the env values.
   const CONNECT_TIMEOUT = Number(process.env.REDIS_CONNECT_TIMEOUT_MS) || 3000;
   const COMMAND_TIMEOUT = Number(process.env.REDIS_COMMAND_TIMEOUT_MS) || 2000;
 
+  const parseAuth = (value = '') => {
+    if (!value) return '';
+    const s = String(value).trim().replace(/^\/+|\/+$/g, '');
+    return encodeURIComponent(s);
+  };
+
+  let connectionUrl =
+    process.env.REDIS_URL && process.env.REDIS_URL.trim() !== ''
+      ? process.env.REDIS_URL.trim()
+      : null;
+
+  if (!connectionUrl) {
+    const scheme = process.env.REDIS_TLS === 'true' ? 'rediss' : 'redis';
+    const user = parseAuth(process.env.REDIS_USERNAME || 'default');
+    const pass = parseAuth(process.env.REDIS_PASSWORD);
+    const auth = pass ? `${user}:${pass}@` : user ? `${user}@` : '';
+    connectionUrl = `${scheme}://${auth}${REDIS_HOST}:${Number(process.env.REDIS_PORT) || 19809}`;
+  }
+
   client = createClient({
-    username: process.env.REDIS_USERNAME || 'default',
-    password: process.env.REDIS_PASSWORD,
+    url: connectionUrl,
     socket: {
-      host: REDIS_HOST,
-      port: Number(process.env.REDIS_PORT) || 19809,
-      // Upstash / redis.io TLS endpoints require tls: {} — enable via REDIS_TLS=true
-      tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
       connectTimeout: CONNECT_TIMEOUT,
       timeout: COMMAND_TIMEOUT,
+      // rediss:// URLs already imply TLS; this is a no-op safety flag.
+      tls: process.env.REDIS_TLS === 'true' ? true : undefined,
     },
   });
 

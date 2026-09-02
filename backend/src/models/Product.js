@@ -97,6 +97,7 @@ const productSchema = new mongoose.Schema(
       type: {
         type: String,
         enum: [
+          '',
           'cpu',
           'cpu_cooler',
           'motherboard',

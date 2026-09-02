@@ -1,11 +1,13 @@
 // src/lib/specFilters.ts
 import type { Product } from '@/types/product';
 
-export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest' | 'rating';
+export type SortOption =
+  'featured' | 'price-asc' | 'price-desc' | 'newest' | 'rating';
 
 export interface FilterState {
   price: [number, number] | null;
   availability: ('in' | 'out')[];
+  rating: number | null; // minimum quality/rating threshold (2–5)
   specs: Record<string, string[]>;
 }
 
@@ -23,6 +25,7 @@ export interface FacetGroup {
 export const EMPTY_FILTERS: FilterState = {
   price: null,
   availability: [],
+  rating: null,
   specs: {},
 };
 
@@ -33,7 +36,10 @@ const FIELD_DEFS: Record<string, { label: string; aliases: string[] }> = {
     label: 'Processor',
     aliases: ['processor', 'cpu', 'processor model', 'processor brand'],
   },
-  RAM: { label: 'RAM', aliases: ['ram', 'memory', 'memory capacity', 'memory size'] },
+  RAM: {
+    label: 'RAM',
+    aliases: ['ram', 'memory', 'memory capacity', 'memory size'],
+  },
   'Graphics Card': {
     label: 'Graphics Card',
     aliases: ['graphics card', 'gpu', 'graphics', 'video card'],
@@ -64,15 +70,33 @@ const FIELD_DEFS: Record<string, { label: string; aliases: string[] }> = {
   },
   'Input Type': {
     label: 'Input Type',
-    aliases: ['input type', 'ports', 'connectivity', 'interfaces', 'inputs', 'input ports'],
+    aliases: [
+      'input type',
+      'ports',
+      'connectivity',
+      'interfaces',
+      'inputs',
+      'input ports',
+    ],
   },
   'Wi-Fi Standard': {
     label: 'Wi-Fi Standard',
-    aliases: ['wi-fi standard', 'wifi standard', 'wireless standard', 'wireless'],
+    aliases: [
+      'wi-fi standard',
+      'wifi standard',
+      'wireless standard',
+      'wireless',
+    ],
   },
   'WiFi Speed': {
     label: 'WiFi Speed',
-    aliases: ['wifi speed', 'wi-fi speed', 'wireless speed', 'speed', 'transfer rate'],
+    aliases: [
+      'wifi speed',
+      'wi-fi speed',
+      'wireless speed',
+      'speed',
+      'transfer rate',
+    ],
   },
   Bands: {
     label: 'Number of Bands',
@@ -80,11 +104,22 @@ const FIELD_DEFS: Record<string, { label: string; aliases: string[] }> = {
   },
   'LAN Ports': {
     label: 'LAN Ports',
-    aliases: ['lan ports', 'number of lan ports', 'ethernet ports', 'ports count', 'lan'],
+    aliases: [
+      'lan ports',
+      'number of lan ports',
+      'ethernet ports',
+      'ports count',
+      'lan',
+    ],
   },
   Features: {
     label: 'Features',
-    aliases: ['features', 'special features', 'additional features', 'key features'],
+    aliases: [
+      'features',
+      'special features',
+      'additional features',
+      'key features',
+    ],
   },
 };
 
@@ -140,7 +175,9 @@ function canonicalize(key: string): { key: string; label: string } {
   return { key: label, label };
 }
 
-export function extractProductSpecs(specs: Record<string, any>): Map<string, string> {
+export function extractProductSpecs(
+  specs: Record<string, any>
+): Map<string, string> {
   const result = new Map<string, string>();
   const sources: Record<string, any>[] = [];
   if (specs?._keySpecs && typeof specs._keySpecs === 'object') {
@@ -171,7 +208,9 @@ export function extractProductSpecs(specs: Record<string, any>): Map<string, str
 export function buildFacetGroups(products: Product[]): FacetGroup[] {
   const map = new Map<string, Map<string, number>>();
   for (const p of products) {
-    const specs = extractProductSpecs((p.specifications ?? {}) as Record<string, any>);
+    const specs = extractProductSpecs(
+      (p.specifications ?? {}) as Record<string, any>
+    );
     for (const [key, value] of specs) {
       let values = map.get(key);
       if (!values) {
@@ -197,7 +236,10 @@ export function buildFacetGroups(products: Product[]): FacetGroup[] {
     const i = FIELD_ORDER.indexOf(k);
     return i === -1 ? FIELD_ORDER.length : i;
   };
-  groups.sort((a, b) => orderRank(a.key) - orderRank(b.key) || a.label.localeCompare(b.label));
+  groups.sort(
+    (a, b) =>
+      orderRank(a.key) - orderRank(b.key) || a.label.localeCompare(b.label)
+  );
   return groups;
 }
 
@@ -215,7 +257,10 @@ export function getPriceRange(products: Product[]): [number, number] {
   return [min, max <= min ? min + 1 : max];
 }
 
-export function applyFilters(products: Product[], filters: FilterState): Product[] {
+export function applyFilters(
+  products: Product[],
+  filters: FilterState
+): Product[] {
   return products.filter((p) => {
     if (filters.price) {
       const price = effectivePrice(p);
@@ -229,12 +274,19 @@ export function applyFilters(products: Product[], filters: FilterState): Product
       if (wantIn !== inStock) return false;
     }
 
-    const specs = extractProductSpecs((p.specifications ?? {}) as Record<string, any>);
+    if (filters.rating != null) {
+      if ((p.averageRating || 0) < filters.rating) return false;
+    }
+
+    const specs = extractProductSpecs(
+      (p.specifications ?? {}) as Record<string, any>
+    );
     for (const [key, selected] of Object.entries(filters.specs)) {
       if (selected.length === 0) continue;
       const value = specs.get(key);
       if (!value) return false;
-      if (!selected.some((s) => s.toLowerCase() === value.toLowerCase())) return false;
+      if (!selected.some((s) => s.toLowerCase() === value.toLowerCase()))
+        return false;
     }
 
     return true;
@@ -251,7 +303,10 @@ export function sortProducts(products: Product[], sort: SortOption): Product[] {
       arr.sort((a, b) => effectivePrice(b) - effectivePrice(a));
       break;
     case 'newest':
-      arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      arr.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
       break;
     case 'rating':
       arr.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
@@ -267,12 +322,17 @@ export function sortProducts(products: Product[], sort: SortOption): Product[] {
   return arr;
 }
 
-export function hasActiveFilters(filters: FilterState, range: [number, number]): boolean {
+export function hasActiveFilters(
+  filters: FilterState,
+  range: [number, number]
+): boolean {
   const priceActive =
-    !!filters.price && (filters.price[0] !== range[0] || filters.price[1] !== range[1]);
+    !!filters.price &&
+    (filters.price[0] !== range[0] || filters.price[1] !== range[1]);
   return (
     priceActive ||
     filters.availability.length > 0 ||
+    filters.rating != null ||
     Object.keys(filters.specs).length > 0
   );
 }

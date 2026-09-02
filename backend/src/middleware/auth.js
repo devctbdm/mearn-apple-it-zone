@@ -1,8 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { mongoose } from '../config/database.js';
-
-const User = mongoose.model('User');
-const TeamMember = mongoose.model('TeamMember');
+import TeamMember from '../models/TeamMember.js';
+import User from '../models/User.js';
 
 export const protect = async (req, res, next) => {
   let token;

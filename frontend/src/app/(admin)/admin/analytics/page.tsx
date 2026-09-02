@@ -1,17 +1,17 @@
 // src/app/(admin)/analytics/page.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { formatBDT } from '@/utils/currency';
+import { LiquidBlob } from '@/components/LiquidBlob';
+import { SiteHeader } from '@/components/site-header';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -21,41 +21,40 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  BarChart,
+  analyticsApi,
+  type AnalyticsPoint,
+  type AnalyticsStats,
+} from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { formatBDT } from '@/utils/currency';
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  DollarSign,
+  Download,
+  Package,
+  ShoppingCart,
+  Users,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Area,
+  AreaChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
   Cell,
   Legend,
-  AreaChart,
-  Area,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import {
-  TrendingUp,
-  DollarSign,
-  ShoppingCart,
-  Package,
-  Users,
-  Download,
-  ArrowUp,
-  ArrowDown,
-  Activity,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { SiteHeader } from '@/components/site-header';
-import { Spinner } from '@/components/ui/spinner';
-import {
-  analyticsApi,
-  type AnalyticsStats,
-  type AnalyticsPoint,
-} from '@/lib/api';
 
 // ------------------------------------------------------------
 // CUSTOM COMPONENTS
@@ -170,10 +169,7 @@ export default function AnalyticsPage() {
     }
     if (!prev || prev.revenue === 0) return null;
     return {
-      revenue: (
-        ((cur.revenue - prev.revenue) / prev.revenue) *
-        100
-      ).toFixed(1),
+      revenue: (((cur.revenue - prev.revenue) / prev.revenue) * 100).toFixed(1),
       orders:
         prev.orders > 0
           ? (((cur.orders - prev.orders) / prev.orders) * 100).toFixed(1)
@@ -239,12 +235,9 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <>
-        <SiteHeader
-          title="Analytics"
-          description="Track your store performance and sales metrics."
-        />
+        <SiteHeader />
         <div className="flex items-center justify-center py-24">
-          <Spinner className="size-8" />
+          <LiquidBlob />
         </div>
       </>
     );
@@ -258,14 +251,14 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <SiteHeader
-        title="Analytics"
-        description="Track your store performance and sales metrics."
-      />
+      <SiteHeader />
       <div className="space-y-6 p-4 md:p-6">
-        {/* ------------------------------------------------------------
-          HEADER
-          ------------------------------------------------------------ */}
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
+          <p className="text-muted-foreground">
+            Overview of your store&apos;s performance and sales trends.
+          </p>
+        </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <Select
@@ -439,10 +432,7 @@ export default function AnalyticsPage() {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(value) => [
-                              `${value} orders`,
-                              'Orders',
-                            ]}
+                            formatter={(value) => [`${value} orders`, 'Orders']}
                           />
                           <Legend />
                         </PieChart>
@@ -601,8 +591,7 @@ export default function AnalyticsPage() {
                         {filteredData.map((row, idx) => {
                           const growthPct =
                             idx > 0
-                              ? ((row.revenue -
-                                  filteredData[idx - 1].revenue) /
+                              ? ((row.revenue - filteredData[idx - 1].revenue) /
                                   (filteredData[idx - 1].revenue || 1)) *
                                 100
                               : 0;
@@ -752,16 +741,11 @@ export default function AnalyticsPage() {
                   <CardContent>
                     <div className="h-75">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analytics.categories}
-                          layout="vertical"
-                        >
+                        <BarChart data={analytics.categories} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             type="number"
-                            tickFormatter={(v) =>
-                              `৳${(v / 1000).toFixed(0)}k`
-                            }
+                            tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`}
                           />
                           <YAxis type="category" dataKey="name" width={80} />
                           <Tooltip
@@ -801,8 +785,7 @@ export default function AnalyticsPage() {
                               <div
                                 className="h-3 w-3 rounded-full"
                                 style={{
-                                  backgroundColor:
-                                    COLORS[idx % COLORS.length],
+                                  backgroundColor: COLORS[idx % COLORS.length],
                                 }}
                               />
                               {cat.name}
@@ -821,8 +804,7 @@ export default function AnalyticsPage() {
                               className="h-2 rounded-full transition-all"
                               style={{
                                 width: `${cat.percentage}%`,
-                                backgroundColor:
-                                  COLORS[idx % COLORS.length],
+                                backgroundColor: COLORS[idx % COLORS.length],
                               }}
                             />
                           </div>
