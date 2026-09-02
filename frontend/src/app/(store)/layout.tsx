@@ -5,6 +5,7 @@ import TopNav from '@/components/store/layout/TopNav';
 import StoreQuickActions from '@/components/store/layout/StoreQuickActions';
 import MobileBottomNav from '@/components/store/layout/MobileBottomNav';
 import { MaintenanceGuard } from '@/components/MaintenanceGuard';
+import PopupOfferDialog from '@/components/store/PopupOfferDialog';
 
 const StoreLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -22,6 +23,7 @@ const StoreLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="print:hidden">
           <MobileBottomNav />
         </div>
+        <PopupOfferDialog />
       </div>
     </MaintenanceGuard>
   );

@@ -176,6 +176,10 @@ const data = {
           url: '/admin/slider',
         },
         {
+          title: 'Popup Offer',
+          url: '/admin/popup',
+        },
+        {
           title: 'Home Text',
           url: '/admin/hometext',
         },

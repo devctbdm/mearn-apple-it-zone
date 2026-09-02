@@ -112,7 +112,7 @@ export default function LoginPage() {
 
       if (data.token) {
         localStorage.setItem('mobile_token', data.token);
-        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        document.cookie = `token=${data.token}; path=/; max-age=${3 * 60 * 60}; SameSite=Lax`;
       }
 
       await fetchUser().catch(() => {});
@@ -145,7 +145,7 @@ export default function LoginPage() {
   const handleTwoFactorSuccess = async (token: string, user: any) => {
     if (token) {
       localStorage.setItem('mobile_token', token);
-      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      document.cookie = `token=${token}; path=/; max-age=${3 * 60 * 60}; SameSite=Lax`;
     }
     useAppStore.setState({
       user,
@@ -191,90 +191,91 @@ export default function LoginPage() {
                 onBack={() => setPendingToken(null)}
               />
             ) : (
-            <>
-            <form onSubmit={onSubmit} className="space-y-5" noValidate>
-              <div className="space-y-2">
-                <Label htmlFor="identifier">Phone / E-Mail</Label>
-                <Input
-                  id="identifier"
-                  type="text"
-                  autoComplete="username"
-                  placeholder="Enter your phone or email"
-                  value={values.identifier}
-                  onChange={(e) => update('identifier', e.target.value)}
-                  aria-invalid={!!errors.identifier}
-                />
-                {errors.identifier && (
-                  <p className="text-xs text-destructive">
-                    {errors.identifier}
+              <>
+                <form onSubmit={onSubmit} className="space-y-5" noValidate>
+                  <div className="space-y-2">
+                    <Label htmlFor="identifier">Phone / E-Mail</Label>
+                    <Input
+                      id="identifier"
+                      type="text"
+                      autoComplete="username"
+                      placeholder="Enter your phone or email"
+                      value={values.identifier}
+                      onChange={(e) => update('identifier', e.target.value)}
+                      aria-invalid={!!errors.identifier}
+                    />
+                    {errors.identifier && (
+                      <p className="text-xs text-destructive">
+                        {errors.identifier}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password</Label>
+                      <Link
+                        href="/forgot-password"
+                        className="text-xs text-primary underline underline-offset-4"
+                      >
+                        Forgotten Password?
+                      </Link>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        value={values.password}
+                        onChange={(e) => update('password', e.target.value)}
+                        aria-invalid={!!errors.password}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={
+                          showPassword ? 'Hide password' : 'Show password'
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                    {errors.password && (
+                      <p className="text-xs text-destructive">
+                        {errors.password}
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Signing in...' : 'Sign in'}
+                  </Button>
+                </form>
+
+                <div className="mt-6 rounded-md border bg-muted/40 p-4 text-sm">
+                  <p className="font-medium">Don&apos;t have an account?</p>
+                  <p className="mt-1 text-muted-foreground">
+                    <Link
+                      href="/register"
+                      className="text-primary underline underline-offset-4"
+                    >
+                      Create Your Account
+                    </Link>{' '}
+                    to get started.
                   </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-primary underline underline-offset-4"
-                  >
-                    Forgotten Password?
-                  </Link>
                 </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    placeholder="••••••••"
-                    value={values.password}
-                    onChange={(e) => update('password', e.target.value)}
-                    aria-invalid={!!errors.password}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={
-                      showPassword ? 'Hide password' : 'Show password'
-                    }
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-                {errors.password && (
-                  <p className="text-xs text-destructive">{errors.password}</p>
-                )}
-              </div>
-
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? 'Signing in...' : 'Sign in'}
-              </Button>
-            </form>
-
-            <div className="mt-6 rounded-md border bg-muted/40 p-4 text-sm">
-              <p className="font-medium">Don&apos;t have an account?</p>
-              <p className="mt-1 text-muted-foreground">
-                <Link
-                  href="/register"
-                  className="text-primary underline underline-offset-4"
-                >
-                  Create Your Account
-                </Link>{' '}
-                to get started.
-              </p>
-              <p className="mt-3 border-t pt-3 text-muted-foreground">
-                Store staff?{' '}
-                <Link
-                  href="/admin/login"
-                  className="text-primary underline underline-offset-4"
-                >
-                  Admin Login
-                </Link>
-              </p>
-            </div>
-            </>
+              </>
             )}
           </CardContent>
         </Card>

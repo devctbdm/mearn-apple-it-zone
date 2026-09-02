@@ -235,6 +235,24 @@ export const homeContentApi = {
     api.delete<{ success: boolean; message: string }>('/home-content'),
 };
 
+export type PopupOffer = {
+  _id: string | null;
+  image: string;
+  enabled: boolean;
+  delaySeconds: number;
+  maxShowsPerDay: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export const popupOfferApi = {
+  get: () =>
+    api.get<{ success: boolean; popupOffer: PopupOffer }>('/popup-offer'),
+
+  update: (data: FormData) =>
+    api.put<{ success: boolean; popupOffer: PopupOffer }>('/popup-offer', data),
+};
+
 export type AdminUser = {
   _id: string;
   name: string;

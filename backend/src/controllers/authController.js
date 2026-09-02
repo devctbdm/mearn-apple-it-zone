@@ -12,7 +12,7 @@ import { parseUserAgent } from '../utils/parseUA.js';
 
 // Generate JWT token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '3h' });
 };
 
 // Record a login session, safe to call even if it fails
