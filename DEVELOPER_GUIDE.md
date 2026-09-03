@@ -22,7 +22,7 @@ apple-it-zone/
 │       ├── services/       # emailService, smsService, notificationService
 │       ├── socket.js       # Socket.IO (admin real-time notifications)
 │       └── utils/          # orderNumber, categoryTree, parseUA, jwt, bcrypt
-└── frontend/       # Next.js 16 (App Router) + TypeScript + pnpm + shadcn/ui
+└── frontend/       # Next.js 16 (App Router) + TypeScript + npm + shadcn/ui
     └── src/
         ├── app/
         │   ├── (store)/     # customer storefront
@@ -39,9 +39,7 @@ apple-it-zone/
         └── types/           # product.d.ts, user.d.ts (order.d.ts is empty)
 ```
 
-> **Package manager:** use **pnpm** for both apps (`pnpm install`, `pnpm dev`).
-> The backend's `npm run dev` also works, but on the frontend `npm install` is
-> unreliable — use `pnpm` everywhere.
+> **Package manager:** use **npm** for both apps (`npm install`, `npm run dev`).
 
 ---
 
@@ -178,12 +176,12 @@ and **never throws**, so order/auth flows never break if email/SMS fails.
 
 Both apps deploy as **Render Web Services** from the monorepo:
 
-| Service  | Root        | Build                        | Start        |
-| -------- | ----------- | ---------------------------- | ------------ |
-| Backend  | `backend/`  | `pnpm install`               | `pnpm start` |
-| Frontend | `frontend/` | `pnpm install && pnpm build` | `pnpm start` |
+| Service  | Root        | Build                          | Start       |
+| -------- | ----------- | ------------------------------ | ----------- |
+| Backend  | `backend/`  | `npm install`                  | `npm start` |
+| Frontend | `frontend/` | `npm install && npm run build` | `npm start` |
 
-**Render auto-detects pnpm** from `pnpm-lock.yaml`. Pin `PNPM_VERSION` in the Render env to match your local version (`pnpm -v`).
+Render uses the npm lockfile generated in each service root.
 
 **Pre-deploy env checklist (per service):**
 
@@ -215,11 +213,11 @@ Both apps deploy as **Render Web Services** from the monorepo:
 
 ### 3.1 Stack
 
-Next.js 16 (App Router), React 19, TypeScript, **pnpm**, **shadcn/ui**,
+Next.js 16 (App Router), React 19, TypeScript, **npm**, **shadcn/ui**,
 Tailwind v4, Zustand (state), Axios (API), `socket.io-client`, zod, sonner.
 
 > `next.config.ts` sets `typescript.ignoreBuildErrors: true` — TS errors do **not**
-> fail `next build`. Rely on `pnpm lint`/editor for type safety.
+> fail `next build`. Rely on `npm run lint`/editor for type safety.
 
 ### 3.2 Route groups
 
@@ -312,14 +310,14 @@ server proxy reads the cookie. One login authenticates both surfaces.
 ```bash
 # Backend
 cd backend
-pnpm install
+npm install
 cp .env.example .env        # edit with your Mongo URI, JWT_SECRET, etc.
-pnpm run dev                # nodemon server.js on :5000
+npm run dev                 # nodemon server.js on :5000
 
 # Frontend (separate terminal)
 cd frontend
-pnpm install
-pnpm dev                    # next dev on :3000
+npm install
+npm run dev                 # next dev on :3000
 ```
 
 Open `http://localhost:3000`. Admin login: `http://localhost:3000/admin/login`.
@@ -328,7 +326,7 @@ Open `http://localhost:3000`. Admin login: `http://localhost:3000/admin/login`.
 
 ## 5. Conventions & gotchas (read before contributing)
 
-1. **pnpm only** for the frontend.
+1. **npm only** for both applications.
 2. **Email/SMS services never throw** — call them fire-and-forget (`.catch(() => {})`).
 3. **Two `useAuth` implementations** — know which one you import.
 4. **Server vs client data:** use `serverApi` in Server Components/`generateMetadata`;
