@@ -370,14 +370,6 @@ export default function AdminDashboardPage() {
           icon: <Package className="h-4 w-4" />,
           color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30',
         },
-        {
-          title: 'SMS Balance',
-          value: smsBalance != null ? formatTaka(smsBalance) : '—',
-          change: 'bulksmsbd.net credit',
-          trend: 'flat' as const,
-          icon: <MessageSquare className="h-4 w-4" />,
-          color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/30',
-        },
       ]
     : [];
 
@@ -394,392 +386,393 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-    <SiteHeader />
-    <div className="flex-1 space-y-6 p-8 pt-6">
-      
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
-            Welcome back! Here's what's happening with your store.
-          </p>
+      <SiteHeader />
+      <div className="flex-1 space-y-6 p-8 pt-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+            <p className="text-muted-foreground">
+              Welcome back! Here's what's happening with your store.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {loading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
-            ))
-          : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
-      </div>
-
-      {/* Loading animation overlay */}
-      {loading && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
-          <LiquidBlob size={64} />
+        {/* Stats Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 rounded-xl" />
+              ))
+            : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
         </div>
-      )}
 
-      {/* Main Content Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Sales by Month chart */}
-        {loading ? (
-          <Card className="col-span-4">
-            <CardHeader>
-              <Skeleton className="h-6 w-37.5 mb-2" />
-              <Skeleton className="h-4 w-62.5" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-75 w-full" />
-            </CardContent>
-          </Card>
-        ) : (
-          <ChartBarLabelCustom
-            data={stats?.monthlyRevenue || []}
-            className="col-span-4"
-          />
+        {/* Loading animation overlay */}
+        {loading && (
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+            <LiquidBlob size={64} />
+          </div>
         )}
 
-        {/* Sales by Category */}
-        {loading ? (
-          <Card className="col-span-3">
-            <CardHeader>
-              <Skeleton className="h-6 w-35 mb-2" />
-              <Skeleton className="h-4 w-50" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle>Sales by Category</CardTitle>
-              <CardDescription>
-                Distribution across product categories
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {stats?.salesByCategory.length ? (
-                stats.salesByCategory.map((category, i) => (
-                  <div key={category.name} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{category.name}</span>
-                      <span className="text-muted-foreground">
-                        {category.value}%
-                      </span>
-                    </div>
-                    <Progress value={category.value} className="h-2">
-                      <div
-                        className={`h-full ${
-                          categoryColors[i % categoryColors.length]
-                        } rounded-full`}
-                        style={{ width: `${category.value}%` }}
-                      />
-                    </Progress>
-                  </div>
-                ))
-              ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No sales data yet.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+        {/* Main Content Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          {/* Sales by Month chart */}
+          {loading ? (
+            <Card className="col-span-4">
+              <CardHeader>
+                <Skeleton className="h-6 w-37.5 mb-2" />
+                <Skeleton className="h-4 w-62.5" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-75 w-full" />
+              </CardContent>
+            </Card>
+          ) : (
+            <ChartBarLabelCustom
+              data={stats?.monthlyRevenue || []}
+              className="col-span-4"
+            />
+          )}
 
-      {/* Bottom Section: Orders & Products */}
-      <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="orders">Recent Orders</TabsTrigger>
-          <TabsTrigger value="products">Top Products</TabsTrigger>
-        </TabsList>
-
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Recent Orders</CardTitle>
+          {/* Sales by Category */}
+          {loading ? (
+            <Card className="col-span-3">
+              <CardHeader>
+                <Skeleton className="h-6 w-35 mb-2" />
+                <Skeleton className="h-4 w-50" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Sales by Category</CardTitle>
                 <CardDescription>
-                  Latest {recentOrders.length} orders
+                  Distribution across product categories
                 </CardDescription>
-              </div>
-              <Link href="/admin/orders">
-                <Button variant="outline" size="sm">
-                  View All
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <TableSkeleton />
-              ) : recentOrders.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No orders yet.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="w-12.5">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentOrders.map((order) => {
-                      const customer =
-                        typeof order.user === 'object' && order.user
-                          ? order.user
-                          : null;
-                      return (
-                        <TableRow key={order._id} className="group">
-                          <TableCell className="font-medium">
-                            {shortId(order._id)}
-                          </TableCell>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {stats?.salesByCategory.length ? (
+                  stats.salesByCategory.map((category, i) => (
+                    <div key={category.name} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{category.name}</span>
+                        <span className="text-muted-foreground">
+                          {category.value}%
+                        </span>
+                      </div>
+                      <Progress value={category.value} className="h-2">
+                        <div
+                          className={`h-full ${
+                            categoryColors[i % categoryColors.length]
+                          } rounded-full`}
+                          style={{ width: `${category.value}%` }}
+                        />
+                      </Progress>
+                    </div>
+                  ))
+                ) : (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No sales data yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Bottom Section: Orders & Products */}
+        <Tabs defaultValue="orders" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="orders">Recent Orders</TabsTrigger>
+            <TabsTrigger value="products">Top Products</TabsTrigger>
+          </TabsList>
+
+          {/* Orders Tab */}
+          <TabsContent value="orders" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Orders</CardTitle>
+                  <CardDescription>
+                    Latest {recentOrders.length} orders
+                  </CardDescription>
+                </div>
+                <Link href="/admin/orders">
+                  <Button variant="outline" size="sm">
+                    View All
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <TableSkeleton />
+                ) : recentOrders.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No orders yet.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="w-12.5">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentOrders.map((order) => {
+                        const customer =
+                          typeof order.user === 'object' && order.user
+                            ? order.user
+                            : null;
+                        return (
+                          <TableRow key={order._id} className="group">
+                            <TableCell className="font-medium">
+                              {shortId(order._id)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs bg-primary/10">
+                                    {customer ? initials(customer.name) : '??'}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">
+                                    {customer?.name || 'Unknown customer'}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer?.email || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <OrderStatusBadge status={order.orderStatus} />
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleDateString(
+                                'en-US',
+                                {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                }
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatTaka(order.totalAmount)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setViewOrder(order);
+                                  setOpen(true);
+                                }}
+                              >
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Products Tab */}
+          <TabsContent value="products" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Top Products</CardTitle>
+                  <CardDescription>
+                    Best performing products by units sold
+                  </CardDescription>
+                </div>
+                <Link href="/admin/products">
+                  <Button variant="outline" size="sm">
+                    View All
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <TableSkeleton />
+                ) : topProducts.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No products sold yet.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Units Sold</TableHead>
+                        <TableHead className="text-right">Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topProducts.map((product) => (
+                        <TableRow key={product._id}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="text-xs bg-primary/10">
-                                  {customer ? initials(customer.name) : '??'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">
-                                  {customer?.name || 'Unknown customer'}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {customer?.email || '—'}
-                                </span>
+                              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+                                {product.image ? (
+                                  <Image
+                                    src={product.image}
+                                    alt={product.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="40px"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-lg">
+                                    📦
+                                  </div>
+                                )}
                               </div>
+                              <span className="font-medium">
+                                {product.name}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <OrderStatusBadge status={order.orderStatus} />
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {new Date(order.createdAt).toLocaleDateString(
-                              'en-US',
-                              {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              }
-                            )}
+                          <TableCell className="text-right">
+                            {product.sales.toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatTaka(order.totalAmount)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setViewOrder(order);
-                                setOpen(true);
-                              }}
-                            >
-                              View
-                            </Button>
+                            {formatTaka(product.revenue)}
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Top Products</CardTitle>
-                <CardDescription>
-                  Best performing products by units sold
-                </CardDescription>
-              </div>
-              <Link href="/admin/products">
-                <Button variant="outline" size="sm">
-                  View All
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <TableSkeleton />
-              ) : topProducts.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No products sold yet.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Units Sold</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topProducts.map((product) => (
-                      <TableRow key={product._id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-muted">
-                              {product.image ? (
-                                <Image
-                                  src={product.image}
-                                  alt={product.name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="40px"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-lg">
-                                  📦
-                                </div>
-                              )}
-                            </div>
-                            <span className="font-medium">{product.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {product.sales.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatTaka(product.revenue)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Order details drawer */}
-      <Drawer
-        open={open}
-        onOpenChange={setOpen}
-        showSwipeHandle={isMobile}
-        swipeDirection={isMobile ? 'down' : 'right'}
-      >
-        <DrawerContent>
-          {viewOrder && (
-            <>
-              <DrawerHeader>
-                <DrawerTitle>{shortId(viewOrder._id)}</DrawerTitle>
-                <DrawerDescription>
-                  Order details for{' '}
-                  {typeof viewOrder.user === 'object' && viewOrder.user
-                    ? viewOrder.user.name
-                    : 'Customer'}
-                </DrawerDescription>
-              </DrawerHeader>
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Customer
-                    </p>
-                    <p className="text-sm font-medium">
-                      {typeof viewOrder.user === 'object' && viewOrder.user
-                        ? viewOrder.user.name
-                        : 'Unknown'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Email
-                    </p>
-                    <p className="text-sm">
-                      {typeof viewOrder.user === 'object' && viewOrder.user
-                        ? viewOrder.user.email
-                        : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Status
-                    </p>
-                    <OrderStatusBadge status={viewOrder.orderStatus} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Date
-                    </p>
-                    <p className="text-sm">
-                      {new Date(viewOrder.createdAt).toLocaleDateString(
-                        'en-US',
-                        {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        }
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Items
-                    </p>
-                    <p className="text-sm">
-                      {viewOrder.items.reduce((s, it) => s + it.quantity, 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Amount
-                    </p>
-                    <p className="text-sm font-medium">
-                      {formatTaka(viewOrder.totalAmount)}
-                    </p>
-                  </div>
-                </div>
-                {viewOrder.items.length > 0 && (
-                  <div className="rounded-lg border">
-                    <div className="divide-y">
-                      {viewOrder.items.map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between px-3 py-2 text-sm"
-                        >
-                          <span className="truncate">
-                            {item.quantity}x {item.name}
-                          </span>
-                          <span className="ml-2 shrink-0 font-medium">
-                            {formatTaka(item.price * item.quantity)}
-                          </span>
-                        </div>
                       ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Order details drawer */}
+        <Drawer
+          open={open}
+          onOpenChange={setOpen}
+          showSwipeHandle={isMobile}
+          swipeDirection={isMobile ? 'down' : 'right'}
+        >
+          <DrawerContent>
+            {viewOrder && (
+              <>
+                <DrawerHeader>
+                  <DrawerTitle>{shortId(viewOrder._id)}</DrawerTitle>
+                  <DrawerDescription>
+                    Order details for{' '}
+                    {typeof viewOrder.user === 'object' && viewOrder.user
+                      ? viewOrder.user.name
+                      : 'Customer'}
+                  </DrawerDescription>
+                </DrawerHeader>
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Customer
+                      </p>
+                      <p className="text-sm font-medium">
+                        {typeof viewOrder.user === 'object' && viewOrder.user
+                          ? viewOrder.user.name
+                          : 'Unknown'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Email
+                      </p>
+                      <p className="text-sm">
+                        {typeof viewOrder.user === 'object' && viewOrder.user
+                          ? viewOrder.user.email
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Status
+                      </p>
+                      <OrderStatusBadge status={viewOrder.orderStatus} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Date
+                      </p>
+                      <p className="text-sm">
+                        {new Date(viewOrder.createdAt).toLocaleDateString(
+                          'en-US',
+                          {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          }
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Items
+                      </p>
+                      <p className="text-sm">
+                        {viewOrder.items.reduce((s, it) => s + it.quantity, 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Amount
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatTaka(viewOrder.totalAmount)}
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
-              <DrawerFooter>
-                <DrawerClose>Close</DrawerClose>
-              </DrawerFooter>
-            </>
-          )}
-        </DrawerContent>
-      </Drawer>
-    </div>
+                  {viewOrder.items.length > 0 && (
+                    <div className="rounded-lg border">
+                      <div className="divide-y">
+                        {viewOrder.items.map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between px-3 py-2 text-sm"
+                          >
+                            <span className="truncate">
+                              {item.quantity}x {item.name}
+                            </span>
+                            <span className="ml-2 shrink-0 font-medium">
+                              {formatTaka(item.price * item.quantity)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <DrawerFooter>
+                  <DrawerClose>Close</DrawerClose>
+                </DrawerFooter>
+              </>
+            )}
+          </DrawerContent>
+        </Drawer>
+      </div>
     </>
   );
 }
