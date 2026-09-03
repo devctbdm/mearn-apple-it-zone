@@ -1,9 +1,7 @@
 // src/lib/axios.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://api-appleitzone-com.onrender.com/api';
+const API_URL = '/api'; // Use Next.js API proxy for consistent auth handling
 
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,
