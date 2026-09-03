@@ -82,15 +82,17 @@ app.set("etag", false);
 app.use(helmet());
 
 // 2. CORS (allow frontend and mobile apps)
-const allowedOrigins = (
-  process.env.CORS_ORIGINS || "http://localhost:3000"
-).split(",");
+const allowedOrigins = new Set([
+  "http://localhost:3000",
+  "https://mearn-apple-it-zone.vercel.app",
+  ...(process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+]);
 const corsOptions = {
   origin: (origin, callback) => {
     if (
       !origin ||
-      allowedOrigins.includes(origin) ||
-      allowedOrigins.includes("*")
+      allowedOrigins.has(origin) ||
+      allowedOrigins.has("*")
     ) {
       callback(null, true);
     } else {
