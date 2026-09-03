@@ -287,7 +287,7 @@ function StatCard({
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [smsBalance, setSmsBalance] = useState<number | null>(null);
+
   const [open, setOpen] = useState(false);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const isMobile = useIsMobile();
@@ -302,16 +302,6 @@ export default function AdminDashboardPage() {
         // leave stats null; UI shows empty states
       } finally {
         if (mounted) setLoading(false);
-      }
-    })();
-    (async () => {
-      try {
-        const { data } = await smsApi.getBalance();
-        if (mounted && data.success) {
-          setSmsBalance(data.balance ?? null);
-        }
-      } catch {
-        // SMS not configured; balance card shows '—'
       }
     })();
     return () => {
@@ -399,9 +389,9 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {loading
-            ? Array.from({ length: 5 }).map((_, i) => (
+            ? Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-32 rounded-xl" />
               ))
             : statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
