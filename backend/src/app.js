@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 // Import route files (with .js extension)
+import { healthCheck } from "./config/database.js";
+import { getRedis } from "./config/redis.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -21,11 +23,11 @@ import maintenanceRoutes from "./routes/maintenanceRoutes.js";
 import metaRoutes from "./routes/metaRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
-import popupOfferRoutes from "./routes/popupOfferRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import paymentSettingsRoutes from "./routes/paymentSettingsRoutes.js";
 import pcBuilderRoutes from "./routes/pcBuilderRoutes.js";
+import popupOfferRoutes from "./routes/popupOfferRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import promoRoutes from "./routes/promoRoutes.js";
 import questionRoutes from "./routes/questionRoutes.js";
@@ -36,8 +38,6 @@ import storeRoutes from "./routes/storeRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import visitorRoutes from "./routes/visitorRoutes.js";
-import { healthCheck } from "./config/database.js";
-import { getRedis } from "./config/redis.js";
 
 // Set DNS servers to avoid DNS resolution issues
 import { setServers } from "node:dns/promises";
@@ -85,8 +85,9 @@ app.use(helmet());
 const allowedOrigins = new Set([
   "http://localhost:3000",
   "https://mearn-apple-it-zone.vercel.app",
+  process.env.FRONTEND_URL?.trim(),
   ...(process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
-]);
+].filter(Boolean));
 const corsOptions = {
   origin: (origin, callback) => {
     if (
