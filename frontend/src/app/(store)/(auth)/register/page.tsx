@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth, useCart } from '@/store';
 import Link from 'next/link';
+import api from '@/lib/axios';
 
 const registerSchema = z
   .object({
@@ -106,20 +107,15 @@ function RegisterPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `${parsed.data.firstName} ${parsed.data.lastName}`,
-          email: parsed.data.email,
-          password: parsed.data.password,
-          phone: parsed.data.telephone,
-        }),
+      const res = await api.post('/auth/register', {
+        name: `${parsed.data.firstName} ${parsed.data.lastName}`,
+        email: parsed.data.email,
+        password: parsed.data.password,
+        phone: parsed.data.telephone,
       });
+      const data = res.data;
 
-      const data = await res.json();
-
-      if (!res.ok) {
+      if (!res.data.success) {
         throw new Error(data.message || 'Registration failed');
       }
 

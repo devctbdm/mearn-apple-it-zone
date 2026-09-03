@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { useAppStore, useAuth } from '@/store';
 import { TwoFactorStep } from '@/components/TwoFactorStep';
 import type { LoginResponse } from '@/lib/api';
+import api from '@/lib/axios';
 
 const ADMIN_ROLES = ['super_admin', 'admin'];
 
@@ -92,18 +93,13 @@ export default function AdminLoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: parsed.data.email,
-          password: parsed.data.password,
-        }),
+      const res = await api.post('/auth/login', {
+        identifier: parsed.data.email,
+        password: parsed.data.password,
       });
+      const data = res.data;
 
-      const data = await res.json();
-
-      if (!res.ok) {
+      if (!res.data.success) {
         throw new Error(data.message || 'Login failed');
       }
 
@@ -122,7 +118,7 @@ export default function AdminLoginPage() {
       const role = data.user?.role;
 
       if (!ADMIN_ROLES.includes(role || '')) {
-        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+        await api.post('/auth/logout').catch(() => {});
         setErrors({
           email:
             'This is the admin login. Only admin accounts can sign in here.',

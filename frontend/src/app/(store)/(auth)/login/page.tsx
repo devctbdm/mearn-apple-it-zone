@@ -20,6 +20,7 @@ import { useAppStore, useAuth, useCart } from '@/store';
 import Link from 'next/link';
 import { TwoFactorStep } from '@/components/TwoFactorStep';
 import type { LoginResponse } from '@/lib/api';
+import api from '@/lib/axios';
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(1, 'Email or phone is required').max(255),
@@ -90,15 +91,10 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
-      });
+      const res = await api.post('/auth/login', parsed.data);
+      const data = res.data;
 
-      const data = await res.json();
-
-      if (!res.ok) {
+      if (!res.data.success) {
         throw new Error(data.message || 'Login failed');
       }
 

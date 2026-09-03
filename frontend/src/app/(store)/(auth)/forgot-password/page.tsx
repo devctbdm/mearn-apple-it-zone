@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import api from '@/lib/axios';
 
 const forgotSchema = z.object({
   phone: z
@@ -42,17 +43,17 @@ export default function ForgotPasswordPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: parsed.data.phone }),
+      const res = await api.post('/auth/forgot-password', {
+        phone: parsed.data.phone,
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = res.data;
+      if (!res.data.success) {
         throw new Error(data.message || 'Something went wrong');
       }
       toast.success('OTP sent to your phone');
-      router.push(`/reset-password?phone=${encodeURIComponent(parsed.data.phone)}`);
+      router.push(
+        `/reset-password?phone=${encodeURIComponent(parsed.data.phone)}`
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -65,15 +66,17 @@ export default function ForgotPasswordPage() {
       <div className="mx-auto max-w-md">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold tracking-tight">Apple IT Zone</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Reset your password</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Reset your password
+          </p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Forgot password</CardTitle>
             <CardDescription>
-              Enter the phone number linked to your account. We&apos;ll text you a
-              verification code.
+              Enter the phone number linked to your account. We&apos;ll text you
+              a verification code.
             </CardDescription>
           </CardHeader>
           <CardContent>
